@@ -1,20 +1,23 @@
+<!-- 默认首页，当浏览器访问vue项目时，访问的其实是默认首页index.html -->
 <!DOCTYPE html>
 <html lang="zh-CN" id="html">
-<head>
-    <meta charset="UTF-8"/>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0"/>
-    <meta name="keywords" content="自动化测试运行系统, python开发">
-    <meta name="description" content="自动化测试运行系统, python开发">
-    <title>自动化测试运行系统</title>
-    <link rel="stylesheet" href="https://cdn.staticfile.org/ant-design-vue/3.2.20/antd.min.css">
-    <script src="https://cdn.staticfile.org/echarts/4.3.0/echarts.min.js"></script>
-    <script>
-    </script>
+    <head>
+        <meta charset="UTF-8"/>
+        <!-- 视口设置，使网页在移动设备上能自适应显示 -->
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0"/>
+        <title>自动化测试运行系统</title>
+        <!-- Ant Design Vue 是基于Vue3的企业级UI组件库,提供丰富的组件和高质量的设计体系，适用于中后台管理系统和复杂业务场景 -->
+        <!-- 浏览器会知道这个链接元素指向的资源是一个外部的样式表文件，浏览器将会加载这个样式表并应用于当前文档，从而影响文档的外观和布局 -->
+        <link rel="stylesheet" href="https://cdn.staticfile.org/ant-design-vue/3.2.20/antd.min.css">
+        <script>
+        </script>
+    </head>
 
-</head>
-
-<body>
-<div id="app"></div>
-<script type="module" src="/src/main.js"></script>
-</body>
+    <body>
+        <div id="app"></div>
+        <!-- 通过script标签，导入了main.js文件 -->
+        <script type="module" src="/src/main.js"></script>
+        <!-- echarts是开源可视化图表库，主要用于在 HTML 页面中展示各种数据可视化图表 -->
+        <!-- <script src="https://cdn.staticfile.org/echarts/4.3.0/echarts.min.js" defer></script> -->
+    </body>
 </html>

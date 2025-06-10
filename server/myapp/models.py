@@ -1,3 +1,7 @@
+'''
+    与数据库相关的内容
+'''
+
 from django.db import models
 
 

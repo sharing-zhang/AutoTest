@@ -1,10 +1,21 @@
 import { defineStore } from 'pinia';
-import {loginApi as adminLogin} from '/@/api/user';
+import {loginApi} from '/@/api/user';
 import { setToken, clearToken } from '/@/utils/auth';
 import { UserState } from './types';
 import {USER_ID, USER_NAME, USER_TOKEN, ADMIN_USER_ID,ADMIN_USER_NAME,ADMIN_USER_TOKEN} from "/@/store/constants";
 
+
+/**
+ * store简单来说就是数据仓库的意思，我们数据都放在store里面。
+ * 当然你也可以把它理解为一个公共组件，只不过该公共组件只存放数据，这些数据我们其它所有的组件都能够访问且可以修改。
+ * pinia中使用defineStore定义store
+ * 第一个参数是应用程序中 store 的唯一 id
+ * 第二个参数是是一个对象，store的配置项，比如配置store内的数据，修改数据的方法等等。
+ *
+ * 返回一个函数使用use+模块名命名
+ */
 export const useUserStore = defineStore('user', {
+  //固定写法，调用UserState中的各个属性进行初始化定义，undefined表示未定义
   state: (): UserState => ({
     user_id: undefined,
     user_name: undefined,
@@ -14,12 +25,17 @@ export const useUserStore = defineStore('user', {
     admin_user_name: undefined,
     admin_user_token: undefined,
   }),
+  //getters 是一种特殊的函数，用于处理和计算 state 中的数据,接收 state 作为参数，并返回一个新的值或对象。
   getters: {},
+  //使用Pinia的actions来调用接口可以更清晰地管理异步操作和状态变化
   actions: {
 
     // 管理员登录
     async adminLogin(loginForm) {
-      const result = await adminLogin(loginForm);
+      //await 用于等待一个Promise的解析结果。当执行到await表达式时，当前的async函数暂停执行，直到等待的Promise进入成功（resolve）或拒绝（reject）状态，然后继续执行后续代码
+      //如果await接收到的是一个reject，则实际返回为err异常，可使用try、catch结构来捕获由await抛出的异常
+      //比如用户名密码错误时，返回为err = {code:1，msg:'用户名或密码错误'}，遇到报错时则会直接终止运行，返回err
+      const result = await loginApi(loginForm);
       console.log('result==>', result)
 
       if(result.code === 0) {

@@ -1,3 +1,4 @@
+<!-- 登录页面 -->
 <template>
   <div id="userLayout">
     <div class="user-layout-header">
@@ -8,6 +9,7 @@
       <div class="main">
         <div class="main_right">
           <h2 class="sys_title">管理员登录</h2>
+          <!-- 创建表单，验证和提交表单数据 -->
           <a-form
               ref="myform"
               layout="vertical"
@@ -15,10 +17,10 @@
               :rules="data.rules"
               :hideRequiredMark="true"
           >
-            <a-form-item name="username" label="账号" :colon="false">
+            <a-form-item name="username" label="用户名" :colon="false">
               <a-input
                   size="large"
-                  placeholder="请输入登录账号"
+                  placeholder="请输入登录用户名"
                   v-model:value="data.loginForm.username"
                   @pressEnter="handleSubmit">
               </a-input>
@@ -87,14 +89,17 @@ const data = reactive({
   }
 })
 
+// 点击【登录】按钮的事件处理
 const handleSubmit = () => {
+  // 表单验证  validate触发表单验证，验证不通过会阻断后续操作
   myform.value?.validate().then(() => {
     handleLogin()
   }).catch(() => {
-    message.warn('不能为空')
+    message.warn('用户名与密码 不能为空')
   })
 }
 
+// 登录校验
 const handleLogin = () => {
   userStore.adminLogin({
     username: data.loginForm.username,
@@ -102,11 +107,12 @@ const handleLogin = () => {
   }).then(res=>{
     loginSuccess()
   }).catch(err=> {
-      message.warn(err.msg || '登录失败')
+      message.warn(err.msg || '登录失败，用户名或密码错误')
   })
 }
 
 const loginSuccess = () => {
+  //跳转
   router.push({ path: '/admin' })
   message.success('登录成功！')
 }
@@ -114,6 +120,10 @@ const loginSuccess = () => {
 
 </script>
 
+<!--
+  1. <style>标签内的CSS代码是用Less语法编写的,scoped可以确保样式的局部性，避免全局污染
+  2. #userLayout 表示布局组件，统一相似业务类型页面的布局，例如头部、底部和侧边栏等公共元素，这里指代登录页面的一些公共元素
+-->
 <style lang="less" scoped>
 
 #userLayout {
@@ -139,7 +149,7 @@ const loginSuccess = () => {
   .main-container {
     width: 100%;
     height: calc(100vh - 160px);
-    background-image: url('../images/admin-login-bg.jpg');
+    background-image: url('../assets/images/admin-login-bg.jpg');
     background-position: center;
     background-repeat: no-repeat;
     background-size: cover;
@@ -150,7 +160,7 @@ const loginSuccess = () => {
       top: 50%;
       display: flex;
       transform: translate(0, -50%);
-      border-radius: 8px;
+      border-radius: 10px;
       overflow: hidden;
       -webkit-box-shadow: 2px 2px 6px #aaa;
       box-shadow: 2px 2px 6px #aaa;

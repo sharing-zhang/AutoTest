@@ -1,4 +1,4 @@
-// 路由表
+// 定义路由关系，路由表
 const constantRouterMap = [
 
   {
