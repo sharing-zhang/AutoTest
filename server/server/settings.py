@@ -78,6 +78,7 @@ CORS_ALLOW_METHODS = (
     'VIEW',
 )
 
+#遇到OPTION预检不通过时，提示admintoken没法通过预检时，在下放配置即可
 CORS_ALLOW_HEADERS = (
     'accept',
     'accept-encoding',
@@ -89,7 +90,11 @@ CORS_ALLOW_HEADERS = (
     'user-agent',
     'x-csrftoken',
     'x-requested-with',
-    'X-CSRFToken'
+    'X-CSRFToken',
+    'ADMINTOKEN',
+    'TOKEN',
+    'admintoken',
+    'token'
 )
 
 # ROOT_URLCONF  根路由是哪个文件，根路由的位置可以变

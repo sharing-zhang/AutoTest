@@ -11,7 +11,7 @@
 
 1. env.development 开发环境配置
 2. eslintrc.js 代码规范化提示
-3. vite.config.js vite 开发服务器配置
+3. vite.1config.js vite 开发服务器配置
 
 #### 常见问题
 

@@ -10,7 +10,7 @@ enum URL {
     detail = '/api/thing/detail',
 }
 
-const listApi = async (params: any) => get<any>({ url: URL.list, params: params, data: {}, headers: {} });
+const listApi = async (params: any) => get<any>({ url: URL.list, params: params, data: {}, headers: {'Content-Type': 'application/x-www-form-urlencoded'} });
 const createApi = async (data: any) =>
     post<any>({ url: URL.create, params: {}, data: data, timeout:20000, headers: { 'Content-Type': 'multipart/form-data;charset=utf-8' } });
 const updateApi = async (params:any, data: any) =>

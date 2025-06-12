@@ -1,4 +1,5 @@
 <template>
+  <!-- a-layout创建响应式的布局，通常包含侧边栏、内容区等部分 -->
   <a-layout id="components-layout-demo-custom-trigger">
     <a-layout-header style="background: #fff; padding: 0">
       <div class="header">
@@ -76,6 +77,7 @@
         </a-menu>
       </a-layout-sider>
       <a-layout-content :style="{ margin: '16px 16px', minHeight: '200px' }">
+        <!-- 路由表中children会被渲染到这一块区域 -->
         <router-view/>
       </a-layout-content>
     </a-layout>

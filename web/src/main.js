@@ -25,5 +25,6 @@ app.use(Antd);
 app.use(router);
 app.use(piniaStore);
 app.use(bootstrap)
+
 //最后，我们将应用挂载到页面的 #app 元素上
 app.mount('#app');
