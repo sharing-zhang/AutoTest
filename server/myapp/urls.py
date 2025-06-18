@@ -7,6 +7,12 @@ urlpatterns = [
     # api
     path('admin/overview/count', views.admin.overview.count),
     path('admin/overview/sysInfo', views.admin.overview.sysInfo),
+    # scanUpdate资源扫描各项目详细信息页面接口路由,记得在views/admin/__init__.py也加上新增的路由
+    path('admin/scanUpdate/list', views.admin.scanUpdate.list_api),
+    path('admin/scanUpdate/detail', views.admin.scanUpdate.detail),
+    path('admin/scanUpdate/create', views.admin.scanUpdate.create),
+    path('admin/scanUpdate/update', views.admin.scanUpdate.update),
+    path('admin/scanUpdate/delete', views.admin.scanUpdate.delete),
     path('admin/thing/list', views.admin.thing.list_api),
     path('admin/thing/detail', views.admin.thing.detail),
     path('admin/thing/create', views.admin.thing.create),

@@ -14,6 +14,10 @@
       <a-layout-sider v-model="collapsed" collapsible >
         <a-menu style="overflow:auto; overflow-x: hidden;" v-model:selectedKeys="selectedKeys" theme="dark" mode="inline" @click="handleClick">
 
+          <a-menu-item key="scanUpdate">
+            <read-outlined/>
+            <span>资源扫描</span>
+          </a-menu-item>
           <a-menu-item key="thing">
             <database-outlined/>
             <span>学生管理</span>
@@ -90,6 +94,7 @@ import logo from '/@/assets/images/logo2.png'
 
 import {
   HomeOutlined,
+  ReadOutlined,
   AppstoreOutlined,
   FolderOutlined,
   UserOutlined,
@@ -105,6 +110,7 @@ import {
 import {ref} from 'vue';
 import {useUserStore} from "/@/store";
 
+//用户数据库
 const userStore = useUserStore();
 
 const selectedKeys = ref<any[]>([])
@@ -115,6 +121,7 @@ const route = useRoute()
 
 const handleClick = ({item, key, keyPath}) => {
   console.log('点击路由===>', key)
+  //导航到新的url中
   router.push({
     name: key,
   })

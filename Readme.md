@@ -55,7 +55,7 @@ npm install
 ```
 (3) 运行项目
 ```
-npm run dev
+npm run dev -- --port 8001
 ```
 
 #### 常见问题

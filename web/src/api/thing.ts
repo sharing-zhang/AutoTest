@@ -7,7 +7,7 @@ enum URL {
     create = '/myapp/admin/thing/create',
     update = '/myapp/admin/thing/update',
     delete = '/myapp/admin/thing/delete',
-    detail = '/api/thing/detail',
+    detail = '/myapp/admin/thing/detail',
 }
 
 const listApi = async (params: any) => get<any>({ url: URL.list, params: params, data: {}, headers: {'Content-Type': 'application/x-www-form-urlencoded'} });

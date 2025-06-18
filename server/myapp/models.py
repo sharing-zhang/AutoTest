@@ -61,6 +61,27 @@ class Classification(models.Model):
     class Meta:
         db_table = "b_classification"
 
+# # http://172.16.34.33:8001/admin/scanUpdate 链接下展示资源扫描各项目详细信息页面关联数据库声明的字段
+class ScanUpdate(models.Model):
+    STATUS_CHOICES = (
+        ('0', '可用'),
+        ('1', '删除'),
+    )
+    id = models.BigAutoField(primary_key=True)
+    projectname = models.CharField(max_length=30, blank=True, null=True)
+    description = models.CharField(max_length=60, blank=True, null=True)
+    versionnumber = models.CharField(max_length=20, blank=True, null=True)
+    # auto_now_add=True会导致时间变为只可读，导致无法修改
+    lastupdatetime = models.DateTimeField(auto_now_add=False, null=True)
+    lastupdates = models.CharField(max_length=60, blank=True, null=True)
+    director = models.CharField(max_length=20, blank=True, null=True)
+    remark = models.CharField(max_length=120, blank=True, null=True)
+    status = models.CharField(max_length=1, choices=STATUS_CHOICES, default='0')
+
+    class Meta:
+        # 关联的数据库
+        db_table = "b_scanUpdateProject"
+
 
 class Thing(models.Model):
     STATUS_CHOICES = (

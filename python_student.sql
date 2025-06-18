@@ -875,6 +875,33 @@ CREATE TABLE `b_tag`  (
 -- Records of b_tag
 -- ----------------------------
 
+
+-- ----------------------------
+-- Table structure for b_scanUpdateProject
+-- http://172.16.34.33:8001/admin/scanUpdate 链接下展示资源扫描各项目详细信息数据表
+-- 下方各键值依次代表：项目id、项目名、描述、版本号、更新时间、更新内容、负责人、备注、信息状态（删除）
+-- ----------------------------
+DROP TABLE IF EXISTS `b_scanUpdateProject`;
+CREATE TABLE `b_scanUpdateProject`  (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `projectname` varchar(30) CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL,
+  `description` varchar(60) CHARACTER SET utf8 COLLATE utf8_general_ci NULL DEFAULT NULL,
+  `versionnumber` varchar(20) CHARACTER SET utf8 COLLATE utf8_general_ci NULL DEFAULT NULL,
+  `lastupdatetime` datetime(6) NULL DEFAULT NULL,
+  `lastupdates` varchar(60) CHARACTER SET utf8 COLLATE utf8_general_ci NULL DEFAULT NULL,
+  `director` varchar(20) CHARACTER SET utf8 COLLATE utf8_general_ci NULL DEFAULT NULL,
+  `remark` varchar(120) CHARACTER SET utf8 COLLATE utf8_general_ci NULL DEFAULT NULL,
+  `status` varchar(1) CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL,
+  PRIMARY KEY (`id`) USING BTREE
+) ENGINE = InnoDB AUTO_INCREMENT = 11 CHARACTER SET = utf8 COLLATE = utf8_general_ci ROW_FORMAT = Dynamic;
+
+-- ----------------------------
+-- Records of b_scanUpdateProject 插入数据
+-- ----------------------------
+INSERT INTO `b_scanUpdateProject` VALUES (1, '国内资源更新扫描', '用于检测特定的国内项目资源更新情况，帮助预警资源更新内容，精准测试改动的内容模块'
+                                         , 'V250613183249', '2025-06-13 18:32:49.972572', '资源更新扫描新增运行弹窗交互', '翁勰', '详细运行规范可参考: https://alidocs.dingtalk.com/i/nodes/YndMj49yWjPGellDhzXoOrq7J3pmz5aA?utm_scene=team_space', '0');
+
+
 -- ----------------------------
 -- Table structure for b_thing
 -- ----------------------------

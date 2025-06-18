@@ -22,7 +22,7 @@ pip install -r requirements.txt -i https://mirrors.aliyun.com/pypi/simple
 ```
 运行项目
 ```
-python manage.py runserver
+python manage.py runserver 0.0.0.0:8000
 ```
 7. 后期维护改动
 
