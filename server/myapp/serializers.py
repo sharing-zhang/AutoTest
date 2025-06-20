@@ -1,7 +1,26 @@
 from rest_framework import serializers
 
-from myapp.models import ScanUpdate, Thing, Classification, Tag, User, Comment, Record, LoginLog, OpLog, Banner, \
+from myapp.models import ScanDevUpdate_scanResult, ScanUpdate, Thing, Classification, Tag, User, Comment, Record, LoginLog, OpLog, Banner, \
     Ad, Notice, ErrorLog, Address
+
+
+# serializers作用可以用来规定提交数据后返回的数据字段，这里就返回时间即可
+class ScanDevUpdate_scanResult_Serializer(serializers.ModelSerializer):
+    # format可以设置时间的格式，下面例子会输出如:2018-1-24 12:10:30
+    # required=False 设置非必填项
+    create_time = serializers.DateTimeField(format='%Y-%m-%d %H:%M:%S', required=False)
+
+    class Meta:
+        model = ScanDevUpdate_scanResult
+        fields = '__all__'
+
+class UpdateScanDevUpdate_scanResult_SerializerSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = ScanDevUpdate_scanResult
+        # 排除多对多字段
+        exclude = ()
+
 
 # serializers作用可以用来规定提交数据后返回的数据字段，这里就返回时间即可
 class ScanUpdateSerializer(serializers.ModelSerializer):

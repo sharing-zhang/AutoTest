@@ -43,7 +43,7 @@
             <span>
               <a @click="handleEdit(record)">编辑</a>
               <a-divider type="vertical" />
-              <a @click="handleEdit(record)">进入项目</a>
+              <a @click="handleClick(record)">进入项目</a>
             </span>
           </template>
         </template>
@@ -125,6 +125,7 @@ import { createApi, listApi, updateApi, deleteApi } from '/@/api/scanUpdate';
 import {BASE_URL} from "/@/store/constants";
 import { FileImageOutlined, VideoCameraOutlined } from '@ant-design/icons-vue';
 import dayjs from 'dayjs';
+import {useRouter} from "vue-router";
 
 const columns = reactive([
 
@@ -225,6 +226,7 @@ const modal = reactive({
     director: undefined,
     remark: undefined,
     status: undefined,
+    child_url_key: undefined,
   },
   rules: {
     projectname: [{ required: true, message: '请输入项目名', trigger: 'change' }],
@@ -292,35 +294,6 @@ const handleEdit = (record: any) => {
   }
 };
 
-const confirmDelete = (record: any) => {
-  console.log('delete', record);
-  deleteApi({ ids: record.id })
-      .then((res) => {
-        getDataList();
-      })
-      .catch((err) => {
-        message.error(err.msg || '操作失败');
-      });
-};
-
-const handleBatchDelete = () => {
-  console.log(data.selectedRowKeys);
-  if (data.selectedRowKeys.length <= 0) {
-    console.log('hello');
-    message.warn('请勾选删除项');
-    return;
-  }
-  deleteApi({ ids: data.selectedRowKeys.join(',') })
-      .then((res) => {
-        message.success('删除成功');
-        data.selectedRowKeys = [];
-        getDataList();
-      })
-      .catch((err) => {
-        message.error(err.msg || '操作失败');
-      });
-};
-
 const handleOk = () => {
   myform.value
       ?.validate()
@@ -384,6 +357,18 @@ const resetModal = () => {
 const hideModal = () => {
   modal.visile = false;
 };
+
+
+// 点击【进入项目】实现指定路由跳转
+const router = useRouter()
+const handleClick = (record: any) => {
+  console.log('点击路由===>', record.child_url_key)
+  //导航到新的url中
+  router.push({
+    name: record.child_url_key,
+  })
+}
+
 </script>
 
 <style scoped lang="less">

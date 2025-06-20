@@ -892,14 +892,34 @@ CREATE TABLE `b_scanUpdateProject`  (
   `director` varchar(20) CHARACTER SET utf8 COLLATE utf8_general_ci NULL DEFAULT NULL,
   `remark` varchar(120) CHARACTER SET utf8 COLLATE utf8_general_ci NULL DEFAULT NULL,
   `status` varchar(1) CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL,
+  `child_url_key` varchar(30) CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL,
   PRIMARY KEY (`id`) USING BTREE
 ) ENGINE = InnoDB AUTO_INCREMENT = 11 CHARACTER SET = utf8 COLLATE = utf8_general_ci ROW_FORMAT = Dynamic;
 
 -- ----------------------------
 -- Records of b_scanUpdateProject 插入数据
 -- ----------------------------
-INSERT INTO `b_scanUpdateProject` VALUES (1, '国内资源更新扫描', '用于检测特定的国内项目资源更新情况，帮助预警资源更新内容，精准测试改动的内容模块'
-                                         , 'V250613183249', '2025-06-13 18:32:49.972572', '资源更新扫描新增运行弹窗交互', '翁勰', '详细运行规范可参考: https://alidocs.dingtalk.com/i/nodes/YndMj49yWjPGellDhzXoOrq7J3pmz5aA?utm_scene=team_space', '0');
+INSERT INTO `b_scanUpdateProject` VALUES (1, '国内资源更新扫描', '用于检测特定的国内项目资源更新情况，帮助预警资源更新内容，精准测试改动的内容模块', 'V250613183249', '2025-06-13 18:32:49.972572', '资源更新扫描新增运行弹窗交互', '翁勰', '详细运行规范可参考:《自动化扫描流程规范》', '0','scanDevUpdate');
+INSERT INTO `b_scanUpdateProject` VALUES (2, '海外资源更新扫描', '用于检测特定的海外项目资源更新情况，帮助预警资源更新内容，精准测试改动的内容模块', 'V250609114953', '2025-06-09 11:49:53.000000', '更新海外资源路径表', '翁勰', '详细运行规范可参考:《自动化扫描流程规范》', '0','scanOvsUpdate');
+
+
+-- ----------------------------
+-- Table structure for b_scanUpdateProject
+-- http://172.16.34.33:8001/admin/scanUpdate/scanDevUpdate 链接下展示国内资源扫描详细信息数据表
+-- 下方各键值依次代表：项目id、资源扫描结果文件名、时间、负责人、备注、信息状态（删除）、文件内容
+-- ----------------------------
+DROP TABLE IF EXISTS `b_scanDevUpdate`;
+CREATE TABLE `b_scanDevUpdate`  (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `scandevresult_filename` varchar(120) CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL,
+  `scandevresult_time` datetime(6) NULL DEFAULT NULL,
+  `director` varchar(20) CHARACTER SET utf8 COLLATE utf8_general_ci NULL DEFAULT NULL,
+  `remark` varchar(120) CHARACTER SET utf8 COLLATE utf8_general_ci NULL DEFAULT NULL,
+  `status` varchar(1) CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL,
+  `scandevresult_content` LONGTEXT CHARACTER SET utf8 COLLATE utf8_general_ci NULL DEFAULT NULL,
+  PRIMARY KEY (`id`) USING BTREE
+) ENGINE = InnoDB AUTO_INCREMENT = 11 CHARACTER SET = utf8 COLLATE = utf8_general_ci ROW_FORMAT = Dynamic;
+
 
 
 -- ----------------------------
@@ -984,7 +1004,7 @@ CREATE TABLE `b_user`  (
 -- Records of b_user
 -- ----------------------------
 INSERT INTO `b_user` VALUES (1, 'admin', '78aafd3207ec4ef6d16f9fc07e95ebc3', '1', '0', NULL, '', NULL, NULL, NULL, NULL, '2023-08-08 16:25:07.934950', 0, NULL, 0, '21232f297a57a5a743894a0e4a801fc3', NULL);
-INSERT INTO `b_user` VALUES (2, 'admin123', '0192023a7bbd73250516f069df18b500', '3', '0', NULL, '', NULL, NULL, NULL, NULL, '2023-08-08 18:43:53.784289', 0, NULL, 0, '0192023a7bbd73250516f069df18b500', NULL);
+INSERT INTO `b_user` VALUES (2, 'admin123', '0192023a7bbd73250516f069df18b500', '1', '0', NULL, '', NULL, NULL, NULL, NULL, '2023-08-08 18:43:53.784289', 0, NULL, 0, '0192023a7bbd73250516f069df18b500', NULL);
 INSERT INTO `b_user` VALUES (3, 'testbbbb', '49af68ca42bddb1084e07e5e245e3f01', '3', '0', NULL, '', NULL, NULL, NULL, NULL, '2023-08-08 18:44:17.426767', 0, NULL, 0, NULL, NULL);
 
 -- ----------------------------

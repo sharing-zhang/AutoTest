@@ -6,9 +6,9 @@ from rest_framework.decorators import api_view, authentication_classes
 from myapp import utils
 from myapp.auth.authentication import AdminTokenAuthtication
 from myapp.handler import APIResponse
-from myapp.models import ScanUpdate
+from myapp.models import ScanDevUpdate_scanResult
 from myapp.permission.permission import isDemoAdminUser
-from myapp.serializers import ScanUpdateSerializer, UpdateScanUpdateSerializer
+from myapp.serializers import ScanDevUpdate_scanResult_Serializer, UpdateScanDevUpdate_scanResult_SerializerSerializer
 
 
 @api_view(['GET'])
@@ -17,12 +17,12 @@ def list_api(request):
         # keyword是当有搜索栏对应搜索内容时使用，没有搜索内容则为空
         keyword = request.GET.get("keyword", None)
         if keyword:
-            scanUpdates = ScanUpdate.objects.filter(name__contains=keyword).order_by('id')
+            scanupdates_scanresult = ScanDevUpdate_scanResult.objects.filter(name__contains=keyword).order_by('-scandevresult_time')
         else:
-            scanUpdates = ScanUpdate.objects.all().order_by('id')
+            scanupdates_scanresult = ScanDevUpdate_scanResult.objects.all().order_by('-scandevresult_time')
         # serializer: 将服务端的数据结构（如模型类对象）转换为客户端可接受的格式（如字典、JSON），
         # 同时也能将客户端的数据（如JSON）转换为服务端的数据结构。这种转换过程包括序列化（将数据转换为可传输的格式）和反序列化（将传输格式的数据还原为Python数据类型）
-        serializer = ScanUpdateSerializer(scanUpdates, many=True)
+        serializer = ScanDevUpdate_scanResult_Serializer(scanupdates_scanresult, many=True)
         return APIResponse(code=0, msg='查询成功', data=serializer.data)
 
 
@@ -31,13 +31,13 @@ def detail(request):
 
     try:
         pk = request.GET.get('id', -1)
-        scanUpdates = ScanUpdate.objects.get(pk=pk)
-    except ScanUpdate.DoesNotExist:
+        scanupdates_scanresult = ScanDevUpdate_scanResult.objects.get(pk=pk)
+    except ScanDevUpdate_scanResult.DoesNotExist:
         utils.log_error(request, '对象不存在')
         return APIResponse(code=1, msg='对象不存在')
 
     if request.method == 'GET':
-        serializer = ScanUpdateSerializer(scanUpdates)
+        serializer = ScanDevUpdate_scanResult_Serializer(scanupdates_scanresult)
         return APIResponse(code=0, msg='查询成功', data=serializer.data)
 
 
@@ -48,7 +48,7 @@ def create(request):
     if isDemoAdminUser(request):
         return APIResponse(code=1, msg='演示帐号无法操作')
 
-    serializer = ScanUpdateSerializer(data=request.data)
+    serializer = ScanDevUpdate_scanResult_Serializer(data=request.data)
     if serializer.is_valid():
         serializer.save()
         return APIResponse(code=0, msg='创建成功', data=serializer.data)
@@ -71,13 +71,13 @@ def update(request):
         # 在数据库中能否搜索到对应id，没有的话则为-1
         # pk‌：代表主键（Primary Key），是每个模型的主键字段。在大多数情况下，主键字段名为id
         pk = request.GET.get('id', -1)
-        scanUpdates = ScanUpdate.objects.get(pk=pk)
+        scanupdates_scanresult = ScanDevUpdate_scanResult.objects.get(pk=pk)
 
-    except ScanUpdate.DoesNotExist:
+    except ScanDevUpdate_scanResult.DoesNotExist:
         return APIResponse(code=1, msg='对象不存在')
 
-    serializer = UpdateScanUpdateSerializer(scanUpdates, data=request.data)
-    print(serializer)
+    serializer = UpdateScanDevUpdate_scanResult_SerializerSerializer(scanupdates_scanresult, data=request.data)
+
     if serializer.is_valid():
         serializer.save()
         return APIResponse(code=0, msg='项目信息更新成功', data=serializer.data)
@@ -98,7 +98,7 @@ def delete(request):
     try:
         ids = request.GET.get('ids')
         ids_arr = ids.split(',')
-        ScanUpdate.objects.filter(id__in=ids_arr).delete()
-    except ScanUpdate.DoesNotExist:
+        ScanDevUpdate_scanResult.objects.filter(id__in=ids_arr).delete()
+    except ScanDevUpdate_scanResult.DoesNotExist:
         return APIResponse(code=1, msg='对象不存在')
     return APIResponse(code=0, msg='删除成功')

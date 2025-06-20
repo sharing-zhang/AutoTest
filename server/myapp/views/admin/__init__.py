@@ -1,4 +1,5 @@
 from myapp.views.admin.scanUpdate import *
+from myapp.views.admin.scanDevUpdate import *
 from myapp.views.admin.thing import *
 from myapp.views.admin.classification import *
 from myapp.views.admin.tag import *

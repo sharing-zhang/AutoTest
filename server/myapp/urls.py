@@ -13,6 +13,13 @@ urlpatterns = [
     path('admin/scanUpdate/create', views.admin.scanUpdate.create),
     path('admin/scanUpdate/update', views.admin.scanUpdate.update),
     path('admin/scanUpdate/delete', views.admin.scanUpdate.delete),
+    # scanDevUpdate是国内资源扫描项目下的接口
+    path('admin/scanDevUpdate/scanResultlist', views.admin.scanDevUpdate.list_api),
+    path('admin/scanDevUpdate/scanResultcreate', views.admin.scanDevUpdate.create),
+    path('admin/scanDevUpdate/scanResultupdate', views.admin.scanDevUpdate.update),
+    path('admin/scanDevUpdate/scanResultdelete', views.admin.scanDevUpdate.delete),
+    path('admin/scanDevUpdate/scanResultdetail', views.admin.scanDevUpdate.detail),
+
     path('admin/thing/list', views.admin.thing.list_api),
     path('admin/thing/detail', views.admin.thing.detail),
     path('admin/thing/create', views.admin.thing.create),

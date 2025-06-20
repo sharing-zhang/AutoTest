@@ -42,7 +42,7 @@ mysql> source D:/xxx/xxx/xxx.sql;
 
 (5) 启动django服务。在server目录下执行：
 ```
-python manage.py runserver
+python manage.py runserver 0.0.0.0:8000
 ```
 
 #### 前端运行步骤
@@ -52,6 +52,7 @@ python manage.py runserver
 (2) 进入web目录下，安装依赖，执行:
 ```
 npm install 
+npm install element-plus --save
 ```
 (3) 运行项目
 ```

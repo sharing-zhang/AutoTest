@@ -17,14 +17,19 @@ import bootstrap from './core/bootstrap';
 import '/@/styles/reset.less';
 import '/@/styles/index.less';
 
+import ElementPlus from 'element-plus';
+import 'element-plus/dist/index.css';
+
 //Vue 应用的起点，所有组件、插件、路由等都需要通过这个实例进行注册和配置
 const app = createApp(App);
+
 
 //使用 .use() 方法安装插件
 app.use(Antd);
 app.use(router);
 app.use(piniaStore);
-app.use(bootstrap)
+app.use(bootstrap);
+app.use(ElementPlus)
 
 //最后，我们将应用挂载到页面的 #app 元素上
 app.mount('#app');

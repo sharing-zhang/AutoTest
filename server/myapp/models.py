@@ -77,10 +77,30 @@ class ScanUpdate(models.Model):
     director = models.CharField(max_length=20, blank=True, null=True)
     remark = models.CharField(max_length=120, blank=True, null=True)
     status = models.CharField(max_length=1, choices=STATUS_CHOICES, default='0')
+    child_url_key = models.CharField(max_length=30, blank=True, null=True)
 
     class Meta:
         # 关联的数据库
         db_table = "b_scanUpdateProject"
+
+# http://172.16.34.33:8001/admin/scanUpdate/scanDevUpdate 扫描结果页签下详细信息展示内容
+class ScanDevUpdate_scanResult(models.Model):
+    STATUS_CHOICES = (
+        ('0', '可用'),
+        ('1', '删除'),
+    )
+    id = models.BigAutoField(primary_key=True)
+    scandevresult_filename = models.CharField(max_length=120, blank=True, null=True)
+    # auto_now_add=True会导致时间变为只可读，导致无法修改
+    scandevresult_time = models.DateTimeField(auto_now_add=False, null=True)
+    director = models.CharField(max_length=20, blank=True, null=True)
+    remark = models.CharField(max_length=120, blank=True, null=True)
+    status = models.CharField(max_length=1, choices=STATUS_CHOICES, default='0')
+    scandevresult_content = models.TextField(blank=True, null=True)
+
+    class Meta:
+        # 关联的数据库
+        db_table = "b_scanDevUpdate"
 
 
 class Thing(models.Model):

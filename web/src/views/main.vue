@@ -20,12 +20,12 @@
           </a-menu-item>
           <a-menu-item key="thing">
             <database-outlined/>
-            <span>学生管理</span>
+            <span>自动化钓鱼</span>
           </a-menu-item>
-          <a-menu-item key="classification">
+          <!--<a-menu-item key="classification">
             <layout-outlined/>
             <span>班级管理</span>
-          </a-menu-item>
+          </a-menu-item>-->
           <!-- <a-menu-item key="tag">
             <tag-outlined/>
             <span>标签管理</span>
@@ -34,10 +34,10 @@
             <comment-outlined/>
             <span>评论管理</span>
           </a-menu-item> -->
-          <a-menu-item key="user">
+          <!--<a-menu-item key="user">
             <user-outlined/>
             <span>用户管理</span>
-          </a-menu-item>
+          </a-menu-item>-->
           <!-- <a-sub-menu>
             <template #icon>
               <folder-outlined/>
@@ -209,8 +209,4 @@ const handleLogout = () => {
   height: 100%;
 }
 
-//:deep(.ant-layout-sider-trigger) {
-//  background-color: #fff;
-//  height: 0px; // 设置0 隐藏
-//}
 </style>
