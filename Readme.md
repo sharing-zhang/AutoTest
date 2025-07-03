@@ -1,20 +1,10 @@
-> 基于python+django+vue.js开发的学生信息管理系统
+> 基于python+django+vue.js开发的自动化测试运行系统
 
 ### 功能介绍
 
 平台采用B/S结构，后端采用主流的Python语言进行开发，前端采用主流的Vue.js进行开发。
 
-功能包括：学生管理、班级管理、用户管理、日志管理、系统信息模块。
-
-
-### 演示地址
-
-http://student.gitapp.cn
-
-演示帐号：
-
-用户名：admin123
-密码：admin123
+功能包括：资源扫描、自动化钓鱼、日志管理、系统信息。
 
 ### 代码结构
 
@@ -29,9 +19,11 @@ http://student.gitapp.cn
 
 (2) 安装依赖。进入server目录下，执行 pip install -r requirements.txt
 
-(3) 安装mysql 5.7数据库，并创建数据库，命名为xxx，创建SQL如下：
+<font color=red size=4>注意：协同开发人员，只需执行上方两步即可，严禁执行下方3、4、5，否则会将数据库重构。</font>
+
+(3) 安装mysql 5.7数据库，并创建数据库，命名为xxx（自定义），创建SQL如下：
 ```
-CREATE DATABASE IF NOT EXISTS xxx DEFAULT CHARSET utf8 COLLATE utf8_general_ci
+CREATE DATABASE IF NOT EXISTS xxx（自定义） DEFAULT CHARSET utf8 COLLATE utf8_general_ci
 ```
 (4) 恢复xxx.sql数据。在mysql下依次执行如下命令：
 
@@ -40,7 +32,7 @@ mysql> use xxx;
 mysql> source D:/xxx/xxx/xxx.sql;
 ```
 
-(5) 启动django服务。在server目录下执行：
+(5) 在server目录下，启动django服务，执行命令：
 ```
 python manage.py runserver 0.0.0.0:8000
 ```
@@ -54,7 +46,7 @@ python manage.py runserver 0.0.0.0:8000
 npm install 
 npm install element-plus --save
 ```
-(3) 运行项目
+(3) 在server目录下，启动前端项目，执行命令：
 ```
 npm run dev -- --port 8001
 ```
@@ -73,8 +65,4 @@ npm run dev -- --port 8001
 
 建议使用国内镜像源安装
 
-
-### 付费咨询
-
-微信（lengqin1024）
 
