@@ -22,6 +22,10 @@
             <database-outlined/>
             <span>自动化钓鱼</span>
           </a-menu-item>
+          <a-menu-item key="plugin">
+            <tag-outlined/>
+            <span>插件管理</span>
+          </a-menu-item>
           <!--<a-menu-item key="classification">
             <layout-outlined/>
             <span>班级管理</span>
@@ -38,7 +42,7 @@
             <user-outlined/>
             <span>用户管理</span>
           </a-menu-item>-->
-          <!-- <a-sub-menu>
+          <a-sub-menu>
             <template #icon>
               <folder-outlined/>
             </template>
@@ -47,11 +51,11 @@
               <appstore-outlined/>
               <span>广告管理</span>
             </a-menu-item>
-            <a-menu-item key="notice">
+            <!--<a-menu-item key="notice">
               <appstore-outlined/>
               <span>通知公告</span>
-            </a-menu-item>
-          </a-sub-menu> -->
+            </a-menu-item>-->
+          </a-sub-menu>
           <a-sub-menu>
             <template #icon>
               <folder-outlined/>

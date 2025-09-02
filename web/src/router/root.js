@@ -21,6 +21,7 @@ const constantRouterMap = [
 
       { path: 'overview', name: 'overview', component: () => import('/@/views/overview.vue') },
       { path: 'thing', name: 'thing', component: () => import('/@/views/thing.vue') },
+      { path: 'plugin', name: 'plugin', component: () => import('/@/views/plugin.vue') },
       { path: 'comment', name: 'comment', component: () => import('/@/views/comment.vue') },
       { path: 'user', name: 'user', component: () => import('/@/views/user.vue') },
       { path: 'classification', name: 'classification', component: () => import('/@/views/classification.vue') },

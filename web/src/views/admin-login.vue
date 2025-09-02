@@ -54,7 +54,13 @@
     </div>
     <footer class="footer">
       <div class="copyright">
-        <span></span>
+        <img src="../assets/images/kuaile-dog.gif" width="80" height="80" style="float: right;">
+        <img src="../assets/images/kuaile-dog.gif" width="80" height="80" style="float: right;">
+        <img src="../assets/images/kuaile-dog.gif" width="80" height="80" style="float: right;">
+        <img src="../assets/images/kuaile-dog.gif" width="80" height="80" style="float: right;">
+        <img src="../assets/images/kuaile-dog.gif" width="80" height="80" style="float: right;">
+        <img src="../assets/images/kuaile-dog.gif" width="80" height="80" style="float: right;">
+        <img src="../assets/images/kuaile-dog.gif" width="80" height="80" style="float: right;">
       </div>
     </footer>
   </div>

@@ -46,7 +46,7 @@ python manage.py runserver 0.0.0.0:8000
 npm install 
 npm install element-plus --save
 ```
-(3) 在server目录下，启动前端项目，执行命令：
+(3) 在web目录下，启动前端项目，执行命令：
 ```
 npm run dev -- --port 8001
 ```
