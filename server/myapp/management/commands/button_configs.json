@@ -1,0 +1,28 @@
+
+[
+
+    {
+        "page_route": "/scanDevUpdate",
+        "script_name": "print_test",
+        "button_text": "测试按钮",
+        "position": "top-right",
+        "button_style": {
+            "type": "primary",
+            "size": "default"
+        }
+    },
+
+
+    {
+        "page_route": "/scanOvsUpdate",
+        "script_name": "print_test",
+        "button_text": "测试按钮2",
+        "position": "bottom-right",
+        "button_style": {
+            "type": "primary",
+            "size": "default"
+        }
+    }
+
+    
+]

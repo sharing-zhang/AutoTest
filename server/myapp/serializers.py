@@ -1,7 +1,7 @@
 from rest_framework import serializers
 
-from myapp.models import ScanDevUpdate_scanResult, ScanUpdate, Thing, Classification, Tag, User, Comment, Record, LoginLog, OpLog, Banner, \
-    Ad, Notice, ErrorLog, Address
+from myapp.models import ScanDevUpdate_scanResult, ScanUpdate, Thing, Classification, Tag, User, Comment, LoginLog, OpLog, \
+    Ad, Notice, ErrorLog, Script, TaskExecution, PageScriptConfig
 
 
 # serializers作用可以用来规定提交数据后返回的数据字段，这里就返回时间即可
@@ -112,10 +112,6 @@ class CommentSerializer(serializers.ModelSerializer):
         fields = ['id', 'content', 'comment_time', 'like_count', 'thing', 'user', 'title', 'username']
 
 
-class RecordSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Record
-        fields = '__all__'
 
 
 class LoginLogSerializer(serializers.ModelSerializer):
@@ -142,14 +138,6 @@ class ErrorLogSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 
-class BannerSerializer(serializers.ModelSerializer):
-    create_time = serializers.DateTimeField(format='%Y-%m-%d %H:%M:%S', required=False)
-    # extra
-    title = serializers.ReadOnlyField(source='thing.title')
-
-    class Meta:
-        model = Banner
-        fields = '__all__'
 
 
 class AdSerializer(serializers.ModelSerializer):
@@ -168,9 +156,23 @@ class NoticeSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 
-class AddressSerializer(serializers.ModelSerializer):
-    create_time = serializers.DateTimeField(format='%Y-%m-%d %H:%M:%S', required=False)
 
+class ScriptSerializer(serializers.ModelSerializer):
     class Meta:
-        model = Address
+        model = Script
+        fields = '__all__'
+
+class TaskExecutionSerializer(serializers.ModelSerializer):
+    script_name = serializers.CharField(source='script.name', read_only=True)
+    user_name = serializers.CharField(source='user.username', read_only=True)
+    
+    class Meta:
+        model = TaskExecution
+        fields = '__all__'
+
+class PageScriptConfigSerializer(serializers.ModelSerializer):
+    script = ScriptSerializer(read_only=True)
+    
+    class Meta:
+        model = PageScriptConfig
         fields = '__all__'

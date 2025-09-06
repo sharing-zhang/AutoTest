@@ -2,14 +2,14 @@
   <div>
     <!-- 使用脚本管理布局组件 -->
     <ScriptManagerLayout 
-      page-route="/scanDevUpdate"
+      page-route="/scanOvsUpdate"
       ref="scriptManager"
     >
       <el-tabs
       v-model="activeName"
       class="el-tabs__content"
       >
-        <el-tab-pane label="扫描结果" name="scanResult" >
+        <el-tab-pane label="海外扫描结果" name="scanResult" >
           <a-table
           size="middle"
           rowKey="scanResult_id"
@@ -36,7 +36,7 @@
             </template>
           </a-table>
         </el-tab-pane>
-        <el-tab-pane label="数据备份" name="dataBackup" >
+        <el-tab-pane label="海外数据备份" name="dataBackup" >
           <a-table
           size="middle"
           rowKey="scanResult_id"
@@ -55,7 +55,7 @@
           </a-table>
         </el-tab-pane>
         <el-tab-pane label="操作" name="configuration" >
-          功能操作区域 <!-- 补充功能操作区域 -->
+          海外资源操作区域 <!-- 海外资源功能操作区域 -->
         </el-tab-pane>
       </el-tabs>
 
@@ -74,7 +74,7 @@
           <a-form ref="myform" :label-col="{ style: { width: '120px'} }" :model="modal.form" :rules="modal.rules">
             <a-row :gutter="24">
               <a-col span="24">
-                <a-form-item label="文件名" name="scandevresult_filename">
+                <a-form-item label="海外扫描结果文件名" name="scandevresult_filename">
                   <a-input placeholder="请输入文件名" v-model:value="modal.form.scandevresult_filename" allowClear />
                 </a-form-item>
               </a-col>
@@ -110,7 +110,7 @@
         <!-- 根据结果类型显示不同的内容 -->
         <div v-if="scanResultContentDetail.form['result_type'] === 'script' || scanResultContentDetail.form['result_type'] === 'task'">
           <!-- 脚本执行结果显示 -->
-          <el-descriptions title="脚本执行信息" :column="2" border>
+          <el-descriptions title="海外资源脚本执行信息" :column="2" border>
             <el-descriptions-item label="脚本名称">
               {{ scanResultContentDetail.form['script_name'] || '未知' }}
             </el-descriptions-item>
@@ -132,7 +132,7 @@
           </el-descriptions>
           
           <!-- 脚本输出结果 -->
-          <el-divider content-position="left">脚本输出结果</el-divider>
+          <el-divider content-position="left">海外资源脚本输出结果</el-divider>
           <el-card v-if="scanResultContentDetail.form['script_output']" shadow="never" style="margin-bottom: 16px;">
             <template #header>
               <span style="color: #67C23A;">
@@ -192,10 +192,8 @@ import { ref, reactive, onMounted } from 'vue'
 // 进来页面后默认定位到扫描结果页面
 const activeName = ref('scanResult')
 
-
 // 扫描结果表格列配置
 const scanResultcolumns = reactive([
-
   {
     title: '序号',
     dataIndex: 'index',
@@ -204,7 +202,7 @@ const scanResultcolumns = reactive([
     width: 100
   },
   {
-    title: '资源扫描结果文件名',
+    title: '海外扫描结果文件名',
     dataIndex: 'scandevresult_filename',
     align: "center",
     key: 'scandevresult_filename',
@@ -265,7 +263,6 @@ const scanResultcolumns = reactive([
 
 // 数据备份表格列配置
 const dataBackupcolumns = reactive([
-
   {
     title: '序号',
     dataIndex: 'index',
@@ -274,7 +271,7 @@ const dataBackupcolumns = reactive([
     width: 100
   },
   {
-    title: '数据备份结果文件',
+    title: '海外数据备份结果文件',
     dataIndex: 'scanDevResult',
     align: "center",
     key: 'scanDevResult',
@@ -326,8 +323,6 @@ const data = reactive({
   page: 1,
 });
 
-
-
 // 编辑弹窗数据
 const modal = reactive({
   scanResult_visile: false,
@@ -354,14 +349,13 @@ const modal = reactive({
 const scanResultContentDetail = reactive({
   scanResultContentDetail_visile: false,
   scanResultContentDetail_editFlag: false,
-  title: '资源扫描结果',
+  title: '海外资源扫描结果',
   form: {
     id: undefined,
     scandevresult_content: undefined,
   },
   rules: {},
 });
-
 
 // 表单实例引用
 const myform = ref<FormInstance>();
@@ -408,7 +402,7 @@ const handleEdit = (record: any) => {
   resetModal();
   modal.scanResult_visile = true;
   modal.scanResult_editFlag = true;
-  modal.title = '编辑资源扫描结果文件信息';
+  modal.title = '编辑海外资源扫描结果文件信息';
   for (const key in modal.form) {
     modal.form[key] = undefined;
   }
@@ -476,13 +470,11 @@ const dataBackup_handleCancel = () => {
   scanResultContentDetail.scanResultContentDetail_visile = false;
 };
 
-
 // 恢复表单初始状态
 const resetModal = () => {
   myform.value?.resetFields();
   fileList.value = []
 };
-
 
 // 查看详情点击响应
 const handleClick = (record: any) => {
@@ -519,7 +511,6 @@ const bodystyle = {
   width: '1600px',
 }
 
-
 </script>
 
 <style scoped lang="less">
@@ -531,7 +522,6 @@ const bodystyle = {
   flex-direction: column;
   position: relative; /* 为绝对定位的按钮提供定位上下文 */
 }
-
 
 .table-operations {
   margin-bottom: 16px;
@@ -546,15 +536,12 @@ const bodystyle = {
   color: #6b778c;
   font-size: 32px;
   font-weight: 600;
-
 }
-
 
 ::v-deep .el-tabs__item {
   width: 90px !important;
   justify-content: center !important;
   padding: 0;
-
 }
 
 ::v-deep .el-tabs__item::after {
@@ -570,7 +557,6 @@ const bodystyle = {
 
 ::v-deep .el-tabs__active-bar {
   width: 90px !important;
-
 }
 
 ::v-deep .ant-table {
@@ -582,6 +568,4 @@ const bodystyle = {
 ::v-deep  .ant-modal-body {
   padding: 18px !important;
 }
-
-
 </style>

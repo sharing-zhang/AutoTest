@@ -16,6 +16,17 @@
           7.2 showSizeChanger：属性用于控制是否显示每页显示条数的选择器
 
       -->
+      
+      <!-- 操作按钮区域 -->
+      <div style="margin-bottom: 16px;">
+        <a-button type="primary" @click="handleAdd">
+          <template #icon>
+            <PlusOutlined />
+          </template>
+          新增项目
+        </a-button>
+      </div>
+      
       <a-table
         size="middle"
         rowKey="id"
@@ -111,6 +122,11 @@
                   <a-input placeholder="请输入备注" v-model:value="modal.form.remark" allowClear />
                 </a-form-item>
               </a-col>
+              <a-col span="24">
+                <a-form-item label="路由键" name="child_url_key">
+                  <a-input placeholder="请输入路由键(如: scanDevUpdate)" v-model:value="modal.form.child_url_key" allowClear />
+                </a-form-item>
+              </a-col>
             </a-row>
           </a-form>
         </div>
@@ -123,7 +139,7 @@
 import { FormInstance, message, SelectProps } from 'ant-design-vue';
 import { createApi, listApi, updateApi, deleteApi } from '/@/api/scanUpdate';
 import {BASE_URL} from "/@/store/constants";
-import { FileImageOutlined, VideoCameraOutlined } from '@ant-design/icons-vue';
+import { FileImageOutlined, VideoCameraOutlined, PlusOutlined } from '@ant-design/icons-vue';
 import dayjs from 'dayjs';
 import {useRouter} from "vue-router";
 
@@ -235,7 +251,8 @@ const modal = reactive({
     lastupdatetime: [{ required: true, message: '请输入最近更新日期', trigger: 'change' }],
     lastupdates: [{ required: true, message: '请输入最新更新内容', trigger: 'change' }],
     director: [{ required: true, message: '请输入负责人', trigger: 'change' }],
-    remark: [{ required: false, message: '请输入备注', trigger: 'change' }]
+    remark: [{ required: false, message: '请输入备注', trigger: 'change' }],
+    child_url_key: [{ required: true, message: '请输入路由键', trigger: 'change' }]
   },
 });
 
@@ -278,6 +295,18 @@ const onSearch = () => {
   getDataList();
 };
 
+// 新增项目
+const handleAdd = () => {
+  resetModal();
+  modal.visile = true;
+  modal.editFlag = false;
+  modal.title = '新增项目';
+  // 重置表单
+  for (const key in modal.form) {
+    modal.form[key] = undefined;
+  }
+};
+
 const handleEdit = (record: any) => {
   resetModal();
   modal.visile = true;
@@ -307,6 +336,7 @@ const handleOk = () => {
         formData.append('lastupdates', modal.form.lastupdates)
         formData.append('director', modal.form.director)
         formData.append('remark', modal.form.remark)
+        formData.append('child_url_key', modal.form.child_url_key)
         if (modal.editFlag) {
           submitting.value = true
           updateApi({

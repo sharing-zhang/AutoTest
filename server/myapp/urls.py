@@ -44,14 +44,6 @@ urlpatterns = [
     path('admin/tag/create', views.admin.tag.create),
     path('admin/tag/update', views.admin.tag.update),
     path('admin/tag/delete', views.admin.tag.delete),
-    path('admin/record/list', views.admin.record.list_api),
-    path('admin/record/create', views.admin.record.create),
-    path('admin/record/update', views.admin.record.update),
-    path('admin/record/delete', views.admin.record.delete),
-    path('admin/banner/list', views.admin.banner.list_api),
-    path('admin/banner/create', views.admin.banner.create),
-    path('admin/banner/update', views.admin.banner.update),
-    path('admin/banner/delete', views.admin.banner.delete),
     path('admin/ad/list', views.admin.ad.list_api),
     path('admin/ad/create', views.admin.ad.create),
     path('admin/ad/update', views.admin.ad.update),
@@ -74,5 +66,12 @@ urlpatterns = [
     path('admin/user/info', views.admin.user.info),
     path('admin/adminLogin', views.admin.user.admin_login),
 
+    # Celery任务相关接口
+    path('admin/celery/test-task', views.celery_views.run_test_task),
+    path('admin/celery/task-result', views.celery_views.get_task_result),
+    path('admin/celery/execute-script', views.celery_views.execute_script_task),
+    path('admin/celery/script-task-result', views.celery_views.get_script_task_result),
+    path('admin/celery/scripts', views.celery_views.list_scripts),
+    path('admin/celery/scripts/<int:script_id>', views.celery_views.get_script_detail),
 
 ]

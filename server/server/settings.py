@@ -41,6 +41,8 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'rest_framework',
     'corsheaders',  # 跨域
+    'django_celery_beat',  # Celery定时任务
+    'django_celery_results',  # Celery结果存储
     'myapp'
 ]
 
@@ -61,11 +63,11 @@ CORS_ORIGIN_ALLOW_ALL = True  # 允许跨域,允许所有IP访问，就不要设
 CORS_ALLOW_CREDENTIALS = True
 
 CSRF_TRUSTED_ORIGINS = [
-    'http://172.16.34.33:8001',#替换成自己的前端url
+    'http://192.168.1.20:8001',#替换成自己的前端url
 ]
 
 CORS_ORIGIN_WHITELIST = (
-'http://172.16.34.33:8001',#替换成自己的前端url
+'http://192.168.1.20:8001',#替换成自己的前端url
 )
 
 CORS_ALLOW_METHODS = (
@@ -128,7 +130,7 @@ WSGI_APPLICATION = 'server.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.mysql',
-        'NAME': 'fishingmaster',
+        'NAME': 'aotutest_db',
         'USER': 'root',
         'PASSWORD': '123456',
         'HOST': '127.0.0.1',
@@ -195,3 +197,48 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 #CORS_ALLOW_CREDENTIALS = True
 #CORS_ALLOW_ALL_ORIGINS = True
 #CORS_ALLOW_HEADERS = '*'
+
+# ========== Celery配置 ==========
+import os
+
+# Celery消息代理配置 (使用Redis)
+CELERY_BROKER_URL = 'redis://localhost:6379/0'
+
+# Celery结果后端配置
+CELERY_RESULT_BACKEND = 'django-db'
+
+# Celery缓存后端配置
+CELERY_CACHE_BACKEND = 'django-cache'
+
+# 任务序列化格式
+CELERY_TASK_SERIALIZER = 'json'
+
+# 结果序列化格式
+CELERY_RESULT_SERIALIZER = 'json'
+
+# 时区
+CELERY_TIMEZONE = TIME_ZONE
+
+# 接受的内容类型
+CELERY_ACCEPT_CONTENT = ['json']
+
+# 任务忽略结果
+CELERY_IGNORE_RESULT = False
+
+# 结果过期时间（秒）
+CELERY_RESULT_EXPIRES = 3600
+
+# 任务路由
+CELERY_TASK_ROUTES = {
+    'myapp.tasks.*': {'queue': 'default'},
+}
+
+# Worker配置
+CELERY_WORKER_PREFETCH_MULTIPLIER = 1
+CELERY_WORKER_MAX_TASKS_PER_CHILD = 1000
+
+# Beat调度器配置
+CELERY_BEAT_SCHEDULER = 'django_celery_beat.schedulers:DatabaseScheduler'
+
+# 启用UTC
+CELERY_ENABLE_UTC = False
