@@ -1,0 +1,52 @@
+{
+  "scanner_file.py": [
+    {
+      "name": "directory",
+      "type": "text",
+      "label": "目录路径",
+      "required": true,
+      "default": "C:\\temp",
+      "placeholder": "例如: C:\\temp 或 /home/user/documents"
+    },
+    {
+      "name": "file_extensions",
+      "type": "checkbox",
+      "label": "文件后缀名",
+      "options": [".txt", ".log", ".json", ".csv", ".xml", ".py", ".js", ".html", ".css", ".md"],
+      "required": false,
+      "multiple": true,
+      "default": [".txt", ".log"]
+    },
+    {
+      "name": "recursive",
+      "type": "switch",
+      "label": "递归扫描",
+      "required": false,
+      "default": true
+    },
+    {
+      "name": "max_depth",
+      "type": "number",
+      "label": "最大深度",
+      "required": false,
+      "default": 3,
+      "min": 0,
+      "max": 10
+    },
+    {
+      "name": "include_hidden",
+      "type": "switch",
+      "label": "包含隐藏文件",
+      "required": false,
+      "default": false
+    },
+    {
+      "name": "output_format",
+      "type": "select",
+      "label": "输出格式",
+      "options": ["list", "detailed", "tree"],
+      "required": false,
+      "default": "list"
+    }
+  ]
+}

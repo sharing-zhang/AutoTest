@@ -82,5 +82,11 @@ urlpatterns = [
     path('admin/celery/script-task-result', views.celery_views.get_script_task_result),
     path('admin/celery/scripts', views.celery_views.list_scripts),
     path('admin/celery/scripts/<int:script_id>', views.celery_views.get_script_detail),
+    
+    # 动态脚本配置管理接口
+    path('api/script-configs/', views.celery_views.get_script_configs),
+    path('api/execute-dynamic-script/', views.celery_views.execute_dynamic_script),
+    path('api/get-script-task-result/', views.celery_views.get_script_task_result),
+    path('api/reload-script-configs/', views.celery_views.reload_script_configs),
 
 ]

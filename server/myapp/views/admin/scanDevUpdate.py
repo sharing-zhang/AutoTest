@@ -17,7 +17,7 @@ def list_api(request):
         # keyword是当有搜索栏对应搜索内容时使用，没有搜索内容则为空
         keyword = request.GET.get("keyword", None)
         if keyword:
-            scanupdates_scanresult = ScanDevUpdate_scanResult.objects.filter(name__contains=keyword).order_by('-scandevresult_time')
+            scanupdates_scanresult = ScanDevUpdate_scanResult.objects.filter(scandevresult_filename__contains=keyword).order_by('-scandevresult_time')
         else:
             scanupdates_scanresult = ScanDevUpdate_scanResult.objects.all().order_by('-scandevresult_time')
         # serializer: 将服务端的数据结构（如模型类对象）转换为客户端可接受的格式（如字典、JSON），

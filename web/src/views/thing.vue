@@ -31,6 +31,15 @@
                   <a @click="handleEdit(record)">编辑</a>
                   <a-divider type="vertical" />
                   <a @click="handleClick(record)">查看详情</a>
+                  <a-divider type="vertical" />
+                  <a-popconfirm
+                    title="确定要删除这条记录吗？"
+                    ok-text="确定"
+                    cancel-text="取消"
+                    @confirm="handleDelete(record)"
+                  >
+                    <a style="color: #ff4d4f;">删除</a>
+                  </a-popconfirm>
                 </span>
               </template>
             </template>
@@ -55,7 +64,35 @@
           </a-table>
         </el-tab-pane>
         <el-tab-pane label="操作" name="configuration" >
-          功能操作区域 <!-- 补充功能操作区域 -->
+          <!-- 脚本执行说明 -->
+          <div class="operation-section">
+            <el-card shadow="never">
+              <template #header>
+                <div class="card-header">
+                  <span>脚本执行</span>
+                  <el-text type="info" size="small">点击页面右上角的脚本按钮执行自动化处理</el-text>
+                </div>
+              </template>
+              
+              <el-empty description="点击页面右上角的脚本按钮开始执行自动化任务">
+                <template #image>
+                  <el-icon size="60" color="#909399">
+                    <Document />
+                  </el-icon>
+                </template>
+                
+                <div class="operation-tips">
+                  <h4>使用说明：</h4>
+                  <ol>
+                    <li>在页面右上角找到脚本执行按钮</li>
+                    <li>点击按钮后，如果脚本需要参数会自动弹出参数配置界面</li>
+                    <li>填写必要的参数后点击执行</li>
+                    <li>执行完成后结果会自动显示在"扫描结果"标签页中</li>
+                  </ol>
+                </div>
+              </el-empty>
+            </el-card>
+          </div>
         </el-tab-pane>
       </el-tabs>
 
@@ -185,7 +222,7 @@
 import { FormInstance, message } from 'ant-design-vue';
 import { createApi, listApi, updateApi, deleteApi } from '/@/api/thing';
 import ScriptManagerLayout from '/@/components/ScriptManagerLayout.vue';
-import { SuccessFilled, CircleCloseFilled } from '@element-plus/icons-vue';
+import { SuccessFilled, CircleCloseFilled, Document } from '@element-plus/icons-vue';
 import dayjs from 'dayjs';
 import { ref, reactive, onMounted } from 'vue'
 
@@ -375,22 +412,24 @@ onMounted(() => {
 
 const getDataList = () => {
   data.loading = true;
+  console.log('正在调用API获取数据...');
   listApi({
     keyword: data.keyword,
   })
       .then((res) => {
         data.loading = false;
-        console.log(res);
+        console.log('API响应:', res);
+        console.log('返回的数据条数:', res.data ? res.data.length : 0);
         res.data.forEach((item: any, index: any) => {
           item.scandevresult_time = dayjs(item.scandevresult_time).format('YYYY-MM-DD HH:mm:ss');
           item.index = index + 1;
         });
         data.scanResult_dataList = res.data;
-        console.log(data.scanResult_dataList);
+        console.log('处理后的数据:', data.scanResult_dataList);
       })
       .catch((err) => {
         data.loading = false;
-        console.log(err);
+        console.log('API调用错误:', err);
       });
 }
 
@@ -501,6 +540,21 @@ const handleClick = (record: any) => {
   console.log(scanResultContentDetail.form['scandevresult_content'] )
 }
 
+// 删除记录
+const handleDelete = (record: any) => {
+  deleteApi({
+    ids: record.id
+  })
+    .then((res) => {
+      message.success('删除成功');
+      getDataList(); // 刷新数据列表
+    })
+    .catch((err) => {
+      console.log(err);
+      message.error(err.msg || '删除失败');
+    });
+};
+
 // 格式化JSON内容
 const formatJsonContent = (jsonStr: string) => {
   if (!jsonStr) return '';
@@ -518,6 +572,16 @@ const bodystyle = {
   overflowX:'auto',
   width: '1600px',
 }
+
+// 脚本执行成功后的回调处理
+// 注册数据刷新回调
+onMounted(() => {
+  // 当ScriptManagerLayout组件可用时注册回调
+  scriptManager.value?.onDataRefresh(() => {
+    getDataList(); // 刷新扫描结果数据
+    activeName.value = 'scanResult'; // 切换到扫描结果标签页
+  });
+});
 
 
 </script>
@@ -581,6 +645,54 @@ const bodystyle = {
 
 ::v-deep  .ant-modal-body {
   padding: 18px !important;
+}
+
+// 操作区域样式
+.operation-section {
+  padding: 16px;
+  
+  .card-header {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    
+    span:first-child {
+      font-size: 16px;
+      font-weight: 600;
+      color: #303133;
+    }
+  }
+  
+  :deep(.el-card__body) {
+    padding: 20px;
+  }
+}
+
+// 确保标签页内容区域有合适的内边距
+:deep(.el-tab-pane) {
+  min-height: 400px;
+}
+
+// 操作说明样式
+.operation-tips {
+  text-align: left;
+  max-width: 400px;
+  margin: 20px auto 0;
+  
+  h4 {
+    color: #303133;
+    margin-bottom: 12px;
+  }
+  
+  ol {
+    padding-left: 20px;
+    
+    li {
+      margin-bottom: 8px;
+      color: #606266;
+      line-height: 1.6;
+    }
+  }
 }
 
 

@@ -1,6 +1,7 @@
 import { ref, reactive } from 'vue'
 import { message } from 'ant-design-vue'
 import { listScriptsApi, executeScriptApi, getScriptTaskResultApi } from '/@/api/scanDevUpdate'
+import { BASE_URL } from '/@/store/constants'
 
 /**
  * 脚本管理组合式函数
@@ -93,20 +94,49 @@ export function useScriptManager(pageRoute: string) {
       return
     }
     
+    // 检查是否为动态脚本（在script_configs.json中有配置）
+    const isDynamicScript = script.name && script.name.endsWith('.py')
+    
     try {
       script.loading = true
-      message.info(`正在启动脚本 ${script.name} (方案1统一执行器)...`)
+      message.info(`正在启动脚本 ${script.name} ${isDynamicScript ? '(动态脚本)' : '(方案1统一执行器)'}...`)
       
-      // 方案1: 使用script_id和parameters，不再使用task_name
-      const executionData = {
-        script_id: script.id,
-        parameters: getDefaultParameters(task.parameters),
-        page_context: pageRoute
+      let executionData
+      if (isDynamicScript) {
+        // 动态脚本使用新的API
+        executionData = {
+          script_name: script.name,
+          parameters: getDefaultParameters(task.parameters),
+          page_context: pageRoute
+        }
+      } else {
+        // 传统脚本使用原有API
+        executionData = {
+          script_id: script.id,
+          parameters: getDefaultParameters(task.parameters),
+          page_context: pageRoute
+        }
       }
       
-      console.log('方案1执行数据:', executionData)
+      console.log('脚本执行数据:', executionData)
       
-      const response = await executeScriptApi(executionData)
+      let response
+      if (isDynamicScript) {
+        // 使用动态脚本API
+        response = await fetch(`${BASE_URL}/myapp/api/execute-dynamic-script/`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(executionData)
+        })
+        const data = await response.json()
+        response = { data }
+      } else {
+        // 使用传统脚本API
+        response = await executeScriptApi(executionData)
+      }
+      
       const data = response.data || response
       
       if (data && data.success) {
@@ -129,11 +159,23 @@ export function useScriptManager(pageRoute: string) {
         const taskId = (error as any).task_id
         const executionId = (error as any).execution_id
         const scriptName = (error as any).script_name || script.name
-        message.success(`${scriptName} 已启动，任务ID: ${taskId.substring(0, 8)}... (方案1)`)
+        message.success(`${scriptName} 已启动，任务ID: ${taskId.substring(0, 8)}...`)
         monitorTaskStatus(script, taskId, executionId)
       } else {
         console.error('执行脚本失败:', error)
-        message.error('执行脚本失败，请检查网络连接')
+        
+        // 处理动态脚本的参数验证错误
+        if (isDynamicScript && error && typeof error === 'object') {
+          const errorData = error as any
+          if (errorData.validation_errors && Array.isArray(errorData.validation_errors)) {
+            message.error(`参数验证失败: ${errorData.validation_errors.join(', ')}`)
+          } else {
+            message.error(errorData.error || '执行脚本失败，请检查网络连接')
+          }
+        } else {
+          message.error('执行脚本失败，请检查网络连接')
+        }
+        
         script.loading = false
       }
     }

@@ -36,6 +36,9 @@ from celery_app.celery import app as celery_app
 from ..models import Script, TaskExecution, PageScriptConfig, ScanDevUpdate_scanResult
 from ..serializers import ScriptSerializer, TaskExecutionSerializer, PageScriptConfigSerializer
 
+# 配置管理器
+from ..management.commands.script_config_manager import script_config_manager
+
 # 获取Celery任务日志器
 logger = get_task_logger(__name__)
 
@@ -700,3 +703,236 @@ def get_script_detail(request, script_id):
             'error': str(e),
             'message': '获取脚本详情失败'
         }, status=500)
+
+# ============================================================================
+# 动态脚本配置管理 API
+# ============================================================================
+
+@csrf_exempt
+@require_http_methods(["GET"])
+def get_script_configs(request):
+    """获取所有脚本的参数配置"""
+    try:
+        script_name = request.GET.get('script_name')
+        
+        if script_name:
+            # 获取单个脚本配置
+            config = script_config_manager.get_parameter_schema(script_name)
+            return JsonResponse({
+                'success': True,
+                'script_config': config
+            })
+        else:
+            # 获取所有脚本列表
+            all_scripts = script_config_manager.get_all_scripts()
+            scripts_info = []
+            
+            for script in all_scripts:
+                config = script_config_manager.get_script_config(script)
+                scripts_info.append({
+                    'script_name': script,
+                    'display_name': script.replace('.py', '').replace('_', ' ').title(),
+                    'parameter_count': len(config),
+                    'has_required_params': any(p.get('required', False) for p in config)
+                })
+            
+            return JsonResponse({
+                'success': True,
+                'scripts': scripts_info,
+                'total_count': len(scripts_info)
+            })
+            
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e),
+            'message': '获取脚本配置失败'
+        }, status=500)
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def execute_dynamic_script(request):
+    """执行动态配置的脚本"""
+    try:
+        data = json.loads(request.body) if request.body else {}
+        script_name = data.get('script_name')
+        parameters = data.get('parameters', {})
+        page_context = data.get('page_context', 'dynamic_execution')
+        
+        if not script_name:
+            return JsonResponse({
+                'success': False,
+                'error': '缺少script_name参数'
+            }, status=400)
+        
+        # 验证参数
+        validation_result = script_config_manager.validate_parameters(script_name, parameters)
+        
+        if not validation_result['valid']:
+            return JsonResponse({
+                'success': False,
+                'error': '参数验证失败',
+                'validation_errors': validation_result['errors']
+            }, status=400)
+        
+        # 使用验证后的参数
+        validated_params = validation_result['processed_params']
+        
+        # 构建脚本路径
+        script_path = os.path.join(settings.BASE_DIR, 'celery_app', script_name)
+        if not script_name.endswith('.py'):
+            script_path += '.py'
+        
+        # 验证脚本文件是否存在
+        if not os.path.exists(script_path):
+            return JsonResponse({
+                'success': False,
+                'error': f'脚本文件不存在: {script_name}'
+            }, status=404)
+        
+        # 为动态脚本创建或获取Script记录
+        script_record, created = Script.objects.get_or_create(
+            name=script_name,
+            defaults={
+                'description': f'动态脚本: {script_name}',
+                'script_path': script_path,
+                'script_type': 'data_processing',
+                'parameters_schema': {},
+                'visualization_config': {},
+                'is_active': True
+            }
+        )
+        
+        # 创建任务执行记录
+        task_execution = TaskExecution.objects.create(
+            task_id='',  # 先创建，稍后更新
+            script=script_record,
+            user_id=1,  # TODO: 从request中获取真实用户ID
+            page_context=page_context,
+            parameters=validated_params,
+            status='PENDING'
+        )
+        
+        # 启动脚本执行任务
+        celery_task = execute_dynamic_script_task.delay(
+            task_execution.id,
+            script_name,
+            script_path,
+            validated_params,
+            1,  # user_id
+            page_context
+        )
+        
+        # 更新任务ID
+        task_execution.task_id = celery_task.id
+        task_execution.save()
+        
+        return JsonResponse({
+            'success': True,
+            'task_id': celery_task.id,
+            'execution_id': task_execution.id,
+            'script_name': script_name,
+            'validated_parameters': validated_params,
+            'message': f'动态脚本 "{script_name}" 已启动执行',
+            'status': 'PENDING'
+        })
+        
+    except json.JSONDecodeError:
+        return JsonResponse({
+            'success': False,
+            'error': '请求数据格式错误'
+        }, status=400)
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e),
+            'message': '执行动态脚本失败'
+        }, status=500)
+
+@csrf_exempt  
+@require_http_methods(["POST"])
+def reload_script_configs(request):
+    """重新加载脚本配置"""
+    try:
+        script_config_manager.reload_config()
+        return JsonResponse({
+            'success': True,
+            'message': '脚本配置已重新加载',
+            'total_scripts': len(script_config_manager.get_all_scripts())
+        })
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e),
+            'message': '重新加载脚本配置失败'
+        }, status=500)
+
+# ============================================================================
+# 动态脚本执行任务
+# ============================================================================
+
+@shared_task(bind=True)
+def execute_dynamic_script_task(self, task_execution_id, script_name, script_path, parameters, user_id, page_context):
+    """动态脚本执行任务"""
+    task_execution = None
+    
+    try:
+        logger.info(f"开始执行动态脚本: task_id={self.request.id}, script={script_name}")
+        
+        # 获取任务记录
+        task_execution = TaskExecution.objects.get(id=task_execution_id)
+        task_execution.status = 'STARTED'
+        task_execution.started_at = timezone.now()
+        task_execution.save()
+        
+        logger.info(f"执行动态脚本: {script_name} ({script_path})")
+        
+        # 记录开始时间
+        start_time = timezone.now()
+        
+        # 执行脚本
+        result = run_script(script_path, parameters, page_context, script_name)
+        
+        # 计算执行时间
+        execution_time = (timezone.now() - start_time).total_seconds()
+        
+        # 更新任务状态
+        task_execution.status = 'SUCCESS'
+        task_execution.result = result
+        task_execution.execution_time = execution_time
+        task_execution.completed_at = timezone.now()
+        task_execution.save()
+        
+        logger.info(f"动态脚本执行成功: 耗时 {execution_time:.2f}s")
+        
+        return {
+            'status': 'success',
+            'result': result,
+            'execution_time': execution_time,
+            'script_name': script_name
+        }
+        
+    except Exception as exc:
+        error_message = str(exc)
+        error_traceback = traceback.format_exc()
+        
+        logger.error(f"动态脚本执行失败: {error_message}")
+        logger.error(f"错误堆栈: {error_traceback}")
+        
+        if task_execution:
+            task_execution.status = 'FAILURE'
+            task_execution.error_message = f"{error_message}\n\n{error_traceback}"
+            task_execution.completed_at = timezone.now()
+            task_execution.save()
+        
+        # 重试机制
+        if self.request.retries < 3:
+            logger.info(f"动态脚本任务重试: 第 {self.request.retries + 1} 次")
+            raise self.retry(exc=exc, countdown=60, max_retries=3)
+        
+        return {
+            'status': 'error',
+            'error': error_message,
+            'traceback': error_traceback,
+            'script_name': script_name
+        }
