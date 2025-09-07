@@ -9,9 +9,7 @@ enum URL {
     update = '/myapp/admin/scanDevUpdate/scanResultupdate',
     delete = '/myapp/admin/scanDevUpdate/scanResultdelete',
     detail = '/myapp/admin/scanDevUpdate/scanResultdetail',
-    // Celery任务接口
-    testTask = '/myapp/admin/celery/test-task',
-    taskResult = '/myapp/admin/celery/task-result',
+    // 方案1 Celery任务接口
     executeScript = '/myapp/admin/celery/execute-script',
     scriptTaskResult = '/myapp/admin/celery/script-task-result',
     listScripts = '/myapp/admin/celery/scripts',
@@ -26,9 +24,7 @@ const updateApi = async (params:any, data: any) =>
 const deleteApi = async (params: any) => post<any>({ url: URL.delete, params: params, headers: {} });
 const detailApi = async (params: any) => get<any>({ url: URL.detail, params: params, headers: {} });
 
-// Celery任务相关API
-const runTestTaskApi = async () => post<any>({ url: URL.testTask, params: {}, data: {}, headers: { 'Content-Type': 'application/json' } });
-const getTaskResultApi = async (taskId: string) => get<any>({ url: URL.taskResult, params: { task_id: taskId }, headers: {} });
+// 方案1任务相关API
 const getScriptTaskResultApi = async (taskId: string, executionId?: string) => {
   const params: any = { task_id: taskId };
   if (executionId) {
@@ -44,6 +40,5 @@ const getScriptDetailApi = async (scriptId: number) => get<any>({ url: `${URL.sc
 
 export { 
     listApi, createApi, updateApi, deleteApi, detailApi, 
-    runTestTaskApi, getTaskResultApi, getScriptTaskResultApi,
-    listScriptsApi, executeScriptApi, getScriptDetailApi 
+    getScriptTaskResultApi, listScriptsApi, executeScriptApi, getScriptDetailApi 
 };

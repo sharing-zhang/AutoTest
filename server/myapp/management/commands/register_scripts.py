@@ -131,18 +131,22 @@ class Command(BaseCommand):
             # 确定脚本类型
             script_type = self.determine_script_type(filename, analyzer.imports, content)
             
-            # 提取参数模式
-            parameters_schema = self.extract_parameters_schema(analyzer.tasks)
+            # 提取参数模式 - 支持方案1的参数提取
+            parameters_schema = self.extract_parameters_schema_v1(filename, content, analyzer.tasks)
+            
+            # 转换为相对路径 (相对于server目录)
+            relative_path = os.path.relpath(filepath, settings.BASE_DIR)
             
             return {
                 'name': filename.replace('.py', ''),
-                'description': module_docstring or f'自动发现的脚本: {filename}',
-                'script_path': filepath,
+                'description': module_docstring or f'方案1脚本: {filename}',
+                'script_path': relative_path,
                 'script_type': script_type,
                 'parameters_schema': parameters_schema,
                 'tasks': analyzer.tasks,
                 'functions': analyzer.functions,
-                'imports': analyzer.imports
+                'imports': analyzer.imports,
+                'is_v1_script': self.is_v1_script(content)
             }
             
         except Exception as e:
@@ -194,6 +198,105 @@ class Command(BaseCommand):
                         }
                 schema[task['name']] = task_schema
                 
+        return schema
+
+    def extract_parameters_schema_v1(self, filename, content, tasks):
+        """方案1专用：提取参数模式"""
+        # 预定义的脚本参数模式
+        predefined_schemas = {
+            'print_test_script': {
+                'greeting': {
+                    'type': 'string',
+                    'default': '你好！',
+                    'description': '问候语',
+                    'required': False
+                },
+                'author': {
+                    'type': 'string', 
+                    'default': '阿青',
+                    'description': '作者名称',
+                    'required': False
+                }
+            },
+            'example_script': {
+                'message': {
+                    'type': 'string',
+                    'default': 'Hello from example script!',
+                    'description': '要处理的消息',
+                    'required': False
+                },
+                'multiplier': {
+                    'type': 'integer',
+                    'default': 1,
+                    'description': '重复次数',
+                    'required': False
+                },
+                'delay': {
+                    'type': 'number',
+                    'default': 1,
+                    'description': '延迟时间(秒)',
+                    'required': False
+                }
+            }
+        }
+        
+        script_name = filename.replace('.py', '')
+        
+        # 如果有预定义的参数模式，使用它
+        if script_name in predefined_schemas:
+            return predefined_schemas[script_name]
+        
+        # 如果是方案1脚本，尝试从注释中提取参数
+        if self.is_v1_script(content):
+            return self.parse_v1_parameters_from_content(content)
+        
+        # 否则使用原有的任务参数提取
+        return self.extract_parameters_schema(tasks)
+
+    def is_v1_script(self, content):
+        """判断是否为方案1脚本"""
+        indicators = [
+            'SCRIPT_PARAMETERS',  # 环境变量获取参数
+            'get_script_parameters',  # 参数获取函数
+            'PAGE_CONTEXT',  # 页面上下文
+            'os.environ.get',  # 环境变量使用
+            'json.dumps(output'  # JSON输出
+        ]
+        
+        return any(indicator in content for indicator in indicators)
+
+    def parse_v1_parameters_from_content(self, content):
+        """从方案1脚本内容中解析参数"""
+        # 基本的参数解析逻辑
+        # 寻找 parameters.get('key', 'default') 模式
+        import re
+        
+        param_pattern = r"parameters\.get\(['\"](\w+)['\"],?\s*([^)]*)\)"
+        matches = re.findall(param_pattern, content)
+        
+        schema = {}
+        for param_name, default_value in matches:
+            # 尝试推断类型
+            param_type = 'string'
+            default_val = default_value.strip(' \'"')
+            
+            if default_val.isdigit():
+                param_type = 'integer'
+                default_val = int(default_val)
+            elif default_val.replace('.', '').isdigit():
+                param_type = 'number'
+                default_val = float(default_val)
+            elif default_val.lower() in ['true', 'false']:
+                param_type = 'boolean'
+                default_val = default_val.lower() == 'true'
+            
+            schema[param_name] = {
+                'type': param_type,
+                'default': default_val,
+                'description': f'脚本参数: {param_name}',
+                'required': False
+            }
+        
         return schema
 
     def register_script(self, script_info, force_update=False):

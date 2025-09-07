@@ -1,28 +1,59 @@
 
 [
-
     {
         "page_route": "/scanDevUpdate",
-        "script_name": "print_test",
-        "button_text": "测试按钮",
+        "script_name": "print_test_script",
+        "button_text": "运行Print测试",
         "position": "top-right",
+        "button_style": {
+            "type": "primary",
+            "size": "default"
+        },
+        "display_order": 1
+    },
+    {
+        "page_route": "/scanDevUpdate",
+        "script_name": "example_script",
+        "button_text": "运行示例脚本",
+        "position": "top-right",
+        "button_style": {
+            "type": "default",
+            "size": "default"
+        },
+        "display_order": 2
+    },
+    {
+        "page_route": "/scanOvsUpdate",
+        "script_name": "print_test_script",
+        "button_text": "运行Print测试",
+        "position": "bottom-right",
+        "button_style": {
+            "type": "primary",
+            "size": "default"
+        },
+        "display_order": 1
+    },
+
+    {
+        "page_route": "/thing",
+        "script_name": "test2",
+        "button_text": "test2",
+        "position": "bottom-right",
         "button_style": {
             "type": "primary",
             "size": "default"
         }
     },
 
-
+    
     {
         "page_route": "/scanOvsUpdate",
-        "script_name": "print_test",
-        "button_text": "测试按钮2",
+        "script_name": "test2",
+        "button_text": "test2",
         "position": "bottom-right",
         "button_style": {
             "type": "primary",
             "size": "default"
         }
     }
-
-    
 ]

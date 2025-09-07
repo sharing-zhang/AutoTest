@@ -1,27 +1,261 @@
 """
-Celery任务相关视图
+方案1 - 统一的Celery任务和视图管理
+整合了任务执行器和API接口，简化代码结构
 """
 from rest_framework.decorators import api_view
 from rest_framework import status
 import logging
 import json
+import subprocess
+import os
+import sys
+import traceback
+import signal
+import psutil
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
 from django.views.decorators.http import require_http_methods
 from django.utils import timezone
+from django.conf import settings
 
-# views.py
+# DRF相关导入
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.shortcuts import get_object_or_404
+
+# Celery相关导入
+from celery import shared_task
+from celery.utils.log import get_task_logger
 from celery.result import AsyncResult
-from ..models import Script, TaskExecution, PageScriptConfig, ScanDevUpdate_scanResult
-from myapp.tasks import execute_python_script
-from ..serializers import ScriptSerializer, TaskExecutionSerializer, PageScriptConfigSerializer
 from celery_app.celery import app as celery_app
+
+# 模型和序列化器
+from ..models import Script, TaskExecution, PageScriptConfig, ScanDevUpdate_scanResult
+from ..serializers import ScriptSerializer, TaskExecutionSerializer, PageScriptConfigSerializer
+
+# 获取Celery任务日志器
+logger = get_task_logger(__name__)
+
+# ============================================================================
+# 方案1 - 统一任务执行器 (原 tasks.py 内容)
+# ============================================================================
+
+@shared_task(bind=True)
+def execute_python_script(self, task_execution_id, script_id, parameters, user_id, page_context):
+    """方案1统一任务执行器 - 执行Python脚本任务"""
+    task_execution = None
+    process = None
+    
+    try:
+        logger.info(f"开始执行脚本任务: task_id={self.request.id}, script_id={script_id}")
+        
+        # 获取任务记录
+        task_execution = TaskExecution.objects.get(id=task_execution_id)
+        task_execution.status = 'STARTED'
+        task_execution.started_at = timezone.now()
+        task_execution.save()
+        
+        # 获取脚本配置
+        script = Script.objects.get(id=script_id)
+        logger.info(f"执行脚本: {script.name} ({script.script_path})")
+        
+        # 记录开始时间和资源使用情况
+        start_time = timezone.now()
+        process_info = psutil.Process()
+        initial_memory = process_info.memory_info().rss / 1024 / 1024  # MB
+        
+        # 执行脚本
+        result = run_script(script.script_path, parameters, page_context, script.name)
+        
+        # 计算执行时间和资源使用
+        execution_time = (timezone.now() - start_time).total_seconds()
+        final_memory = process_info.memory_info().rss / 1024 / 1024  # MB
+        memory_usage = final_memory - initial_memory
+        
+        # 更新任务状态
+        task_execution.status = 'SUCCESS'
+        task_execution.result = result
+        task_execution.execution_time = execution_time
+        task_execution.memory_usage = memory_usage
+        task_execution.completed_at = timezone.now()
+        task_execution.save()
+        
+        logger.info(f"脚本执行成功: 耗时 {execution_time:.2f}s, 内存使用 {memory_usage:.2f}MB")
+        
+        return {
+            'status': 'success',
+            'result': result,
+            'execution_time': execution_time,
+            'memory_usage': memory_usage,
+            'script_name': script.name
+        }
+        
+    except Exception as exc:
+        error_message = str(exc)
+        error_traceback = traceback.format_exc()
+        
+        logger.error(f"脚本执行失败: {error_message}")
+        logger.error(f"错误堆栈: {error_traceback}")
+        
+        if task_execution:
+            task_execution.status = 'FAILURE'
+            task_execution.error_message = f"{error_message}\n\n{error_traceback}"
+            task_execution.completed_at = timezone.now()
+            task_execution.save()
+        
+        # 清理进程
+        if process and process.poll() is None:
+            try:
+                process.terminate()
+                process.wait(timeout=5)
+            except:
+                pass
+        
+        # 重试机制
+        if self.request.retries < 3:
+            logger.info(f"任务重试: 第 {self.request.retries + 1} 次")
+            raise self.retry(exc=exc, countdown=60, max_retries=3)
+        
+        return {
+            'status': 'error',
+            'error': error_message,
+            'traceback': error_traceback,
+            'script_name': script.name if 'script' in locals() else 'unknown'
+        }
+
+def run_script(script_path, parameters, page_context, script_name):
+    """运行脚本的核心逻辑 - 方案1实现"""
+    # 验证脚本路径
+    if not os.path.exists(script_path):
+        raise FileNotFoundError(f"脚本文件不存在: {script_path}")
+    
+    # 确保脚本路径是绝对路径
+    if not os.path.isabs(script_path):
+        # 如果是相对路径，基于项目根目录解析
+        script_path = os.path.join(settings.BASE_DIR, script_path)
+    
+    logger.info(f"执行脚本文件: {script_path}")
+    
+    # 根据文件类型执行不同的处理
+    if script_path.endswith('.py'):
+        return run_python_file(script_path, parameters, page_context, script_name)
+    elif script_path.endswith('.sh'):
+        return run_shell_script(script_path, parameters, page_context, script_name)
+    else:
+        raise ValueError(f"不支持的脚本类型: {os.path.splitext(script_path)[1]}")
+
+def run_python_file(script_path, parameters, page_context, script_name):
+    """运行Python文件 - 方案1增强版"""
+    # 准备环境变量
+    env = os.environ.copy()
+    env['SCRIPT_PARAMETERS'] = json.dumps(parameters, ensure_ascii=False)
+    env['PAGE_CONTEXT'] = page_context
+    env['SCRIPT_NAME'] = script_name
+    env['EXECUTION_ID'] = str(timezone.now().timestamp())
+    
+    logger.info(f"准备执行Python脚本: {script_path}")
+    logger.info(f"参数: {parameters}")
+    
+    # 执行脚本
+    try:
+        result = subprocess.run(
+            [sys.executable, script_path],
+            capture_output=True,
+            text=True,
+            env=env,
+            timeout=540,  # 9分钟超时 (与Celery软限制对应)
+            cwd=os.path.dirname(script_path)
+        )
+        
+        logger.info(f"脚本执行完成，返回码: {result.returncode}")
+        
+        if result.returncode != 0:
+            error_msg = f"脚本执行失败 (返回码: {result.returncode})\nSTDERR: {result.stderr}\nSTDOUT: {result.stdout}"
+            logger.error(error_msg)
+            raise RuntimeError(error_msg)
+        
+        # 尝试解析JSON输出
+        try:
+            output_data = json.loads(result.stdout) if result.stdout.strip() else {}
+            logger.info(f"脚本输出解析成功: {type(output_data)}")
+        except json.JSONDecodeError as e:
+            logger.warning(f"脚本输出不是有效JSON，作为文本处理: {e}")
+            # 如果不是JSON，就作为普通文本处理
+            output_data = {
+                'type': 'text',
+                'content': result.stdout,
+                'stderr': result.stderr,
+                'message': '脚本执行完成，输出为文本格式'
+            }
+        
+        # 确保输出包含必要的元数据
+        if isinstance(output_data, dict):
+            output_data.setdefault('script_name', script_name)
+            output_data.setdefault('execution_time', timezone.now().isoformat())
+            if 'status' not in output_data:
+                output_data['status'] = 'success'
+        
+        return output_data
+        
+    except subprocess.TimeoutExpired:
+        error_msg = f"脚本执行超时 (超过540秒): {script_path}"
+        logger.error(error_msg)
+        raise RuntimeError(error_msg)
+    except Exception as e:
+        error_msg = f"执行脚本时发生异常: {e}"
+        logger.error(error_msg)
+        raise
+
+def run_shell_script(script_path, parameters, page_context, script_name):
+    """运行Shell脚本 - 方案1扩展支持"""
+    # 准备环境变量
+    env = os.environ.copy()
+    env['SCRIPT_PARAMETERS'] = json.dumps(parameters, ensure_ascii=False)
+    env['PAGE_CONTEXT'] = page_context
+    env['SCRIPT_NAME'] = script_name
+    
+    logger.info(f"准备执行Shell脚本: {script_path}")
+    
+    try:
+        # Windows下使用PowerShell，Linux/Mac使用bash
+        if os.name == 'nt':
+            cmd = ['powershell', '-ExecutionPolicy', 'Bypass', '-File', script_path]
+        else:
+            cmd = ['bash', script_path]
+        
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            env=env,
+            timeout=540,
+            cwd=os.path.dirname(script_path)
+        )
+        
+        if result.returncode != 0:
+            raise RuntimeError(f"Shell脚本执行失败: {result.stderr}")
+        
+        return {
+            'type': 'shell_output',
+            'content': result.stdout,
+            'stderr': result.stderr,
+            'script_name': script_name,
+            'status': 'success',
+            'message': 'Shell脚本执行完成'
+        }
+        
+    except subprocess.TimeoutExpired:
+        raise RuntimeError(f"Shell脚本执行超时: {script_path}")
+    except Exception as e:
+        logger.error(f"执行Shell脚本失败: {e}")
+        raise
+
+# ============================================================================
+# DRF ViewSets (原有的视图集)
+# ============================================================================
 
 class ScriptViewSet(viewsets.ModelViewSet):
     queryset = Script.objects.filter(is_active=True)
@@ -50,12 +284,20 @@ class TaskExecutionViewSet(viewsets.ModelViewSet):
     
     @action(detail=False, methods=['post'])
     def execute_script(self, request):
-        """执行脚本"""
+        """方案1 - 统一脚本执行接口"""
         script_id = request.data.get('script_id')
         parameters = request.data.get('parameters', {})
         page_context = request.data.get('page_context', '')
         
+        # 验证脚本存在
         script = get_object_or_404(Script, id=script_id, is_active=True)
+        
+        # 验证脚本路径
+        if not script.script_path:
+            return Response({
+                'error': '脚本路径未配置',
+                'code': 400
+            }, status=400)
         
         # 创建任务执行记录
         task_execution = TaskExecution.objects.create(
@@ -67,7 +309,7 @@ class TaskExecutionViewSet(viewsets.ModelViewSet):
             status='PENDING'
         )
         
-        # 启动Celery任务
+        # 启动方案1的统一任务执行器
         celery_task = execute_python_script.delay(
             task_execution.id,
             script_id,
@@ -83,8 +325,10 @@ class TaskExecutionViewSet(viewsets.ModelViewSet):
         return Response({
             'task_id': celery_task.id,
             'execution_id': task_execution.id,
+            'script_name': script.name,
+            'script_type': script.script_type,
             'status': 'started',
-            'message': '脚本开始执行'
+            'message': f'脚本 "{script.name}" 开始执行 (方案1)'
         })
     
     @action(detail=False, methods=['get'])
@@ -134,21 +378,21 @@ class TaskExecutionViewSet(viewsets.ModelViewSet):
         else:
             return Response({'error': '任务无法取消'}, status=400)
 
-# 动态脚本执行API
+# 方案1 - 脚本执行API (简化版)
 @csrf_exempt
 @require_http_methods(["POST"])
 def execute_script_task(request):
-    """执行脚本任务API"""
+    """方案1 - 统一脚本执行API"""
     try:
         data = json.loads(request.body) if request.body else {}
         script_id = data.get('script_id')
-        task_name = data.get('task_name')
         parameters = data.get('parameters', {})
+        page_context = data.get('page_context', 'api')
         
-        if not script_id or not task_name:
+        if not script_id:
             return JsonResponse({
                 'success': False,
-                'error': '缺少script_id或task_name参数'
+                'error': '缺少script_id参数'
             }, status=400)
         
         # 获取脚本配置
@@ -160,30 +404,43 @@ def execute_script_task(request):
                 'error': '脚本不存在或已禁用'
             }, status=404)
         
+        # 验证脚本路径
+        if not script.script_path:
+            return JsonResponse({
+                'success': False,
+                'error': '脚本路径未配置'
+            }, status=400)
+        
         # 创建任务执行记录
         task_execution = TaskExecution.objects.create(
             task_id='',  # 先创建，稍后更新
             script=script,
             user_id=1,  # TODO: 从request中获取真实用户ID
-            page_context=data.get('page_context', 'manual'),
+            page_context=page_context,
             parameters=parameters,
             status='PENDING'
         )
         
-        # 动态调用任务
-        from celery_app.celery import app as celery_app
-        task_result = celery_app.send_task(task_name, kwargs=parameters)
+        # 调用方案1的统一任务执行器
+        celery_task = execute_python_script.delay(
+            task_execution.id,
+            script_id,
+            parameters,
+            1,  # user_id
+            page_context
+        )
         
         # 更新任务ID
-        task_execution.task_id = task_result.id
+        task_execution.task_id = celery_task.id
         task_execution.save()
         
         return JsonResponse({
             'code': 200,
             'success': True,
-            'task_id': task_result.id,
+            'task_id': celery_task.id,
             'execution_id': task_execution.id,
-            'message': f'脚本 {script.name} 已启动执行',
+            'script_name': script.name,
+            'message': f'脚本 "{script.name}" 已启动执行 (方案1)',
             'status': 'PENDING'
         })
         
@@ -194,115 +451,9 @@ def execute_script_task(request):
             'message': '启动脚本执行失败'
         }, status=500)
 
-# 简单的测试任务API (保留向后兼容)
-@csrf_exempt
-@require_http_methods(["POST"])
-def run_test_task(request):
-    """运行测试任务API"""
-    try:
-        logging.info("Frontend requested to start debug_task")
-        # 启动celery任务
-        task = debug_task.delay()
-        logging.info(f"Debug task started with ID: {task.id}, status: {task.status}")
-        
-        return JsonResponse({
-            'code': 200,
-            'success': True,
-            'task_id': task.id,
-            'message': '测试任务已启动',
-            'status': 'PENDING'
-        })
-        
-    except Exception as e:
-        logging.exception(f"Error starting debug task: {e}")
-        return JsonResponse({
-            'success': False,
-            'error': str(e),
-            'message': '启动任务失败'
-        }, status=500)
+# 方案2测试任务已删除，请使用方案1的脚本执行接口
 
-@csrf_exempt
-@require_http_methods(["GET"])
-def get_task_result(request):
-    """获取任务结果API"""
-    task_id = request.GET.get('task_id')
-    logging.info(f"Frontend requested task status for task_id: {task_id}")
-    
-    if not task_id:
-        return JsonResponse({
-            'success': False,
-            'error': '缺少task_id参数'
-        }, status=400)
-    
-    try:
-        # 使用正确的Celery app实例获取任务结果
-        result = AsyncResult(task_id, app=celery_app)
-        logging.info(f"AsyncResult for {task_id}: status={result.status}, ready={result.ready()}, successful={result.successful()}")
-        
-        response_data = {
-            'code': 200,
-            'task_id': task_id,
-            'status': result.status,
-            'ready': result.ready()
-        }
-        
-        if result.ready():
-            if result.successful():
-                task_result = result.result
-                response_data.update({
-                    'code': 200,
-                    'success': True,
-                    'result': task_result
-                })
-                logging.info(f"Task {task_id} is successful. Result: {task_result}")
-                
-                # 如果任务成功，将结果存储到数据库
-                if isinstance(task_result, dict) and task_result.get('status') == 'success':
-                    try:
-                        # 创建扫描结果记录
-                        scan_result = ScanDevUpdate_scanResult.objects.create(
-                            scandevresult_filename=f"测试任务结果_{task_id[:8]}.json",
-                            scandevresult_time=timezone.now(),
-                            director="系统自动",
-                            remark=f"Celery测试任务执行结果",
-                            scandevresult_content=json.dumps(task_result, ensure_ascii=False, indent=2),
-                            status='0',
-                            # 新增字段
-                            result_type='task',
-                            script_name='hellowrld',
-                            task_id=task_id,
-                            script_output=task_result.get('message', ''),
-                            error_message=task_result.get('error', '') if task_result.get('status') == 'error' else None
-                        )
-                        response_data['saved_to_db'] = True
-                        response_data['db_record_id'] = scan_result.id
-                        logging.info(f"Task result for {task_id} saved to DB as ScanDevUpdate_scanResult ID: {scan_result.id}")
-                    except Exception as db_error:
-                        response_data['db_save_error'] = str(db_error)
-                        logging.error(f"Failed to save task result for {task_id} to DB: {db_error}")
-                        
-            else:
-                response_data.update({
-                    'success': False,
-                    'error': str(result.result)
-                })
-                logging.warning(f"Task {task_id} is ready but not successful. Error: {result.result}")
-        else:
-            response_data.update({
-                'success': None,
-                'message': '任务正在执行中...'
-            })
-            logging.info(f"Task {task_id} is not ready yet. Status: {result.status}")
-            
-        return JsonResponse(response_data)
-        
-    except Exception as e:
-        logging.exception(f"Error getting task status for {task_id}: {e}")
-        return JsonResponse({
-            'success': False,
-            'error': str(e),
-            'message': '获取任务状态失败'
-        }, status=500)
+# 方案2通用任务结果API已删除，请使用 get_script_task_result
 
 # 动态脚本任务结果获取API
 @csrf_exempt
@@ -383,7 +534,7 @@ def get_script_task_result(request):
                             script_name=script_name,
                             task_id=task_id,
                             execution_time=task_execution.execution_time if task_execution else None,
-                            script_output=task_result.get('message', ''),
+                            script_output=task_result.get('message', '') or (task_result.get('result', {}).get('message', '') if isinstance(task_result.get('result'), dict) else ''),
                             error_message=task_result.get('error', '') if task_result.get('status') == 'error' else None
                         )
                         response_data['saved_to_db'] = True
@@ -428,11 +579,11 @@ def get_script_task_result(request):
             'message': '获取动态脚本任务结果失败'
         }, status=500)
 
-# 脚本管理API
+# 方案1 - 脚本管理API
 @csrf_exempt
 @require_http_methods(["GET"])
 def list_scripts(request):
-    """获取脚本列表API"""
+    """方案1 - 获取脚本列表API"""
     try:
         page_route = request.GET.get('page_route')
         script_type = request.GET.get('script_type')
@@ -449,35 +600,20 @@ def list_scripts(request):
                 'name': script.name,
                 'description': script.description,
                 'script_type': script.script_type,
+                'script_path': script.script_path,
                 'parameters_schema': script.parameters_schema,
                 'created_at': script.created_at.isoformat(),
                 'tasks': []
             }
             
-            # 从参数模式中提取任务信息
-            if script.parameters_schema and isinstance(script.parameters_schema, dict):
-                for task_name, task_params in script.parameters_schema.items():
-                    script_data['tasks'].append({
-                        'name': task_name,
-                        'full_name': f'celery_app.{script.name}.{task_name}',
-                        'parameters': task_params
-                    })
-            else:
-                # 如果没有参数模式，根据脚本名称添加实际存在的任务
-               
-                if script.name == 'print_test':
-                    script_data['tasks'].append({
-                        'name': 'hello_task',
-                        'full_name': 'celery_app.print_test.hello_task',
-                        'parameters': {}
-                    })
-                else:
-                    # 其他脚本的默认处理
-                    script_data['tasks'].append({
-                        'name': 'default_task',
-                        'full_name': f'celery_app.{script.name}.default_task',
-                        'parameters': {}
-                    })
+            # 方案1: 每个脚本只有一个"统一执行任务"
+            # 实际的参数来自parameters_schema
+            script_data['tasks'].append({
+                'name': 'unified_execution',
+                'full_name': f'方案1统一执行器.{script.name}',
+                'parameters': script.parameters_schema or {},
+                'description': f'通过方案1统一执行器运行 {script.name}'
+            })
             
             scripts.append(script_data)
         
@@ -504,7 +640,8 @@ def list_scripts(request):
             'code': 200,
             'success': True,
             'scripts': scripts,
-            'page_configs': page_configs
+            'page_configs': page_configs,
+            'execution_method': 'scheme_1_unified_executor'
         })
         
     except Exception as e:

@@ -371,6 +371,14 @@ const scriptManager = ref();
 
 onMounted(() => {
   getDataList();
+  
+  // 注册脚本执行完成后的数据刷新回调
+  if (scriptManager.value) {
+    scriptManager.value.onDataRefresh(() => {
+      console.log('脚本执行完成，刷新扫描结果数据...')
+      getDataList();
+    });
+  }
 });
 
 const getDataList = () => {

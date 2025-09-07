@@ -85,7 +85,7 @@ export function useScriptManager(pageRoute: string) {
   }
 
   /**
-   * 执行脚本任务
+   * 执行脚本任务 - 方案1版本
    */
   const executeScript = async (script: any, task: any) => {
     if (!script || !task) {
@@ -95,14 +95,16 @@ export function useScriptManager(pageRoute: string) {
     
     try {
       script.loading = true
-      message.info(`正在启动脚本 ${script.name} - ${task.name}...`)
+      message.info(`正在启动脚本 ${script.name} (方案1统一执行器)...`)
       
+      // 方案1: 使用script_id和parameters，不再使用task_name
       const executionData = {
         script_id: script.id,
-        task_name: task.full_name,
         parameters: getDefaultParameters(task.parameters),
         page_context: pageRoute
       }
+      
+      console.log('方案1执行数据:', executionData)
       
       const response = await executeScriptApi(executionData)
       const data = response.data || response
@@ -110,7 +112,8 @@ export function useScriptManager(pageRoute: string) {
       if (data && data.success) {
         const taskId = data.task_id
         const executionId = data.execution_id
-        message.success(`${script.name} 已启动，任务ID: ${taskId.substring(0, 8)}...`)
+        const scriptName = data.script_name || script.name
+        message.success(`${scriptName} 已启动，任务ID: ${taskId.substring(0, 8)}... (方案1)`)
         
         // 监控任务状态
         monitorTaskStatus(script, taskId, executionId)
@@ -125,7 +128,8 @@ export function useScriptManager(pageRoute: string) {
         console.log('检测到成功响应被当作异常处理，进行修正...')
         const taskId = (error as any).task_id
         const executionId = (error as any).execution_id
-        message.success(`${script.name} 已启动，任务ID: ${taskId.substring(0, 8)}...`)
+        const scriptName = (error as any).script_name || script.name
+        message.success(`${scriptName} 已启动，任务ID: ${taskId.substring(0, 8)}... (方案1)`)
         monitorTaskStatus(script, taskId, executionId)
       } else {
         console.error('执行脚本失败:', error)
@@ -158,10 +162,19 @@ export function useScriptManager(pageRoute: string) {
               message.info(`执行结果: ${taskData.result.message}`)
             }
             
-            // 触发数据刷新事件
-            emitRefreshData()
+            // 延迟触发数据刷新，确保数据库已经完全保存
+            setTimeout(() => {
+              console.log('脚本执行成功，自动刷新数据列表...')
+              emitRefreshData()
+            }, 1000)
           } else {
             message.error(`${script.name} 执行失败: ${taskData.error || '未知错误'}`)
+            
+            // 即使失败也刷新数据，可能有部分结果需要显示
+            setTimeout(() => {
+              console.log('脚本执行结束（失败），刷新数据列表...')
+              emitRefreshData()
+            }, 500)
           }
         } else if (attempts >= maxAttempts) {
           script.loading = false
@@ -184,18 +197,27 @@ export function useScriptManager(pageRoute: string) {
     if (error && typeof error === 'object' && error.success === true) {
       const taskData = error
       
-      if (taskData && taskData.ready) {
-        script.loading = false
-        
-        if (taskData.success) {
-          message.success(`${script.name} 执行成功！`)
-          if (taskData.result && taskData.result.message) {
-            message.info(`执行结果: ${taskData.result.message}`)
+        if (taskData && taskData.ready) {
+          script.loading = false
+          
+          if (taskData.success) {
+            message.success(`${script.name} 执行成功！`)
+            if (taskData.result && taskData.result.message) {
+              message.info(`执行结果: ${taskData.result.message}`)
+            }
+            // 延迟触发数据刷新，确保数据库已经完全保存
+            setTimeout(() => {
+              console.log('脚本执行成功，自动刷新数据列表...')
+              emitRefreshData()
+            }, 1000)
+          } else {
+            message.error(`${script.name} 执行失败: ${taskData.error || '未知错误'}`)
+            // 即使失败也刷新数据，可能有部分结果需要显示
+            setTimeout(() => {
+              console.log('脚本执行结束（失败），刷新数据列表...')
+              emitRefreshData()
+            }, 500)
           }
-          emitRefreshData()
-        } else {
-          message.error(`${script.name} 执行失败: ${taskData.error || '未知错误'}`)
-        }
       } else if (attempts >= maxAttempts) {
         script.loading = false
         message.warning(`${script.name} 任务查询超时`)

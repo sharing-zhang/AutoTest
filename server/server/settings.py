@@ -230,7 +230,7 @@ CELERY_RESULT_EXPIRES = 3600
 
 # 任务路由
 CELERY_TASK_ROUTES = {
-    'myapp.tasks.*': {'queue': 'default'},
+    'myapp.views.celery_views.*': {'queue': 'default'},
 }
 
 # Worker配置

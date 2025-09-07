@@ -1,6 +1,14 @@
-from django.urls import path
+from django.urls import path, include
+from rest_framework.routers import DefaultRouter
 
 from myapp import views
+from myapp.views import celery_views
+
+# 创建DRF路由器
+router = DefaultRouter()
+router.register(r'scripts', celery_views.ScriptViewSet, basename='script')
+router.register(r'page-configs', celery_views.PageScriptConfigViewSet, basename='page-config') 
+router.register(r'task-executions', celery_views.TaskExecutionViewSet, basename='task-execution')
 
 app_name = 'myapp'
 urlpatterns = [
@@ -66,9 +74,10 @@ urlpatterns = [
     path('admin/user/info', views.admin.user.info),
     path('admin/adminLogin', views.admin.user.admin_login),
 
-    # Celery任务相关接口
-    path('admin/celery/test-task', views.celery_views.run_test_task),
-    path('admin/celery/task-result', views.celery_views.get_task_result),
+    # 方案1 - DRF API路由
+    path('api/', include(router.urls)),
+    
+    # celery任务相关接口
     path('admin/celery/execute-script', views.celery_views.execute_script_task),
     path('admin/celery/script-task-result', views.celery_views.get_script_task_result),
     path('admin/celery/scripts', views.celery_views.list_scripts),

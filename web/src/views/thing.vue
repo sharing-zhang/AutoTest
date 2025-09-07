@@ -2,7 +2,7 @@
   <div>
     <!-- 使用脚本管理布局组件 -->
     <ScriptManagerLayout 
-      page-route="/scanDevUpdate"
+      page-route="/thing"
       ref="scriptManager"
     >
       <el-tabs
