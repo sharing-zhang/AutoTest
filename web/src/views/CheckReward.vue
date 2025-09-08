@@ -2,7 +2,7 @@
   <div>
     <!-- 使用脚本管理布局组件 -->
     <ScriptManagerLayout 
-      page-route="/scanOvsUpdate"
+      page-route="/CheckReward"
       ref="scriptManager"
     >
       <el-tabs

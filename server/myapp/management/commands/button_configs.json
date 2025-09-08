@@ -25,7 +25,7 @@
     },
 
     {
-        "page_route": "/scanOvsUpdate",
+        "page_route": "/CheckReward",
         "script_name": "check_Reward",
         "button_text": "扫描奖励（不含参）",
         "position": "top-right",

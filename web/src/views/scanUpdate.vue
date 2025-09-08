@@ -124,7 +124,7 @@
               </a-col>
               <a-col span="24">
                 <a-form-item label="路由键" name="child_url_key">
-                  <a-input placeholder="请输入路由键(如: scanDevUpdate)" v-model:value="modal.form.child_url_key" allowClear />
+                  <a-input placeholder="请输入路由键(如: CheckReward)" v-model:value="modal.form.child_url_key" allowClear />
                 </a-form-item>
               </a-col>
             </a-row>
