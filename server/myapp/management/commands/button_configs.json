@@ -34,6 +34,17 @@
             "size": "default"
         },
         "display_order": 1
+    },
+     {
+        "page_route": "/CheckConfigTime",
+        "script_name": "check_ConfigTime",
+        "button_text": "扫描活动时间（不含参）",
+        "position": "top-right",
+        "button_style": {
+            "type": "primary",
+            "size": "default"
+        },
+        "display_order": 1
     }
 
 ]
