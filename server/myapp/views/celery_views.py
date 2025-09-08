@@ -714,10 +714,12 @@ def get_script_configs(request):
     """获取所有脚本的参数配置"""
     try:
         script_name = request.GET.get('script_name')
+        print(f"API请求脚本配置: {script_name}")
         
         if script_name:
             # 获取单个脚本配置
             config = script_config_manager.get_parameter_schema(script_name)
+            print(f"返回配置: {config}")
             return JsonResponse({
                 'success': True,
                 'script_config': config
@@ -743,6 +745,7 @@ def get_script_configs(request):
             })
             
     except Exception as e:
+        print(f"获取脚本配置失败: {e}")
         return JsonResponse({
             'success': False,
             'error': str(e),
