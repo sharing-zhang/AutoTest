@@ -48,5 +48,15 @@
       "required": false,
       "default": "list"
     }
+  ],
+  "check_ConfigTime.py": [
+    {
+      "name": "directory",
+      "type": "text",
+      "label": "目录路径",
+      "required": true,
+      "default": "C:\\temp",
+      "placeholder": "例如: C:\\temp 或 /home/user/documents"
+    }
   ]
 }
