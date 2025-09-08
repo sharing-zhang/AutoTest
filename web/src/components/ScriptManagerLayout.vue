@@ -110,8 +110,8 @@ const checkScriptParameters = async (scriptName: string) => {
     // 尝试不同的脚本名称格式
     const possibleNames = [
       scriptName,                    // 原始名称
-      scriptName + '.py',           // 添加.py后缀
-      scriptName.replace('.py', '') // 移除.py后缀
+      scriptName.replace('.py', ''), // 移除.py后缀（如果存在）
+      scriptName + '.py'            // 添加.py后缀
     ]
     
     for (const name of possibleNames) {

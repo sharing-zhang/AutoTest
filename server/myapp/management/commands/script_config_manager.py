@@ -47,12 +47,16 @@ class ScriptConfigManager:
         if not self._config_cache:
             return []
         
-        # 支持带.py后缀和不带后缀的脚本名
-        script_key = script_name
-        if not script_key.endswith('.py'):
-            script_key += '.py'
+        # 移除.py后缀（如果存在）来匹配配置键
+        script_key = script_name.replace('.py', '') if script_name.endswith('.py') else script_name
         
-        return self._config_cache.get(script_key, [])
+        print(f"查找脚本配置: {script_name} -> {script_key}")
+        print(f"可用配置键: {list(self._config_cache.keys())}")
+        
+        config = self._config_cache.get(script_key, [])
+        print(f"找到配置: {len(config)} 个参数")
+        
+        return config
     
     def get_all_scripts(self) -> List[str]:
         """获取所有配置的脚本名称"""

@@ -22,6 +22,19 @@
             "size": "default"
         },
         "display_order": 1
+    },
+
+    {
+        "page_route": "/scanOvsUpdate",
+        "script_name": "test2",
+        "button_text": "测试脚本ovs（含参）",
+        "position": "top-right",
+        "button_style": {
+            "type": "primary",
+            "size": "default"
+        },
+        "display_order": 1
     }
+
 
 ]
