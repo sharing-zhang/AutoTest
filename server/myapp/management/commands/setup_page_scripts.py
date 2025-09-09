@@ -8,6 +8,7 @@ import os
 from django.core.management.base import BaseCommand
 from django.db import models
 from myapp.models import Script, PageScriptConfig
+from myapp.management.commands.script_config_manager import script_config_manager
 
 
 class Command(BaseCommand):
@@ -95,6 +96,9 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
+        # 自动更新脚本参数（在配置页面脚本之前）
+        self.update_script_parameters()
+        
         # 新增功能：处理配置文件
         if options['config_file']:
             self.handle_config_file(options)
@@ -631,3 +635,64 @@ class Command(BaseCommand):
                 f'已清除页面 {page_route} 的 {deleted_count} 个脚本配置'
             )
         )
+
+    def update_script_parameters(self):
+        """更新脚本参数配置"""
+        try:
+            self.stdout.write('正在更新脚本参数配置...')
+            
+            # 重新加载配置
+            script_config_manager.reload_config()
+            
+            # 获取所有配置的脚本
+            all_scripts = script_config_manager.get_all_scripts()
+            
+            if not all_scripts:
+                self.stdout.write(self.style.WARNING('没有找到任何脚本配置'))
+                return
+            
+            updated_count = 0
+            created_count = 0
+            
+            for script_name in all_scripts:
+                # 获取脚本配置
+                script_config = script_config_manager.get_script_config(script_name)
+                
+                if not script_config:
+                    self.stdout.write(f'跳过 {script_name}：没有找到配置')
+                    continue
+                
+                # 查找或创建Script记录
+                script_record, created = Script.objects.get_or_create(
+                    name=script_name,
+                    defaults={
+                        'description': f'动态脚本: {script_name}',
+                        'script_path': f'celery_app/{script_name}.py',
+                        'script_type': 'data_processing',
+                        'parameters_schema': {},
+                        'visualization_config': {},
+                        'is_active': True
+                    }
+                )
+                
+                # 更新参数配置
+                script_record.parameters_schema = script_config
+                script_record.save()
+                
+                if created:
+                    created_count += 1
+                    self.stdout.write(f'  创建新脚本记录: {script_name}')
+                else:
+                    updated_count += 1
+                    self.stdout.write(f'  更新脚本参数: {script_name}')
+            
+            self.stdout.write(
+                self.style.SUCCESS(
+                    f'脚本参数更新完成！创建了 {created_count} 个新记录，更新了 {updated_count} 个现有记录'
+                )
+            )
+            
+        except Exception as e:
+            self.stdout.write(
+                self.style.ERROR(f'更新脚本参数时出错: {str(e)}')
+            )
