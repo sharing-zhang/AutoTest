@@ -1,5 +1,5 @@
 {
-  "scanner_file.py": [
+  "test2": [
     {
       "name": "directory",
       "type": "text",
@@ -16,37 +16,6 @@
       "required": false,
       "multiple": true,
       "default": [".txt", ".log"]
-    },
-    {
-      "name": "recursive",
-      "type": "switch",
-      "label": "递归扫描",
-      "required": false,
-      "default": true
-    },
-    {
-      "name": "max_depth",
-      "type": "number",
-      "label": "最大深度",
-      "required": false,
-      "default": 3,
-      "min": 0,
-      "max": 10
-    },
-    {
-      "name": "include_hidden",
-      "type": "switch",
-      "label": "包含隐藏文件",
-      "required": false,
-      "default": false
-    },
-    {
-      "name": "output_format",
-      "type": "select",
-      "label": "输出格式",
-      "options": ["list", "detailed", "tree"],
-      "required": false,
-      "default": "list"
     }
   ]
 }
