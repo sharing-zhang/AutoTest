@@ -184,26 +184,39 @@ def is_standard_duration(script, duration_info: Dict[str, Any]) -> bool:
     return is_standard
 
 
-def print_colored_message(script, message: str, color: str):
+def print_message(message):
     """
-    输出带颜色的消息
-
-    Args:
-        script: ScriptBase实例
-        message: 消息内容
-        color: 颜色 ('red', 'green', 'yellow')
+    简单打印消息（无颜色）
     """
-    colors = {
-        'red': '\033[31m',
-        'green': '\033[32m',
-        'yellow': '\033[33m',
-        'reset': '\033[0m'
-    }
+    import sys
+    import re
 
-    color_code = colors.get(color, '')
-    reset_code = colors['reset']
+    try:
+        # 确保message是字符串
+        if not isinstance(message, str):
+            message = str(message)
 
-    print(f"{color_code}{message}{reset_code}")
+        # 在Windows环境下移除emoji
+        if sys.platform == "win32":
+            emoji_pattern = re.compile("["
+                                       u"\U0001F600-\U0001F64F"  # emoticons
+                                       u"\U0001F300-\U0001F5FF"  # symbols & pictographs
+                                       u"\U0001F680-\U0001F6FF"  # transport & map symbols
+                                       u"\U0001F1E0-\U0001F1FF"  # flags
+                                       "]+", flags=re.UNICODE)
+            message = emoji_pattern.sub('', message)
+
+        print(message)
+
+    except UnicodeEncodeError:
+        clean_message = message.encode('ascii', errors='ignore').decode('ascii')
+        print(clean_message)
+    except Exception as e:
+        print(f"打印消息时出错: {e}")
+        try:
+            print(str(message))
+        except:
+            print("无法显示消息内容")
 
 
 def validate_parameters(script, directory: str, encoding: str) -> Tuple[bool, str]:
@@ -282,7 +295,7 @@ def get_and_validate_parameters(script) -> Tuple[Optional[str], Optional[str], O
         script.info("开始获取脚本参数")
 
         # 获取参数，使用配置文件中定义的默认值
-        directory = script.get_parameter('directory', 'C:\\temp')
+        directory = script.get_parameter('directory', 'C:\temp')
         encoding = script.get_parameter('encoding', 'UTF-16')
 
         script.info(f"原始参数 - directory: '{directory}' (类型: {type(directory)})")
@@ -394,11 +407,9 @@ def main_logic(script):
 
         if not duration_info:
             invalid_time_activities += 1
-            print_colored_message(
-                script,
-                f"⚠️  无效的活动时间配置: ID: {activity_info['id']}, Name: {activity_info['name']}, "
-                f"openTime={activity_info['open_time']}, endTime={activity_info['end_time']}",
-                'yellow'
+            print_message(
+                f"无效的活动时间配置: ID: {activity_info['id']}, Name: {activity_info['name']}, "
+                f"openTime={activity_info['open_time']}, endTime={activity_info['end_time']}"
             )
             continue
 
@@ -417,20 +428,18 @@ def main_logic(script):
             }
             abnormal_duration_activities.append(abnormal_activity)
 
-            print_colored_message(
-                script,
-                f"🔴 需要注意的活动时间配置:\n"
+            print_message(
+                f"需要注意的活动时间配置:\n"
                 f"   ID: {activity_info['id']}\n"
                 f"   Name: {activity_info['name']}\n"
                 f"   开始时间: {activity_info['open_time']}\n"
                 f"   结束时间: {activity_info['end_time']}\n"
-                f"   持续时间: {abnormal_activity['duration_text']}",
-                'red'
+                f"   持续时间: {abnormal_activity['duration_text']}"
             )
 
     # 4. 生成检查结果摘要
     script.info("=== 活动时间配置检查完成 ===")
-    script.info(f"📊 检查统计:")
+    script.info(f"检查统计:")
     script.info(f"   - 总活动数: {total_activities}")
     script.info(f"   - 时间格式无效的活动数: {invalid_time_activities}")
     script.info(f"   - 持续时间异常的活动数: {len(abnormal_duration_activities)}")
@@ -464,12 +473,12 @@ def main_logic(script):
 
     # 6. 生成最终消息并返回结果
     if has_issues:
-        message = f"🔍 检查完成：发现 {issues_count} 个活动时间配置问题，需要关注"
-        print_colored_message(script, message, 'yellow')
+        message = f"检查完成：发现 {issues_count} 个活动时间配置问题，需要关注"
+        print_message(message)
         script.warning(message)
     else:
-        message = "✅ 检查完成：所有活动时间配置都符合标准"
-        print_colored_message(script, message, 'green')
+        message = "检查完成：所有活动时间配置都符合标准"
+        print_message(message)
         script.info(message)
 
     return script.success_result(message, result_data)
