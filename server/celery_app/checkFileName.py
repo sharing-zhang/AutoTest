@@ -3,7 +3,7 @@
 """
 文件名合规性检查脚本
 功能：检查Unity项目中的文件名规范，包括非法后缀和重名文件检测
-支持国内外版本差异检测和基准文件对比
+支持用户自定义路径和基准文件对比
 """
 
 import datetime
@@ -25,38 +25,21 @@ def setup_imports():
 # 设置导入路径
 setup_imports()
 
-# 安全导入模块
-try:
-    from checkConfigurationTableUpdate import find_all_Configuration_in_InBundle
-except ImportError as e:
-    print(f"警告: 无法导入 find_all_Configuration_in_InBundle: {e}")
-
-
-    def find_all_Configuration_in_InBundle(file_list, directory):
-        """替代函数：遍历目录获取所有文件"""
-        if not os.path.exists(directory):
-            print(f"目录不存在: {directory}")
-            return
-        for root, dirs, files in os.walk(directory):
-            for file in files:
-                file_list.append(os.path.join(root, file))
-
-# 导入 path_config
-try:
-    from . import path_config
-except (ImportError, ValueError):
-    try:
-        import path_config
-    except ImportError:
-        print("警告: 无法导入 path_config，使用默认路径")
-
-
-        class PathConfig:
-            DOMESTIC_UNITY_ROOT_PATH = "D:/Unity/Project"
-            GLOBAL_UNITY_ROOT_PATH = "D:/Unity/Project"
-
-
-        path_config = PathConfig()
+# ==================== 文件遍历函数 ====================
+def find_all_Configuration_in_InBundle(allFiles_InBundle, configuration_table_path):
+    """找出指定文件夹下所有文件
+    
+    Args:
+        allFiles_InBundle: 用于存储文件路径的列表
+        configuration_table_path: 要遍历的目录路径
+    """
+    # 将所有找到的文件存在列表中
+    for filepath, dirnames, filenames in os.walk(configuration_table_path):
+        for filename in filenames:
+            allFiles_InBundle.append(os.path.join(filepath, filename))
+    # 用于输出所有找到的文件
+    # for file in allFiles_InBundle:
+    #     print(file)
 
 
 # ==================== 辅助函数区域 ====================
@@ -161,16 +144,16 @@ def parse_benchmark(script, content):
                 current_section = None
             continue
 
-        if current_section == 'abnormal' and line.startswith('→'):
-            path = os.path.normpath(line[1:].strip()).lower()
+        if current_section == 'abnormal' and line.startswith('->'):
+            path = os.path.normpath(line[2:].strip()).lower()
             benchmark['abnormal']['非法文件后缀检查'].add(path)
 
         elif current_section == 'duplicates':
             if line.startswith(('1.', '2.', '3.')):
                 if '同名文件: ' in line:
                     current_group = line.split('同名文件: ')[1].strip().lower()
-            elif line.startswith('▸') and current_group:
-                path = os.path.normpath(line[1:].strip()).lower()
+            elif line.startswith('  -') and current_group:
+                path = os.path.normpath(line[3:].strip()).lower()
                 benchmark['duplicates'][current_group].add(path)
 
     return benchmark
@@ -185,13 +168,13 @@ def generate_full_report(script, abnormal, duplicates):
         content.append("=== 非法文件后缀检查 ===\n")
         for err_type, files in abnormal.items():
             sorted_files = sorted(files, key=lambda x: x[1])
-            content.append(f"⛔ 违规类型：{err_type}（{len(sorted_files)}个）\n")
+            content.append(f"[ERROR] 违规类型：{err_type}（{len(sorted_files)}个）\n")
             for f in sorted_files:
                 if 'InBundle' in f[0]:
                     relative_path = f[0].split('InBundle', 1)[-1]
                 else:
                     relative_path = f[0]
-                content.append(f"   → {relative_path}\n")
+                content.append(f"   -> {relative_path}\n")
             content.append("\n")
 
     if duplicates:
@@ -204,7 +187,7 @@ def generate_full_report(script, abnormal, duplicates):
                     relative_path = p[0].split('InBundle', 1)[-1]
                 else:
                     relative_path = p[0]
-                content.append(f"   ▸ {relative_path}\n")
+                content.append(f"   - {relative_path}\n")
             content.append("\n")
 
     return "".join(content)
@@ -256,25 +239,25 @@ def generate_diff_report(script, current_abnormal, current_dups, benchmark):
     if new_abnormal:
         content.append("=== 新增非法后缀文件 ===\n")
         for err_type, files in new_abnormal.items():
-            content.append(f"⛔ 违规类型：{err_type}（{len(files)}个）\n")
+            content.append(f"[ERROR] 违规类型：{err_type}（{len(files)}个）\n")
             for f in files:
                 if 'InBundle' in f[0]:
                     relative_path = f[0].split('InBundle', 1)[-1]
                 else:
                     relative_path = f[0]
-                content.append(f"   → {relative_path}\n")
+                content.append(f"   -> {relative_path}\n")
             content.append("\n")
 
     if removed_abnormal:
         content.append("=== 减少非法后缀文件 ===\n")
         for err_type, files in removed_abnormal.items():
-            content.append(f"⛔ 违规类型：{err_type}（{len(files)}个）\n")
+            content.append(f"[ERROR] 违规类型：{err_type}（{len(files)}个）\n")
             for f in files:
                 if 'InBundle' in f:
                     relative_path = f.split('InBundle', 1)[-1]
                 else:
                     relative_path = f
-                content.append(f"   → {relative_path}\n")
+                content.append(f"   -> {relative_path}\n")
             content.append("\n")
 
     if new_duplicates:
@@ -287,7 +270,7 @@ def generate_diff_report(script, current_abnormal, current_dups, benchmark):
                     relative_path = p[0].split('InBundle', 1)[-1]
                 else:
                     relative_path = p[0]
-                content.append(f"   ▸ {relative_path}\n")
+                content.append(f"   - {relative_path}\n")
             content.append("\n")
 
     if removed_duplicates:
@@ -303,31 +286,28 @@ def generate_diff_report(script, current_abnormal, current_dups, benchmark):
                     relative_path = path_str.split('InBundle', 1)[-1]
                 else:
                     relative_path = path_str
-                content.append(f"   ▸ {relative_path}\n")
+                content.append(f"   - {relative_path}\n")
             content.append("\n")
 
     report_content = "".join(content).strip()
-    result = report_content if report_content else "✅ 无新增或减少异常文件"
+    result = report_content if report_content else "[OK] 无新增或减少异常文件"
 
     return result, new_abnormal, new_duplicates, removed_abnormal, removed_duplicates
 
 
-def select_benchmark_path(script, region):
-    """选择国内/海外基准文件路径"""
-    script.debug(f"选择基准文件，区域: {region}")
+def get_benchmark_path(script, output_dir, unity_root_path):
+    """获取基准文件路径"""
+    script.debug(f"生成基准文件路径，Unity路径: {unity_root_path}")
 
-    output_dir = "../result/domesticLogs/checkFileNameLogs"
+    # 基于Unity路径生成唯一的基准文件名
+    path_hash = abs(hash(unity_root_path)) % 100000
+    benchmark_filename = f"checkFileName_{path_hash}.txt"
+    benchmark_path = os.path.join(output_dir, "checkFileNameLogs", benchmark_filename)
 
-    if str(region) == "1":
-        script.info("选择国内版本")
-        return (os.path.join(output_dir, "checkFileName.txt"), path_config.DOMESTIC_UNITY_ROOT_PATH)
-    elif str(region) == "2":
-        script.info("选择海外版本")
-        return (os.path.join(output_dir, "checkFileName_global.txt"), path_config.GLOBAL_UNITY_ROOT_PATH)
-    else:
-        script.info("使用默认值（国内）")
-        return (os.path.join(output_dir, "checkFileName.txt"), path_config.DOMESTIC_UNITY_ROOT_PATH)
+    # 确保目录存在
+    os.makedirs(os.path.dirname(benchmark_path), exist_ok=True)
 
+    return benchmark_path
 
 def validate_data(script, data):
     """验证结果数据"""
@@ -352,17 +332,16 @@ def main_logic(script: ScriptBase):
     """
 
     # 1. 获取参数
-    region = script.get_parameter('region', '1')  # 默认国内
-    directory = script.get_parameter('directory', 'C:\\temp')
-    output_dir = script.get_parameter('output_dir', '../result/domesticLogs/checkFileNameLogs')
+    unity_root_path = script.get_parameter('unity_root_path', 'D:\\fishdev')
+    output_dir = script.get_parameter('output_dir', 'D:\\Users\\Administrator\\Desktop')
 
     script.info("文件名合规性检查开始执行")
-    script.debug(f"参数 - 区域: {region}, 检查路径: {directory}")
+    script.debug(f"参数 - Unity根路径: {unity_root_path}")
 
     try:
-        # 2. 选择基准文件和路径
-        script.info("选择基准文件...")
-        benchmark_path, unity_root_path = select_benchmark_path(script, region)
+        # 2. 获取基准文件路径
+        script.info("获取基准文件路径...")
+        benchmark_path = get_benchmark_path(script, output_dir, unity_root_path)
         script.info(f"Unity根路径: {unity_root_path}")
         script.info(f"基准文件路径: {benchmark_path}")
 
@@ -371,6 +350,7 @@ def main_logic(script: ScriptBase):
         os.makedirs(output_dir, exist_ok=True)
 
         # 4. 检查目录路径
+        inbundle_path = script.get_parameter('inbundle_path', "client/MainProject/Assets/InBundle")
         script.info("检查目录路径...")
         full_inbundle_path = os.path.join(unity_root_path, inbundle_path)
         script.info(f"完整检查路径: {full_inbundle_path}")
@@ -420,7 +400,6 @@ def main_logic(script: ScriptBase):
 
         # 9. 处理输出结果
         result_data = {
-            'region': region,
             'unity_root_path': unity_root_path,
             'check_path': full_inbundle_path,
             'benchmark_path': benchmark_path,
@@ -439,7 +418,7 @@ def main_logic(script: ScriptBase):
         }
 
         # 10. 保存差异报告文件
-        if diff_content != "✅ 无新增或减少异常文件":
+        if diff_content != "[OK] 无新增或减少异常文件":
             timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
             result_path = os.path.join(output_dir, f"diff_{timestamp}.txt")
             try:
@@ -460,7 +439,7 @@ def main_logic(script: ScriptBase):
         script.info(f"新增异常: {stats['new_abnormal_count']}, 减少异常: {stats['removed_abnormal_count']}")
 
         # 13. 返回成功结果
-        if diff_content != "✅ 无新增或减少异常文件":
+        if diff_content != "[OK] 无新增或减少异常文件":
             message = f"发现文件变化 - 新增异常{stats['new_abnormal_count']}个，减少异常{stats['removed_abnormal_count']}个"
         else:
             message = "文件名检查完成，无异常变化"
@@ -478,4 +457,4 @@ if __name__ == '__main__':
 
     sys.setrecursionlimit(3000)
 
-    create_simple_script('filename_compliance_checker', main_logic)
+    create_simple_script('checkFileName', main_logic)

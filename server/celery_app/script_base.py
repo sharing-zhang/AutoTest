@@ -145,7 +145,15 @@ class ScriptBase:
             result: 结果字典
         """
         self.debug(f"{self.script_name}执行完成，准备输出结果")
-        print(json.dumps(result, ensure_ascii=False, indent=2))
+        try:
+            # 尝试使用UTF-8编码输出
+            import sys
+            if hasattr(sys.stdout, 'reconfigure'):
+                sys.stdout.reconfigure(encoding='utf-8')
+            print(json.dumps(result, ensure_ascii=True, indent=2))
+        except UnicodeEncodeError:
+            # 如果UTF-8失败，使用ASCII安全模式
+            print(json.dumps(result, ensure_ascii=True, indent=2))
     
     def run_with_error_handling(self, main_func):
         """运行主函数并处理错误

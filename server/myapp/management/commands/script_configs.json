@@ -97,5 +97,15 @@
       "placeholder": "输入天数，按回车添加（例如：3, 7, 14）",
       "description": "输入允许的活动持续天数，支持多个值"
     }
+  ],
+  "checkFileName": [
+    {
+      "name": "unity_root_path",
+      "type": "text",
+      "label": "目录路径",
+      "required": true,
+      "default": "C:\\temp",
+      "placeholder": "例如: C:\\temp 或 /home/user/documents"
+    }
   ]
 }

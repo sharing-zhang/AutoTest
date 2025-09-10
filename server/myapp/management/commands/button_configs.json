@@ -45,6 +45,18 @@
             "size": "default"
         },
         "display_order": 1
+    },
+
+    {
+        "page_route": "/scanDevUpdate",
+        "script_name": "checkFileName",
+        "button_text": "file（含参）",
+        "position": "top-right",
+        "button_style": {
+            "type": "primary",
+            "size": "default"
+        },
+        "display_order": 1
     }
 
 ]
