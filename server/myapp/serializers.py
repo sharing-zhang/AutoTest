@@ -1,7 +1,7 @@
 from rest_framework import serializers
 
-from myapp.models import ScanDevUpdate_scanResult, ScanUpdate, Thing, Classification, Tag, User, Comment, LoginLog, OpLog, \
-    Ad, Notice, ErrorLog, Script, TaskExecution, PageScriptConfig
+from myapp.models import ScanDevUpdate_scanResult, ScanUpdate, Thing, User, LoginLog, OpLog, \
+    ErrorLog, Plugin, Script, TaskExecution, PageScriptConfig
 
 
 # serializers作用可以用来规定提交数据后返回的数据字段，这里就返回时间即可
@@ -41,8 +41,6 @@ class UpdateScanUpdateSerializer(serializers.ModelSerializer):
 
 class ThingSerializer(serializers.ModelSerializer):
     create_time = serializers.DateTimeField(format='%Y-%m-%d %H:%M:%S', required=False)
-    # 额外字段
-    classification_title = serializers.ReadOnlyField(source='classification.title')
 
     class Meta:
         model = Thing
@@ -50,8 +48,6 @@ class ThingSerializer(serializers.ModelSerializer):
 
 
 class DetailThingSerializer(serializers.ModelSerializer):
-    # 额外字段
-    classification_title = serializers.ReadOnlyField(source='classification.title')
 
     class Meta:
         model = Thing
@@ -60,8 +56,6 @@ class DetailThingSerializer(serializers.ModelSerializer):
 
 
 class UpdateThingSerializer(serializers.ModelSerializer):
-    # 额外字段
-    classification_title = serializers.ReadOnlyField(source='classification.title')
 
     class Meta:
         model = Thing
@@ -71,25 +65,11 @@ class UpdateThingSerializer(serializers.ModelSerializer):
 
 class ListThingSerializer(serializers.ModelSerializer):
     create_time = serializers.DateTimeField(format='%Y-%m-%d %H:%M:%S', required=False)
-    # 额外字段
-    classification_title = serializers.ReadOnlyField(source='classification.title')
 
     class Meta:
         model = Thing
         # 排除字段
         exclude = ('wish', 'collect', 'description',)
-
-
-class ClassificationSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Classification
-        fields = '__all__'
-
-
-class TagSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Tag
-        fields = '__all__'
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -100,18 +80,12 @@ class UserSerializer(serializers.ModelSerializer):
         fields = '__all__'
         # exclude = ('password',)
 
-
-class CommentSerializer(serializers.ModelSerializer):
-    comment_time = serializers.DateTimeField(format='%Y-%m-%d %H:%M:%S', required=False)
-    # 额外字段
-    title = serializers.ReadOnlyField(source='thing.title')
-    username = serializers.ReadOnlyField(source='user.username')
+class PluginSerializer(serializers.ModelSerializer):
+    create_time = serializers.DateTimeField(format='%Y-%m-%d %H:%M:%S', required=False)
 
     class Meta:
-        model = Comment
-        fields = ['id', 'content', 'comment_time', 'like_count', 'thing', 'user', 'title', 'username']
-
-
+        model = Plugin
+        fields = '__all__'
 
 
 class LoginLogSerializer(serializers.ModelSerializer):
@@ -135,24 +109,6 @@ class ErrorLogSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ErrorLog
-        fields = '__all__'
-
-
-
-
-class AdSerializer(serializers.ModelSerializer):
-    create_time = serializers.DateTimeField(format='%Y-%m-%d %H:%M:%S', required=False)
-
-    class Meta:
-        model = Ad
-        fields = '__all__'
-
-
-class NoticeSerializer(serializers.ModelSerializer):
-    create_time = serializers.DateTimeField(format='%Y-%m-%d %H:%M:%S', required=False)
-
-    class Meta:
-        model = Notice
         fields = '__all__'
 
 

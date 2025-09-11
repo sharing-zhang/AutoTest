@@ -40,27 +40,16 @@ class User(models.Model):
     class Meta:
         db_table = "b_user"
 
-
-class Tag(models.Model):
+class Plugin(models.Model):
     id = models.BigAutoField(primary_key=True)
-    title = models.CharField(max_length=100, blank=True, null=True)
+    image = models.ImageField(upload_to='ad/', null=True)
+    link = models.CharField(max_length=500, blank=True, null=True)
     create_time = models.DateTimeField(auto_now_add=True, null=True)
 
     class Meta:
-        db_table = "b_tag"
+        db_table = "b_plugin"
 
 
-class Classification(models.Model):
-    list_display = ("title", "id")
-    id = models.BigAutoField(primary_key=True)
-    title = models.CharField(max_length=100, blank=True, null=True)
-    create_time = models.DateTimeField(auto_now_add=True, null=True)
-
-    def __str__(self):
-        return self.title
-
-    class Meta:
-        db_table = "b_classification"
 
 # # http://172.16.34.33:8001/admin/scanUpdate 链接下展示资源扫描各项目详细信息页面关联数据库声明的字段
 class ScanUpdate(models.Model):
@@ -125,9 +114,8 @@ class Thing(models.Model):
         ('1', '下架'),
     )
     id = models.BigAutoField(primary_key=True)
-    classification = models.ForeignKey(Classification, on_delete=models.CASCADE, blank=True, null=True,
-                                       related_name='classification_thing')
-    tag = models.ManyToManyField(Tag, blank=True)
+    classification = models.CharField(max_length=20, blank=True, null=True)
+    tag = models.CharField(max_length=20, blank=True, null=True)
     xuehao = models.CharField(max_length=20, blank=True, null=True)
     name = models.CharField(max_length=20, blank=True, null=True)
     sex = models.CharField(max_length=20, blank=True, null=True)
@@ -143,30 +131,6 @@ class Thing(models.Model):
     class Meta:
         db_table = "b_thing"
 
-
-class Comment(models.Model):
-    id = models.BigAutoField(primary_key=True)
-    content = models.CharField(max_length=200, blank=True, null=True)
-    user = models.ForeignKey(User, on_delete=models.CASCADE, null=True, related_name='user_comment')
-    thing = models.ForeignKey(Thing, on_delete=models.CASCADE, null=True, related_name='thing_comment')
-    comment_time = models.DateTimeField(auto_now_add=True, null=True)
-    like_count = models.IntegerField(default=0)
-
-    class Meta:
-        db_table = "b_comment"
-
-
-
-
-class LoginLog(models.Model):
-    id = models.BigAutoField(primary_key=True)
-    username = models.CharField(max_length=50, blank=True, null=True)
-    ip = models.CharField(max_length=100, blank=True, null=True)
-    ua = models.CharField(max_length=200, blank=True, null=True)
-    log_time = models.DateTimeField(auto_now_add=True, null=True)
-
-    class Meta:
-        db_table = "b_login_log"
 
 
 class OpLog(models.Model):
@@ -192,28 +156,6 @@ class ErrorLog(models.Model):
 
     class Meta:
         db_table = "b_error_log"
-
-
-
-
-class Ad(models.Model):
-    id = models.BigAutoField(primary_key=True)
-    image = models.ImageField(upload_to='ad/', null=True)
-    link = models.CharField(max_length=500, blank=True, null=True)
-    create_time = models.DateTimeField(auto_now_add=True, null=True)
-
-    class Meta:
-        db_table = "b_ad"
-
-
-class Notice(models.Model):
-    id = models.BigAutoField(primary_key=True)
-    title = models.CharField(max_length=100, blank=True, null=True)
-    content = models.CharField(max_length=1000, blank=True, null=True)
-    create_time = models.DateTimeField(auto_now_add=True, null=True)
-
-    class Meta:
-        db_table = "b_notice"
 
 
 
@@ -297,6 +239,16 @@ class TaskExecution(models.Model):
         verbose_name = "任务执行记录"
         verbose_name_plural = "任务执行记录"
 
+
+class LoginLog(models.Model):
+    id = models.BigAutoField(primary_key=True)
+    username = models.CharField(max_length=50, blank=True, null=True)
+    ip = models.CharField(max_length=100, blank=True, null=True)
+    ua = models.CharField(max_length=200, blank=True, null=True)
+    log_time = models.DateTimeField(auto_now_add=True, null=True)
+
+    class Meta:
+        db_table = "b_login_log"
 
 
 class PageScriptConfig(models.Model):

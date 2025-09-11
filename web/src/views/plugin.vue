@@ -86,7 +86,7 @@
 
 <script setup lang="ts">
 import {FormInstance, message} from 'ant-design-vue';
-import {createApi, listApi, updateApi, deleteApi} from '/@/api/ad';
+import {createApi, listApi, updateApi, deleteApi} from '/@/api/plugin';
 import {BASE_URL} from "/@/store/constants";
 
 const columns = reactive([

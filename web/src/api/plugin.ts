@@ -7,7 +7,6 @@ enum URL {
     create = '/myapp/admin/plugin/create',
     update = '/myapp/admin/plugin/update',
     delete = '/myapp/admin/plugin/delete',
-    detail = '/myapp/admin/plugin/detail',
 }
 
 const listApi = async (params: any) => get<any>({ url: URL.list, params: params, data: {}, headers: {'Content-Type': 'application/x-www-form-urlencoded'} });
@@ -16,6 +15,5 @@ const createApi = async (data: any) =>
 const updateApi = async (params:any, data: any) =>
     post<any>({ url: URL.update,params: params, data: data, headers: { 'Content-Type': 'multipart/form-data;charset=utf-8' } });
 const deleteApi = async (params: any) => post<any>({ url: URL.delete, params: params, headers: {} });
-const detailApi = async (params: any) => get<any>({ url: URL.detail, params: params, headers: {} });
 
-export { listApi, createApi, updateApi, deleteApi, detailApi };
+export { listApi, createApi, updateApi, deleteApi };

@@ -1,4 +1,4 @@
-const BASE_URL = 'http://192.168.1.20:8000'
+const BASE_URL = 'http://172.16.36.233:8000'
 
 const USER_ID = 'user_id'
 const USER_NAME = 'user_name'

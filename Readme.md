@@ -1,6 +1,6 @@
 # 自动化测试运行系统 (AutoTest)
 
-> 基于 Python + Django + Vue.js 开发的自动化测试运行系统
+> 基于 Python + Django + Vue.js + Celery开发的自动化测试运行平台系统
 
 ## 📋 项目概述
 
@@ -65,7 +65,6 @@ AutoTest/
 │   ├── public/               # 静态资源
 │   ├── package.json          # 前端依赖
 │   └── vite.config.ts        # Vite 配置
-├── python_student.sql        # 数据库初始化脚本
 └── README.md                 # 项目文档
 ```
 
@@ -83,7 +82,6 @@ AutoTest/
   - `Thing` - 事物管理模型
   - `Script` - 脚本配置模型
   - `TaskExecution` - 任务执行记录模型
-  - `Comment` - 评论模型
   - `Address` - 地址模型
 
 - **`tasks.py`** - Celery 异步任务
@@ -258,7 +256,7 @@ AutoTest/
 
 #### 数据库
 
-- **`python_student.sql`** - 数据库初始化脚本
+- **`autotest_db.sql`** - 数据库初始化脚本
 
 ## 🚀 快速开始
 
@@ -285,7 +283,7 @@ AutoTest/
 3. **导入数据**
    ```sql
    mysql> use autotest;
-   mysql> source python_student.sql;
+   mysql> source autotest_db.sql的绝对路径;
    ```
 
 4. **启动 Django 服务**

@@ -2,13 +2,8 @@ from myapp.views.admin.scanUpdate import *
 from myapp.views.admin.scanDevUpdate import *
 from myapp.views.admin.thing import *
 from myapp.views.admin.plugin import *
-from myapp.views.admin.classification import *
-from myapp.views.admin.tag import *
 from myapp.views.admin.user import *
-from myapp.views.admin.comment import *
 from myapp.views.admin.overview import *
 from myapp.views.admin.loginLog import *
 from myapp.views.admin.opLog import *
 from myapp.views.admin.errorLog import *
-from myapp.views.admin.ad import *
-from myapp.views.admin.notice import *

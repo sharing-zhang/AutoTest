@@ -9,7 +9,7 @@ CREATE DATABASE IF NOT EXISTS python_student DEFAULT CHARSET utf8 COLLATE utf8_g
 3. 恢复sql数据
 ```
 use python_student
-source python_student.sql
+source autotest_db.sql
 ```
 4. 修改settings.py中的配置信息
 5. 复制资源，将upload文件夹复制到server目录下

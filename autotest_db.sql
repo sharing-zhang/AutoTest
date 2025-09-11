@@ -16,255 +16,8 @@
 /*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
 
 --
--- Table structure for table `auth_group`
---
-
-DROP TABLE IF EXISTS `auth_group`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `auth_group` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
-  `name` varchar(150) NOT NULL,
-  PRIMARY KEY (`id`) USING BTREE,
-  UNIQUE KEY `name` (`name`) USING BTREE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8 ROW_FORMAT=DYNAMIC;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Dumping data for table `auth_group`
---
-
-LOCK TABLES `auth_group` WRITE;
-/*!40000 ALTER TABLE `auth_group` DISABLE KEYS */;
-/*!40000 ALTER TABLE `auth_group` ENABLE KEYS */;
-UNLOCK TABLES;
-
---
--- Table structure for table `auth_group_permissions`
---
-
-DROP TABLE IF EXISTS `auth_group_permissions`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `auth_group_permissions` (
-  `id` bigint(20) NOT NULL AUTO_INCREMENT,
-  `group_id` int(11) NOT NULL,
-  `permission_id` int(11) NOT NULL,
-  PRIMARY KEY (`id`) USING BTREE,
-  UNIQUE KEY `auth_group_permissions_group_id_permission_id_0cd325b0_uniq` (`group_id`,`permission_id`) USING BTREE,
-  KEY `auth_group_permissio_permission_id_84c5c92e_fk_auth_perm` (`permission_id`) USING BTREE,
-  CONSTRAINT `auth_group_permissio_permission_id_84c5c92e_fk_auth_perm` FOREIGN KEY (`permission_id`) REFERENCES `auth_permission` (`id`),
-  CONSTRAINT `auth_group_permissions_group_id_b120cbf9_fk_auth_group_id` FOREIGN KEY (`group_id`) REFERENCES `auth_group` (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8 ROW_FORMAT=DYNAMIC;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Dumping data for table `auth_group_permissions`
---
-
-LOCK TABLES `auth_group_permissions` WRITE;
-/*!40000 ALTER TABLE `auth_group_permissions` DISABLE KEYS */;
-/*!40000 ALTER TABLE `auth_group_permissions` ENABLE KEYS */;
-UNLOCK TABLES;
-
---
--- Table structure for table `auth_permission`
---
-
-DROP TABLE IF EXISTS `auth_permission`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `auth_permission` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
-  `name` varchar(255) NOT NULL,
-  `content_type_id` int(11) NOT NULL,
-  `codename` varchar(100) NOT NULL,
-  PRIMARY KEY (`id`) USING BTREE,
-  UNIQUE KEY `auth_permission_content_type_id_codename_01ab375a_uniq` (`content_type_id`,`codename`) USING BTREE,
-  CONSTRAINT `auth_permission_content_type_id_2f476e4b_fk_django_co` FOREIGN KEY (`content_type_id`) REFERENCES `django_content_type` (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=153 DEFAULT CHARSET=utf8 ROW_FORMAT=DYNAMIC;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Dumping data for table `auth_permission`
---
-
-LOCK TABLES `auth_permission` WRITE;
-/*!40000 ALTER TABLE `auth_permission` DISABLE KEYS */;
-INSERT INTO `auth_permission` VALUES (1,'Can add log entry',1,'add_logentry'),(2,'Can change log entry',1,'change_logentry'),(3,'Can delete log entry',1,'delete_logentry'),(4,'Can view log entry',1,'view_logentry'),(5,'Can add permission',2,'add_permission'),(6,'Can change permission',2,'change_permission'),(7,'Can delete permission',2,'delete_permission'),(8,'Can view permission',2,'view_permission'),(9,'Can add group',3,'add_group'),(10,'Can change group',3,'change_group'),(11,'Can delete group',3,'delete_group'),(12,'Can view group',3,'view_group'),(13,'Can add user',4,'add_user'),(14,'Can change user',4,'change_user'),(15,'Can delete user',4,'delete_user'),(16,'Can view user',4,'view_user'),(17,'Can add content type',5,'add_contenttype'),(18,'Can change content type',5,'change_contenttype'),(19,'Can delete content type',5,'delete_contenttype'),(20,'Can view content type',5,'view_contenttype'),(21,'Can add session',6,'add_session'),(22,'Can change session',6,'change_session'),(23,'Can delete session',6,'delete_session'),(24,'Can view session',6,'view_session'),(25,'Can add ad',7,'add_ad'),(26,'Can change ad',7,'change_ad'),(27,'Can delete ad',7,'delete_ad'),(28,'Can view ad',7,'view_ad'),(29,'Can add classification',8,'add_classification'),(30,'Can change classification',8,'change_classification'),(31,'Can delete classification',8,'delete_classification'),(32,'Can view classification',8,'view_classification'),(33,'Can add error log',9,'add_errorlog'),(34,'Can change error log',9,'change_errorlog'),(35,'Can delete error log',9,'delete_errorlog'),(36,'Can view error log',9,'view_errorlog'),(37,'Can add login log',10,'add_loginlog'),(38,'Can change login log',10,'change_loginlog'),(39,'Can delete login log',10,'delete_loginlog'),(40,'Can view login log',10,'view_loginlog'),(41,'Can add notice',11,'add_notice'),(42,'Can change notice',11,'change_notice'),(43,'Can delete notice',11,'delete_notice'),(44,'Can view notice',11,'view_notice'),(45,'Can add op log',12,'add_oplog'),(46,'Can change op log',12,'change_oplog'),(47,'Can delete op log',12,'delete_oplog'),(48,'Can view op log',12,'view_oplog'),(49,'Can add tag',13,'add_tag'),(50,'Can change tag',13,'change_tag'),(51,'Can delete tag',13,'delete_tag'),(52,'Can view tag',13,'view_tag'),(53,'Can add user',14,'add_user'),(54,'Can change user',14,'change_user'),(55,'Can delete user',14,'delete_user'),(56,'Can view user',14,'view_user'),(57,'Can add thing',15,'add_thing'),(58,'Can change thing',15,'change_thing'),(59,'Can delete thing',15,'delete_thing'),(60,'Can view thing',15,'view_thing'),(61,'Can add record',16,'add_record'),(62,'Can change record',16,'change_record'),(63,'Can delete record',16,'delete_record'),(64,'Can view record',16,'view_record'),(65,'Can add comment',17,'add_comment'),(66,'Can change comment',17,'change_comment'),(67,'Can delete comment',17,'delete_comment'),(68,'Can view comment',17,'view_comment'),(69,'Can add banner',18,'add_banner'),(70,'Can change banner',18,'change_banner'),(71,'Can delete banner',18,'delete_banner'),(72,'Can view banner',18,'view_banner'),(73,'Can add address',19,'add_address'),(74,'Can change address',19,'change_address'),(75,'Can delete address',19,'delete_address'),(76,'Can view address',19,'view_address'),(77,'Can add scan update',20,'add_scanupdate'),(78,'Can change scan update',20,'change_scanupdate'),(79,'Can delete scan update',20,'delete_scanupdate'),(80,'Can view scan update',20,'view_scanupdate'),(81,'Can add scan dev update_scan result',21,'add_scandevupdate_scanresult'),(82,'Can change scan dev update_scan result',21,'change_scandevupdate_scanresult'),(83,'Can delete scan dev update_scan result',21,'delete_scandevupdate_scanresult'),(84,'Can view scan dev update_scan result',21,'view_scandevupdate_scanresult'),(85,'Can add run log',22,'add_runlog'),(86,'Can change run log',22,'change_runlog'),(87,'Can delete run log',22,'delete_runlog'),(88,'Can view run log',22,'view_runlog'),(89,'Can add script config',23,'add_scriptconfig'),(90,'Can change script config',23,'change_scriptconfig'),(91,'Can delete script config',23,'delete_scriptconfig'),(92,'Can view script config',23,'view_scriptconfig'),(93,'Can add crontab',24,'add_crontabschedule'),(94,'Can change crontab',24,'change_crontabschedule'),(95,'Can delete crontab',24,'delete_crontabschedule'),(96,'Can view crontab',24,'view_crontabschedule'),(97,'Can add interval',25,'add_intervalschedule'),(98,'Can change interval',25,'change_intervalschedule'),(99,'Can delete interval',25,'delete_intervalschedule'),(100,'Can view interval',25,'view_intervalschedule'),(101,'Can add periodic task',26,'add_periodictask'),(102,'Can change periodic task',26,'change_periodictask'),(103,'Can delete periodic task',26,'delete_periodictask'),(104,'Can view periodic task',26,'view_periodictask'),(105,'Can add periodic tasks',27,'add_periodictasks'),(106,'Can change periodic tasks',27,'change_periodictasks'),(107,'Can delete periodic tasks',27,'delete_periodictasks'),(108,'Can view periodic tasks',27,'view_periodictasks'),(109,'Can add solar event',28,'add_solarschedule'),(110,'Can change solar event',28,'change_solarschedule'),(111,'Can delete solar event',28,'delete_solarschedule'),(112,'Can view solar event',28,'view_solarschedule'),(113,'Can add clocked',29,'add_clockedschedule'),(114,'Can change clocked',29,'change_clockedschedule'),(115,'Can delete clocked',29,'delete_clockedschedule'),(116,'Can view clocked',29,'view_clockedschedule'),(117,'Can add task result',30,'add_taskresult'),(118,'Can change task result',30,'change_taskresult'),(119,'Can delete task result',30,'delete_taskresult'),(120,'Can view task result',30,'view_taskresult'),(121,'Can add chord counter',31,'add_chordcounter'),(122,'Can change chord counter',31,'change_chordcounter'),(123,'Can delete chord counter',31,'delete_chordcounter'),(124,'Can view chord counter',31,'view_chordcounter'),(125,'Can add group result',32,'add_groupresult'),(126,'Can change group result',32,'change_groupresult'),(127,'Can delete group result',32,'delete_groupresult'),(128,'Can view group result',32,'view_groupresult'),(129,'Can add 脚本配置',33,'add_script'),(130,'Can change 脚本配置',33,'change_script'),(131,'Can delete 脚本配置',33,'delete_script'),(132,'Can view 脚本配置',33,'view_script'),(133,'Can add 任务执行记录',34,'add_taskexecution'),(134,'Can change 任务执行记录',34,'change_taskexecution'),(135,'Can delete 任务执行记录',34,'delete_taskexecution'),(136,'Can view 任务执行记录',34,'view_taskexecution'),(137,'Can add execution output',35,'add_executionoutput'),(138,'Can change execution output',35,'change_executionoutput'),(139,'Can delete execution output',35,'delete_executionoutput'),(140,'Can view execution output',35,'view_executionoutput'),(141,'Can add execution artifact',36,'add_executionartifact'),(142,'Can change execution artifact',36,'change_executionartifact'),(143,'Can delete execution artifact',36,'delete_executionartifact'),(144,'Can view execution artifact',36,'view_executionartifact'),(145,'Can add page script config',37,'add_pagescriptconfig'),(146,'Can change page script config',37,'change_pagescriptconfig'),(147,'Can delete page script config',37,'delete_pagescriptconfig'),(148,'Can view page script config',37,'view_pagescriptconfig'),(149,'Can add execution summary',38,'add_executionsummary'),(150,'Can change execution summary',38,'change_executionsummary'),(151,'Can delete execution summary',38,'delete_executionsummary'),(152,'Can view execution summary',38,'view_executionsummary');
-/*!40000 ALTER TABLE `auth_permission` ENABLE KEYS */;
-UNLOCK TABLES;
-
---
--- Table structure for table `auth_user`
---
-
-DROP TABLE IF EXISTS `auth_user`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `auth_user` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
-  `password` varchar(128) NOT NULL,
-  `last_login` datetime(6) DEFAULT NULL,
-  `is_superuser` tinyint(1) NOT NULL,
-  `username` varchar(150) NOT NULL,
-  `first_name` varchar(150) NOT NULL,
-  `last_name` varchar(150) NOT NULL,
-  `email` varchar(254) NOT NULL,
-  `is_staff` tinyint(1) NOT NULL,
-  `is_active` tinyint(1) NOT NULL,
-  `date_joined` datetime(6) NOT NULL,
-  PRIMARY KEY (`id`) USING BTREE,
-  UNIQUE KEY `username` (`username`) USING BTREE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8 ROW_FORMAT=DYNAMIC;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Dumping data for table `auth_user`
---
-
-LOCK TABLES `auth_user` WRITE;
-/*!40000 ALTER TABLE `auth_user` DISABLE KEYS */;
-/*!40000 ALTER TABLE `auth_user` ENABLE KEYS */;
-UNLOCK TABLES;
-
---
--- Table structure for table `auth_user_groups`
---
-
-DROP TABLE IF EXISTS `auth_user_groups`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `auth_user_groups` (
-  `id` bigint(20) NOT NULL AUTO_INCREMENT,
-  `user_id` int(11) NOT NULL,
-  `group_id` int(11) NOT NULL,
-  PRIMARY KEY (`id`) USING BTREE,
-  UNIQUE KEY `auth_user_groups_user_id_group_id_94350c0c_uniq` (`user_id`,`group_id`) USING BTREE,
-  KEY `auth_user_groups_group_id_97559544_fk_auth_group_id` (`group_id`) USING BTREE,
-  CONSTRAINT `auth_user_groups_group_id_97559544_fk_auth_group_id` FOREIGN KEY (`group_id`) REFERENCES `auth_group` (`id`),
-  CONSTRAINT `auth_user_groups_user_id_6a12ed8b_fk_auth_user_id` FOREIGN KEY (`user_id`) REFERENCES `auth_user` (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8 ROW_FORMAT=DYNAMIC;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Dumping data for table `auth_user_groups`
---
-
-LOCK TABLES `auth_user_groups` WRITE;
-/*!40000 ALTER TABLE `auth_user_groups` DISABLE KEYS */;
-/*!40000 ALTER TABLE `auth_user_groups` ENABLE KEYS */;
-UNLOCK TABLES;
-
---
--- Table structure for table `auth_user_user_permissions`
---
-
-DROP TABLE IF EXISTS `auth_user_user_permissions`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `auth_user_user_permissions` (
-  `id` bigint(20) NOT NULL AUTO_INCREMENT,
-  `user_id` int(11) NOT NULL,
-  `permission_id` int(11) NOT NULL,
-  PRIMARY KEY (`id`) USING BTREE,
-  UNIQUE KEY `auth_user_user_permissions_user_id_permission_id_14a6b632_uniq` (`user_id`,`permission_id`) USING BTREE,
-  KEY `auth_user_user_permi_permission_id_1fbb5f2c_fk_auth_perm` (`permission_id`) USING BTREE,
-  CONSTRAINT `auth_user_user_permi_permission_id_1fbb5f2c_fk_auth_perm` FOREIGN KEY (`permission_id`) REFERENCES `auth_permission` (`id`),
-  CONSTRAINT `auth_user_user_permissions_user_id_a95ead1b_fk_auth_user_id` FOREIGN KEY (`user_id`) REFERENCES `auth_user` (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8 ROW_FORMAT=DYNAMIC;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Dumping data for table `auth_user_user_permissions`
---
-
-LOCK TABLES `auth_user_user_permissions` WRITE;
-/*!40000 ALTER TABLE `auth_user_user_permissions` DISABLE KEYS */;
-/*!40000 ALTER TABLE `auth_user_user_permissions` ENABLE KEYS */;
-UNLOCK TABLES;
-
---
--- Table structure for table `b_ad`
---
-
-DROP TABLE IF EXISTS `b_ad`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `b_ad` (
-  `id` bigint(20) NOT NULL AUTO_INCREMENT,
-  `image` varchar(100) DEFAULT NULL,
-  `link` varchar(500) DEFAULT NULL,
-  `create_time` datetime(6) DEFAULT NULL,
-  PRIMARY KEY (`id`) USING BTREE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8 ROW_FORMAT=DYNAMIC;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Dumping data for table `b_ad`
---
-
-LOCK TABLES `b_ad` WRITE;
-/*!40000 ALTER TABLE `b_ad` DISABLE KEYS */;
-/*!40000 ALTER TABLE `b_ad` ENABLE KEYS */;
-UNLOCK TABLES;
-
---
--- Table structure for table `b_classification`
---
-
-DROP TABLE IF EXISTS `b_classification`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `b_classification` (
-  `id` bigint(20) NOT NULL AUTO_INCREMENT,
-  `title` varchar(100) DEFAULT NULL,
-  `create_time` datetime(6) DEFAULT NULL,
-  PRIMARY KEY (`id`) USING BTREE
-) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8 ROW_FORMAT=DYNAMIC;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Dumping data for table `b_classification`
---
-
-LOCK TABLES `b_classification` WRITE;
-/*!40000 ALTER TABLE `b_classification` DISABLE KEYS */;
-INSERT INTO `b_classification` VALUES (1,'数字媒体技术二班','2023-08-08 17:43:08.581345'),(2,'数字媒体技术一班','2023-08-08 17:43:17.456454'),(3,'软件工程二班','2023-08-08 17:43:25.656795'),(4,'软件工程一班','2023-08-08 17:43:33.333292');
-/*!40000 ALTER TABLE `b_classification` ENABLE KEYS */;
-UNLOCK TABLES;
-
---
 -- Table structure for table `b_comment`
 --
-
-DROP TABLE IF EXISTS `b_comment`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `b_comment` (
-  `id` bigint(20) NOT NULL AUTO_INCREMENT,
-  `content` varchar(200) DEFAULT NULL,
-  `comment_time` datetime(6) DEFAULT NULL,
-  `like_count` int(11) NOT NULL,
-  `thing_id` bigint(20) DEFAULT NULL,
-  `user_id` bigint(20) DEFAULT NULL,
-  PRIMARY KEY (`id`) USING BTREE,
-  KEY `b_comment_thing_id_57ab492b_fk_b_thing_id` (`thing_id`) USING BTREE,
-  KEY `b_comment_user_id_46f0670f_fk_b_user_id` (`user_id`) USING BTREE,
-  CONSTRAINT `b_comment_thing_id_57ab492b_fk_b_thing_id` FOREIGN KEY (`thing_id`) REFERENCES `b_thing` (`id`),
-  CONSTRAINT `b_comment_user_id_46f0670f_fk_b_user_id` FOREIGN KEY (`user_id`) REFERENCES `b_user` (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8 ROW_FORMAT=DYNAMIC;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Dumping data for table `b_comment`
---
-
-LOCK TABLES `b_comment` WRITE;
-/*!40000 ALTER TABLE `b_comment` DISABLE KEYS */;
-/*!40000 ALTER TABLE `b_comment` ENABLE KEYS */;
-UNLOCK TABLES;
-
 --
 -- Table structure for table `b_error_log`
 --
@@ -280,7 +33,8 @@ CREATE TABLE `b_error_log` (
   `content` varchar(200) DEFAULT NULL,
   `log_time` datetime(6) DEFAULT NULL,
   PRIMARY KEY (`id`) USING BTREE
-) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8 ROW_FORMAT=DYNAMIC;
+) ENGINE=InnoDB AUTO_INCREMENT=11 DEFAULT CHARSET=utf8 ROW_FORMAT=DYNAMIC;
+
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -292,6 +46,31 @@ LOCK TABLES `b_error_log` WRITE;
 INSERT INTO `b_error_log` VALUES (1,'192.168.1.20','/myapp/admin/thing/runLogs','GET','查询运行记录失败: (1054, \"Unknown column \'b_run_log.output_length\' in \'field list\'\")','2025-09-04 23:59:56.629734'),(2,'192.168.1.20','/myapp/admin/thing/runLogs','GET','查询运行记录失败: (1054, \"Unknown column \'b_run_log.output_length\' in \'field list\'\")','2025-09-04 23:59:59.747704');
 /*!40000 ALTER TABLE `b_error_log` ENABLE KEYS */;
 UNLOCK TABLES;
+
+
+-- ----------------------------
+-- Table structure for b_ad
+-- ----------------------------
+DROP TABLE IF EXISTS `b_plugin`;
+CREATE TABLE `b_plugin`  (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `image` varchar(100) CHARACTER SET utf8 COLLATE utf8_general_ci NULL DEFAULT NULL,
+  `link` varchar(500) CHARACTER SET utf8 COLLATE utf8_general_ci NULL DEFAULT NULL,
+  `create_time` datetime(6) NULL DEFAULT NULL,
+  PRIMARY KEY (`id`) USING BTREE
+) ENGINE = InnoDB AUTO_INCREMENT = 1 CHARACTER SET = utf8 COLLATE = utf8_general_ci ROW_FORMAT = Dynamic;
+
+-- ----------------------------
+-- Records of b_ad
+-- ----------------------------
+
+
+
+
+
+
+
+
 
 --
 -- Table structure for table `b_login_log`
@@ -307,7 +86,7 @@ CREATE TABLE `b_login_log` (
   `ua` varchar(200) DEFAULT NULL,
   `log_time` datetime(6) DEFAULT NULL,
   PRIMARY KEY (`id`) USING BTREE
-) ENGINE=InnoDB AUTO_INCREMENT=21 DEFAULT CHARSET=utf8 ROW_FORMAT=DYNAMIC;
+) ENGINE=InnoDB AUTO_INCREMENT=11 DEFAULT CHARSET=utf8 ROW_FORMAT=DYNAMIC;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -323,27 +102,6 @@ UNLOCK TABLES;
 --
 -- Table structure for table `b_notice`
 --
-
-DROP TABLE IF EXISTS `b_notice`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `b_notice` (
-  `id` bigint(20) NOT NULL AUTO_INCREMENT,
-  `title` varchar(100) DEFAULT NULL,
-  `content` varchar(1000) DEFAULT NULL,
-  `create_time` datetime(6) DEFAULT NULL,
-  PRIMARY KEY (`id`) USING BTREE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8 ROW_FORMAT=DYNAMIC;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Dumping data for table `b_notice`
---
-
-LOCK TABLES `b_notice` WRITE;
-/*!40000 ALTER TABLE `b_notice` DISABLE KEYS */;
-/*!40000 ALTER TABLE `b_notice` ENABLE KEYS */;
-UNLOCK TABLES;
 
 --
 -- Table structure for table `b_op_log`
@@ -441,29 +199,6 @@ INSERT INTO `b_scanupdateproject` VALUES (1,'国内资源更新扫描','用于�
 /*!40000 ALTER TABLE `b_scanupdateproject` ENABLE KEYS */;
 UNLOCK TABLES;
 
---
--- Table structure for table `b_tag`
---
-
-DROP TABLE IF EXISTS `b_tag`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `b_tag` (
-  `id` bigint(20) NOT NULL AUTO_INCREMENT,
-  `title` varchar(100) DEFAULT NULL,
-  `create_time` datetime(6) DEFAULT NULL,
-  PRIMARY KEY (`id`) USING BTREE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8 ROW_FORMAT=DYNAMIC;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Dumping data for table `b_tag`
---
-
-LOCK TABLES `b_tag` WRITE;
-/*!40000 ALTER TABLE `b_tag` DISABLE KEYS */;
-/*!40000 ALTER TABLE `b_tag` ENABLE KEYS */;
-UNLOCK TABLES;
 
 --
 -- Table structure for table `b_thing`
@@ -486,48 +221,9 @@ CREATE TABLE `b_thing` (
   `sfz` varchar(20) DEFAULT NULL,
   `xuehao` varchar(20) DEFAULT NULL,
   `remark` varchar(30) DEFAULT NULL,
-  PRIMARY KEY (`id`) USING BTREE,
-  KEY `b_thing_classification_id_47675ac4_fk_b_classification_id` (`classification_id`) USING BTREE,
-  CONSTRAINT `b_thing_classification_id_47675ac4_fk_b_classification_id` FOREIGN KEY (`classification_id`) REFERENCES `b_classification` (`id`)
+  PRIMARY KEY (`id`) USING BTREE
 ) ENGINE=InnoDB AUTO_INCREMENT=11 DEFAULT CHARSET=utf8 ROW_FORMAT=DYNAMIC;
-/*!40101 SET character_set_client = @saved_cs_client */;
 
---
--- Dumping data for table `b_thing`
---
-
-LOCK TABLES `b_thing` WRITE;
-/*!40000 ALTER TABLE `b_thing` DISABLE KEYS */;
-/*!40000 ALTER TABLE `b_thing` ENABLE KEYS */;
-UNLOCK TABLES;
-
---
--- Table structure for table `b_thing_tag`
---
-
-DROP TABLE IF EXISTS `b_thing_tag`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `b_thing_tag` (
-  `id` bigint(20) NOT NULL AUTO_INCREMENT,
-  `thing_id` bigint(20) NOT NULL,
-  `tag_id` bigint(20) NOT NULL,
-  PRIMARY KEY (`id`) USING BTREE,
-  UNIQUE KEY `b_thing_tag_thing_id_tag_id_a5d426b2_uniq` (`thing_id`,`tag_id`) USING BTREE,
-  KEY `b_thing_tag_tag_id_d02b28a1_fk_b_tag_id` (`tag_id`) USING BTREE,
-  CONSTRAINT `b_thing_tag_tag_id_d02b28a1_fk_b_tag_id` FOREIGN KEY (`tag_id`) REFERENCES `b_tag` (`id`),
-  CONSTRAINT `b_thing_tag_thing_id_fb8ecf3f_fk_b_thing_id` FOREIGN KEY (`thing_id`) REFERENCES `b_thing` (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8 ROW_FORMAT=DYNAMIC;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Dumping data for table `b_thing_tag`
---
-
-LOCK TABLES `b_thing_tag` WRITE;
-/*!40000 ALTER TABLE `b_thing_tag` DISABLE KEYS */;
-/*!40000 ALTER TABLE `b_thing_tag` ENABLE KEYS */;
-UNLOCK TABLES;
 
 --
 -- Table structure for table `b_user`
@@ -585,10 +281,7 @@ CREATE TABLE `c_page_script_configs` (
   `is_enabled` tinyint(1) NOT NULL,
   `display_order` int(11) NOT NULL,
   `script_id` bigint(20) NOT NULL,
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `c_page_script_configs_page_route_script_id_defd5fcd_uniq` (`page_route`,`script_id`),
-  KEY `c_page_script_configs_script_id_ea05f57c_fk_c_scripts_id` (`script_id`),
-  CONSTRAINT `c_page_script_configs_script_id_ea05f57c_fk_c_scripts_id` FOREIGN KEY (`script_id`) REFERENCES `c_scripts` (`id`)
+  PRIMARY KEY (`id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=52 DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -661,16 +354,7 @@ CREATE TABLE `c_task_executions` (
   `celery_task_id` int(11) DEFAULT NULL,
   `script_id` bigint(20) NOT NULL,
   `user_id` bigint(20) NOT NULL,
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `task_id` (`task_id`),
-  UNIQUE KEY `celery_task_id` (`celery_task_id`),
-  KEY `c_task_exec_status_4e2528_idx` (`status`),
-  KEY `c_task_exec_script__69add1_idx` (`script_id`,`created_at`),
-  KEY `c_task_exec_user_id_5e952b_idx` (`user_id`,`created_at`),
-  KEY `c_task_exec_page_co_934b65_idx` (`page_context`),
-  CONSTRAINT `c_task_executions_celery_task_id_3c3ef596_fk_django_ce` FOREIGN KEY (`celery_task_id`) REFERENCES `django_celery_results_taskresult` (`id`),
-  CONSTRAINT `c_task_executions_script_id_874d298e_fk_c_scripts_id` FOREIGN KEY (`script_id`) REFERENCES `c_scripts` (`id`),
-  CONSTRAINT `c_task_executions_user_id_9e6ce65e_fk_b_user_id` FOREIGN KEY (`user_id`) REFERENCES `b_user` (`id`)
+  PRIMARY KEY (`id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=103 DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -700,11 +384,7 @@ CREATE TABLE `django_admin_log` (
   `change_message` longtext NOT NULL,
   `content_type_id` int(11) DEFAULT NULL,
   `user_id` int(11) NOT NULL,
-  PRIMARY KEY (`id`) USING BTREE,
-  KEY `django_admin_log_content_type_id_c4bce8eb_fk_django_co` (`content_type_id`) USING BTREE,
-  KEY `django_admin_log_user_id_c564eba6_fk_auth_user_id` (`user_id`) USING BTREE,
-  CONSTRAINT `django_admin_log_content_type_id_c4bce8eb_fk_django_co` FOREIGN KEY (`content_type_id`) REFERENCES `django_content_type` (`id`),
-  CONSTRAINT `django_admin_log_user_id_c564eba6_fk_auth_user_id` FOREIGN KEY (`user_id`) REFERENCES `auth_user` (`id`)
+  PRIMARY KEY (`id`) USING BTREE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8 ROW_FORMAT=DYNAMIC;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -1057,8 +737,7 @@ CREATE TABLE `django_session` (
   `session_key` varchar(40) NOT NULL,
   `session_data` longtext NOT NULL,
   `expire_date` datetime(6) NOT NULL,
-  PRIMARY KEY (`session_key`) USING BTREE,
-  KEY `django_session_expire_date_a5c62663` (`expire_date`) USING BTREE
+  PRIMARY KEY (`session_key`) USING BTREE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8 ROW_FORMAT=DYNAMIC;
 /*!40101 SET character_set_client = @saved_cs_client */;
 

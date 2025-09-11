@@ -63,11 +63,11 @@ CORS_ORIGIN_ALLOW_ALL = True  # 允许跨域,允许所有IP访问，就不要设
 CORS_ALLOW_CREDENTIALS = True
 
 CSRF_TRUSTED_ORIGINS = [
-    'http://172.16.36.247:8001',#替换成自己的前端url
+    'http://172.16.36.233:8001',#替换成自己的前端url
 ]
 
 CORS_ORIGIN_WHITELIST = (
-'http://172.16.36.247:8001',#替换成自己的前端url
+'http://172.16.36.233:8001',#替换成自己的前端url
 )
 
 CORS_ALLOW_METHODS = (
@@ -130,7 +130,7 @@ WSGI_APPLICATION = 'server.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.mysql',
-        'NAME': 'python_student',
+        'NAME': 'autotest',
         'USER': 'root',
         'PASSWORD': '123456',
         'HOST': '127.0.0.1',
