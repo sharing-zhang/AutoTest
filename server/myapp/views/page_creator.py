@@ -491,7 +491,7 @@ const scanResultcolumns = reactive([
     width: 100
   }},
   {{
-    title: '{page_title}文件名',
+    title: '文件名',
     dataIndex: 'scandevresult_filename',
     align: "center",
     key: 'scandevresult_filename',
