@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-文件解析检查脚本 - 检查progressRewards配置数据
-解析指定文件并提取满足条件的数据块
+文件解析检查脚本 - 检查 progressRewards 配置数据
+根据用户输入：目录、文件名（可多项）、最大奖励数值，扫描并输出超过阈值的配置项
 """
 
 import os
@@ -15,6 +15,7 @@ import time
 import traceback
 from datetime import datetime
 from typing import Dict, Any, Optional, List
+from typing import Pattern
 
 
 class ScriptBase:
@@ -187,65 +188,155 @@ def detect_encoding(file_path: str) -> str:
     return result['encoding']
 
 
-def parse_file(file_path: str) -> List[Dict[str, str]]:
-    """解析文件并提取指定条件的数据块"""
+def parse_file(
+    file_path: str,
+    max_reward: int,
+    count: str,
+    reward_id_regex: Optional[Pattern[str]] = None,
+    reward_id_value: Optional[str] = None
+) -> List[Dict[str, Any]]:
+    """解析文件并提取大于阈值且匹配奖励ID条件的 progressRewards 配置块"""
     encoding = detect_encoding(file_path)
     with open(file_path, 'r', encoding=encoding) as file:
         content = file.read()
 
-    # 找到所有 progressRewards { ... };
+    # 匹配所有 progressRewards { ... } 块
     pattern = r'progressRewards\s*\{\s*([^}]+)\s*\};'
     blocks = re.findall(pattern, content)
-    result = []
+    result: List[Dict[str, Any]] = []
 
     for block in blocks:
         # 匹配每一项 key="value";
         pairs = re.findall(r'(\w+)\s*=\s*"([^"]+)"', block)
-        d = {k: v for k, v in pairs}
-        # 满足 tpId 以"971"开头 且 count > 1
-        if d.get("tpId", "").startswith("971") and int(d.get("count", "0")) > 1:
-            result.append(d)
+        item = {k: v for k, v in pairs}
+
+        # 奖励数值字段约定为 count（若后续有变化可扩展）
+        try:
+            count_value = int(item.get(count, '0'))
+        except ValueError:
+            count_value = 0
+
+        # 奖励ID过滤（tpId），支持正则或精确匹配
+        tp_id = item.get('tpId', '')
+        id_match_ok = True
+        if reward_id_regex is not None:
+            try:
+                id_match_ok = bool(reward_id_regex.search(tp_id))
+            except Exception:
+                id_match_ok = False
+        elif reward_id_value:
+            id_match_ok = (tp_id == str(reward_id_value))
+
+        if id_match_ok and count_value > max_reward:
+            item['count_value'] = count_value
+            result.append(item)
 
     return result
 
 
-def main_logic(script: ScriptBase) -> Dict[str, Any]:
-    """主要业务逻辑"""
+def find_target_files(root_directory: str, file_names: List[str], recursive: bool = False) -> List[str]:
+    """在目录中查找目标文件（支持多文件名与递归）"""
+    normalized = {str(n).strip() for n in (file_names or []) if str(n).strip()}
+    matched: List[str] = []
 
-    # 从参数获取配置，如果没有则使用默认值
-    root_path = script.get_parameter('root_path', r"D:\dev")
-    mission_paths = script.get_parameter('mission_paths', [
-        r"datapool\ElementData\BaseData\POINT_PROGRESS_REWARD_ENDLESS.data.txt",
-        r"datapool\ElementData\BaseData\POINT_PROGRESS_REWARD.data.txt",
-    ])
+    if not normalized:
+        return matched
 
-    script.info(f"开始检查文件，根路径: {root_path}")
-    script.info(f"检查文件列表: {mission_paths}")
-
-    all_results = {}
-    warning_files = []  # 有问题的文件
-
-    for mission_path in mission_paths:
-        file_path = os.path.join(root_path, mission_path)
-
-        script.debug(f"正在检查文件: {file_path}")
-
-        if not os.path.exists(file_path):
-            error_msg = f"文件不存在：{file_path}"
-            script.warning(error_msg)
-            all_results[mission_path] = {"error": error_msg, "filtered_blocks": []}
-            continue
-
+    if recursive:
+        for dirpath, _, files in os.walk(root_directory):
+            for fname in files:
+                if fname in normalized:
+                    matched.append(os.path.join(dirpath, fname))
+    else:
         try:
-            filtered_blocks = parse_file(file_path)
-            all_results[mission_path] = {
+            for fname in os.listdir(root_directory):
+                path = os.path.join(root_directory, fname)
+                if os.path.isfile(path) and fname in normalized:
+                    matched.append(path)
+        except Exception:
+            pass
+
+    return matched
+
+
+def main_logic(script: ScriptBase) -> Dict[str, Any]:
+    """主要业务逻辑：扫描大于最大奖励数值的配置项"""
+
+    # 读取参数
+    directory = script.get_parameter('directory', r"D:\dev")
+    file_names_param = script.get_parameter('file_names', [
+        "POINT_PROGRESS_REWARD_ENDLESS.data.txt",
+        "POINT_PROGRESS_REWARD.data.txt"
+    ])
+    count= script.get_parameter('count_id', "count")
+    recursive = bool(script.get_parameter('recursive', False))
+    max_reward_param = script.get_parameter('max_reward', 1)
+    reward_id_param = script.get_parameter('reward_id', '')  # 支持正则或精确值
+
+    # 归一化参数
+    if isinstance(file_names_param, str):
+        file_names = [seg.strip() for seg in file_names_param.split(',') if seg.strip()]
+    elif isinstance(file_names_param, (list, tuple)):
+        file_names = [str(x).strip() for x in file_names_param if str(x).strip()]
+    else:
+        file_names = [str(file_names_param)]
+
+    try:
+        max_reward = int(max_reward_param)
+    except Exception:
+        max_reward = 1
+
+    # 解析奖励ID过滤器
+    reward_id_regex: Optional[Pattern[str]] = None
+    reward_id_value: Optional[str] = None
+    reward_id_text = str(reward_id_param).strip() if reward_id_param is not None else ''
+    if reward_id_text:
+        # 尝试编译为正则；若失败则作为精确匹配值
+        try:
+            reward_id_regex = re.compile(reward_id_text)
+        except re.error:
+            reward_id_regex = None
+            reward_id_value = reward_id_text
+
+    script.info(f"开始检查，目录: {directory}")
+    script.info(f"目标文件名: {file_names} (递归: {recursive})")
+    script.info(f"最大奖励阈值: {max_reward}")
+    script.info(f"配置表数量ID字段: {count}")
+    if reward_id_text:
+        script.info(f"奖励ID过滤: {'正则' if reward_id_regex else '精确'} = {reward_id_text}")
+
+    # 查找文件
+    target_files = find_target_files(directory, file_names, recursive)
+
+    if not target_files:
+        return script.success_result(
+            message="未找到任何目标文件",
+            data={
+                "searched_directory": directory,
+                "target_file_names": file_names,
+                "recursive": recursive,
+                "max_reward": max_reward,
+                "files": [],
+                "summary": {"total_files": 0, "problem_files": 0}
+            }
+        )
+
+    all_results: Dict[str, Any] = {}
+    warning_files: List[str] = []
+
+    for file_path in target_files:
+        script.debug(f"正在检查文件: {file_path}")
+        try:
+            filtered_blocks = parse_file(file_path, max_reward, count, reward_id_regex, reward_id_value)
+            all_results[file_path] = {
                 "file_path": file_path,
-                "filtered_blocks": filtered_blocks,
-                "block_count": len(filtered_blocks)
+                "encoding": detect_encoding(file_path),
+                "exceeded_blocks": filtered_blocks,
+                "exceeded_count": len(filtered_blocks)
             }
 
             if filtered_blocks:
-                script.warning(f"发现问题文件: {file_path}, 找到 {len(filtered_blocks)} 个匹配的数据块")
+                script.warning(f"发现大于阈值的配置: {file_path}, 共 {len(filtered_blocks)} 条")
                 warning_files.append(file_path)
             else:
                 script.info(f"文件检查通过: {file_path}")
@@ -253,27 +344,31 @@ def main_logic(script: ScriptBase) -> Dict[str, Any]:
         except Exception as e:
             error_msg = f"解析文件失败: {file_path}, 错误: {str(e)}"
             script.error(error_msg)
-            all_results[mission_path] = {"error": error_msg, "filtered_blocks": []}
+            all_results[file_path] = {"error": error_msg, "exceeded_blocks": []}
 
-    # 准备返回结果
-    total_files = len(mission_paths)
+    total_files = len(target_files)
     problem_files = len(warning_files)
 
-    if problem_files > 0:
-        message = f"检查完成，发现 {problem_files}/{total_files} 个文件存在问题"
-    else:
-        message = f"检查完成，所有 {total_files} 个文件都通过检查"
+    message = (
+        f"检查完成，发现 {problem_files}/{total_files} 个文件存在大于阈值的配置"
+        if problem_files > 0 else f"检查完成，所有 {total_files} 个文件都通过检查"
+    )
 
     return script.success_result(
         message=message,
         data={
-            "check_summary": {
+            "searched_directory": directory,
+            "target_file_names": file_names,
+            "recursive": recursive,
+            "max_reward": max_reward,
+            "count_field": count,
+            "reward_id": reward_id_text,
+            "summary": {
                 "total_files": total_files,
                 "problem_files": problem_files,
                 "warning_files": warning_files
             },
-            "detailed_results": all_results,
-            "root_path": root_path
+            "detailed_results": all_results
         }
     )
 

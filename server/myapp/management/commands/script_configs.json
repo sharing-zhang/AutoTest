@@ -49,6 +49,57 @@
       "default": "list"
     }
   ],
+  "check_Reward": [
+    {
+      "name": "directory",
+      "type": "text",
+      "label": "目录路径",
+      "required": true,
+      "default": "C:\\temp",
+      "placeholder": "例如: C:\\temp 或 /home/user/documents"
+    },
+    {
+      "name": "file_names",
+      "type": "tags",
+      "label": "需要检查的文件名",
+      "required": true,
+      "multiple": true,
+      "default": [
+        "POINT_PROGRESS_REWARD_ENDLESS.data.txt",
+        "POINT_PROGRESS_REWARD.data.txt"
+      ],
+      "placeholder": "输入文件名，按回车添加"
+    },
+    {
+      "name": "reward_id",
+      "type": "text",
+      "label": "奖励ID(支持正则)",
+      "required": true,
+      "placeholder": "例如: 971.* 或 9711001"
+    },
+    {
+      "name": "count_id",
+      "type": "text",
+      "label": "配置表数量ID",
+      "required": true,
+      "default": "count"
+    },
+    {
+      "name": "recursive",
+      "type": "switch",
+      "label": "递归扫描子目录",
+      "required": false,
+      "default": false
+    },
+    {
+      "name": "max_reward",
+      "type": "number",
+      "label": "最大奖励数值",
+      "required": true,
+      "default": 1,
+      "min": 1
+    }
+  ],
   "check_ConfigTime": [
     {
       "name": "directory",
