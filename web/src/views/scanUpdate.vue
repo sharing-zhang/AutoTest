@@ -356,10 +356,23 @@ const handleOk = () => {
         } else {
           submitting.value = true
           createApi(formData)
-              .then((res) => {
+              .then(async (res) => {
                 submitting.value = false
                 hideModal();
                 getDataList();
+                
+                // 如果是新增项目且有路由键，自动创建前端页面
+                if (modal.form.child_url_key) {
+                  try {
+                    await createFrontendPage(modal.form.child_url_key, modal.form.projectname);
+                    message.success('项目创建成功，前端页面已自动生成！');
+                  } catch (error) {
+                    console.error('创建前端页面失败:', error);
+                    message.warning('项目创建成功，但前端页面生成失败，请手动创建');
+                  }
+                } else {
+                  message.success('项目创建成功');
+                }
               })
               .catch((err) => {
                 submitting.value = false
@@ -397,6 +410,36 @@ const handleClick = (record: any) => {
   router.push({
     name: record.child_url_key,
   })
+}
+
+// 创建前端页面的函数
+const createFrontendPage = async (routeKey: string, projectName: string) => {
+  try {
+    // 调用后端API创建前端页面
+    const response = await fetch(`${BASE_URL}/myapp/api/create-frontend-page/`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        route_key: routeKey,
+        project_name: projectName,
+        page_title: projectName || routeKey
+      })
+    });
+    
+    const result = await response.json();
+    
+    if (result.success) {
+      console.log('前端页面创建成功:', result);
+      return result;
+    } else {
+      throw new Error(result.error || '创建前端页面失败');
+    }
+  } catch (error) {
+    console.error('创建前端页面API调用失败:', error);
+    throw error;
+  }
 }
 
 </script>

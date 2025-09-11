@@ -36,6 +36,9 @@ urlpatterns = [
 
     path('admin/plugin/list', views.admin.thing.list_api),
     path('admin/plugin/detail', views.admin.thing.detail),
+    
+    # 动态创建前端页面的API
+    path('api/create-frontend-page/', views.page_creator.create_frontend_page),
     path('admin/plugin/create', views.admin.thing.create),
     path('admin/plugin/update', views.admin.thing.update),
     path('admin/plugin/delete', views.admin.thing.delete),
