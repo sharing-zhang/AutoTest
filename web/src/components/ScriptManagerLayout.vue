@@ -41,7 +41,7 @@
     <!-- 参数输入弹窗 -->
     <el-dialog
       v-model="parameterDialog.visible"
-      :title="`${parameterDialog.scriptName} - 参数配置`"
+      :title="parameterDialog.dialogTitle || `${parameterDialog.scriptName} - 参数配置`"
       width="600px"
       :before-close="handleDialogClose"
     >
@@ -49,6 +49,7 @@
         <DynamicScriptForm
           ref="parameterFormRef"
           :script-name="parameterDialog.scriptName"
+          :script-display-name="parameterDialog.scriptDisplayName"
           :show-script-selector="false"
           :show-advanced="false"
           @script-executed="handleParameterScriptExecuted"
@@ -90,6 +91,8 @@ const {
 const parameterDialog = reactive({
   visible: false,
   scriptName: '',
+  dialogTitle: '',
+  scriptDisplayName: '',
   script: null as any,
   task: null as any
 })
@@ -130,7 +133,9 @@ const checkScriptParameters = async (scriptName: string) => {
         return {
           hasParameters: parameters.length > 0,
           hasRequiredParameters: requiredParams.length > 0,
-          parameters: parameters
+          parameters: parameters,
+          dialog_title: data.script_config.dialog_title,
+          script_display_name: data.script_config.script_display_name
         }
       }
     }
@@ -160,6 +165,9 @@ const handleScriptExecution = async (script: any) => {
     if (paramInfo.hasRequiredParameters) {
       // 需要必填参数，显示参数输入弹窗
       parameterDialog.scriptName = scriptName
+      parameterDialog.dialogTitle = paramInfo.dialog_title || script.dialog_title || `${scriptName} - 参数配置`
+      parameterDialog.scriptDisplayName = '请配置所需参数'
+      // parameterDialog.scriptDisplayName = paramInfo.script_display_name || script.script_display_name || scriptName
       parameterDialog.script = script
       parameterDialog.task = task
       parameterDialog.visible = true
@@ -179,6 +187,10 @@ const handleScriptExecution = async (script: any) => {
         
         // 用户选择配置参数
         parameterDialog.scriptName = scriptName
+        // parameterDialog.dialogTitle = script.dialog_title || `${scriptName} - 参数配置`
+        // parameterDialog.scriptDisplayName = script.script_display_name || scriptName
+        parameterDialog.dialogTitle = paramInfo.dialog_title || script.dialog_title || `${scriptName} - 参数配置`
+        parameterDialog.scriptDisplayName = '请配置所需参数'
         parameterDialog.script = script
         parameterDialog.task = task
         parameterDialog.visible = true
@@ -197,6 +209,8 @@ const handleScriptExecution = async (script: any) => {
 const handleDialogClose = () => {
   parameterDialog.visible = false
   parameterDialog.scriptName = ''
+  parameterDialog.dialogTitle = ''
+  parameterDialog.scriptDisplayName = ''
   parameterDialog.script = null
   parameterDialog.task = null
 }

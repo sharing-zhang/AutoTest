@@ -336,6 +336,8 @@ export function useScriptManager(pageRoute: string) {
             button_style: config.button_style || {},
             position: config.position || 'top-right',
             display_order: config.display_order || 0,
+            dialog_title: config.dialog_title,
+            script_display_name: config.script_display_name,
             config_id: config.id
           })
         })

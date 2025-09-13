@@ -53,16 +53,48 @@ class ScriptConfigManager:
         print(f"查找脚本配置: {script_name} -> {script_key}")
         print(f"可用配置键: {list(self._config_cache.keys())}")
         
-        config = self._config_cache.get(script_key, [])
-        print(f"找到配置: {len(config)} 个参数")
+        config = self._config_cache.get(script_key, {})
         
-        return config
+        # 处理新的配置结构
+        if isinstance(config, dict) and 'parameters' in config:
+            parameters = config.get('parameters', [])
+            print(f"找到配置: {len(parameters)} 个参数")
+            return parameters
+        elif isinstance(config, list):
+            # 兼容旧格式
+            print(f"找到配置: {len(config)} 个参数")
+            return config
+        else:
+            print(f"未找到配置")
+            return []
     
     def get_all_scripts(self) -> List[str]:
         """获取所有配置的脚本名称"""
         if not self._config_cache:
             return []
         return list(self._config_cache.keys())
+    
+    def get_script_display_info(self, script_name: str) -> Dict[str, str]:
+        """获取脚本的显示信息（标题和显示名称）"""
+        if not self._config_cache:
+            return {}
+        
+        # 移除.py后缀（如果存在）来匹配配置键
+        script_key = script_name.replace('.py', '') if script_name.endswith('.py') else script_name
+        config = self._config_cache.get(script_key, {})
+        
+        # 处理新的配置结构
+        if isinstance(config, dict):
+            return {
+                'dialog_title': config.get('dialog_title', f'{script_name} - 参数配置'),
+                'script_display_name': config.get('script_display_name', script_name)
+            }
+        else:
+            # 兼容旧格式，返回默认值
+            return {
+                'dialog_title': f'{script_name} - 参数配置',
+                'script_display_name': script_name
+            }
     
     def validate_parameters(self, script_name: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
         """验证脚本参数"""
@@ -175,11 +207,14 @@ class ScriptConfigManager:
     def get_parameter_schema(self, script_name: str) -> Dict[str, Any]:
         """获取参数模式定义，用于前端渲染"""
         config = self.get_script_config(script_name)
+        display_info = self.get_script_display_info(script_name)
         
         schema = {
             'script_name': script_name,
             'parameters': config,
-            'form_layout': self._generate_form_layout(config)
+            'form_layout': self._generate_form_layout(config),
+            'dialog_title': display_info.get('dialog_title', f'{script_name} - 参数配置'),
+            'script_display_name': display_info.get('script_display_name', script_name)
         }
         
         return schema
