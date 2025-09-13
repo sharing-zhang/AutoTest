@@ -46,9 +46,19 @@ def create_frontend_page(request):
         # 检查路由键是否已存在
         if check_route_exists(route_key):
             return JsonResponse({
-                'success': False,
-                'error': f'路由键 "{route_key}" 已存在，请使用其他名称'
-            }, status=400)
+          
+                'success': True,
+                'message': f'路由键 "{route_key}" 已存在，直接进入已有页面',
+                'route_key': route_key,
+                'existing': True,
+                'api_endpoints': {
+                    'list': '/myapp/admin/scanDevUpdate/scanResultlist',
+                    'create': '/myapp/admin/scanDevUpdate/scanResultcreate',
+                    'update': '/myapp/admin/scanDevUpdate/scanResultupdate',
+                    'delete': '/myapp/admin/scanDevUpdate/scanResultdelete',
+                    'detail': '/myapp/admin/scanDevUpdate/scanResultdetail'
+                }
+            })
         
         # 创建Vue组件文件
         vue_file_path = create_vue_component(route_key, project_name, page_title)
