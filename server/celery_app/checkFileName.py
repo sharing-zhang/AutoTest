@@ -1,17 +1,39 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-文件名合规性检查脚本
-功能：检查Unity项目中的文件名规范，包括非法后缀和重名文件检测
-支持用户自定义路径和基准文件对比
+文件名合规性检查脚本（优化版）
+功能：检查项目中的文件名规范，包括非法后缀和重名文件检测
 """
 
-import datetime
 import os
 import re
 import sys
+import gc
+import time
+import threading
 from collections import defaultdict
 from script_base import ScriptBase, create_simple_script
+
+# 设置更保守的递归限制
+sys.setrecursionlimit(500)
+
+
+# ==================== 全局配置 ====================
+class CheckConfig:
+    MAX_FILES = 20000  # 降低文件数量限制
+    BATCH_SIZE = 500  # 批处理大小
+    GC_FREQUENCY = 200  # 垃圾回收频率
+    TIMEOUT_SECONDS = 30  # 超时时间
+    MAX_PATH_LENGTH = 260  # 最大路径长度
+
+
+# ==================== 超时控制 ====================
+class TimeoutException(Exception):
+    pass
+
+
+def timeout_handler():
+    raise TimeoutException("脚本执行超时")
 
 
 # ==================== 导入和路径设置 ====================
@@ -22,439 +44,313 @@ def setup_imports():
         sys.path.insert(0, current_dir)
 
 
-# 设置导入路径
 setup_imports()
 
-# ==================== 文件遍历函数 ====================
-def find_all_Configuration_in_InBundle(allFiles_InBundle, configuration_table_path):
-    """找出指定文件夹下所有文件
-    
-    Args:
-        allFiles_InBundle: 用于存储文件路径的列表
-        configuration_table_path: 要遍历的目录路径
-    """
-    # 将所有找到的文件存在列表中
-    for filepath, dirnames, filenames in os.walk(configuration_table_path):
-        for filename in filenames:
-            allFiles_InBundle.append(os.path.join(filepath, filename))
-    # 用于输出所有找到的文件
-    # for file in allFiles_InBundle:
-    #     print(file)
 
-
-# ==================== 辅助函数区域 ====================
-def validate_extension(script, ext):
-    """严格校验后缀规则（只允许纯小写字母）"""
-    script.debug(f"校验文件扩展名: {ext}")
-    errors = []
-    if ext:
-        ext_part = ext[1:]  # 去除扩展名的点
-        if not ext_part:
-            errors.append("空后缀")
-        elif not re.fullmatch(r'^[a-z]+$', ext_part):
-            errors.append("非纯小写字母")
-    return errors
-
-
-def get_abnormal_extensions(script, directory):
-    """获取非法后缀文件"""
-    script.info(f"开始检查目录: {directory}")
-
-    if not os.path.exists(directory):
-        script.warning(f"目录不存在 - {directory}")
-        return defaultdict(list)
+# ==================== 安全文件遍历 ====================
+def safe_walk_directory(directory_path, script, max_files=None):
+    """安全的目录遍历，带有更多保护机制"""
+    if max_files is None:
+        max_files = CheckConfig.MAX_FILES
 
     all_files = []
+    file_count = 0
+    processed_dirs = 0
+
     try:
-        find_all_Configuration_in_InBundle(all_files, directory)
-        script.info(f"共扫描文件: {len(all_files)} 个")
-    except Exception as e:
-        script.error(f"文件遍历出错: {e}")
-        return defaultdict(list)
+        script.info(f"开始遍历目录: {directory_path}")
 
-    error_dict = defaultdict(list)
-    for file_path in all_files:
-        try:
-            ext = os.path.splitext(file_path)[1]
-            if errors := validate_extension(script, ext):
-                error_type = "+".join(errors)
-                normalized_path = os.path.normpath(file_path).lower()
-                error_dict[error_type].append((file_path, normalized_path))
-        except Exception as e:
-            script.warning(f"处理文件时出错 {file_path}: {e}")
-            continue
-
-    script.info(f"发现异常后缀类型: {len(error_dict)} 种")
-    return error_dict
-
-
-def find_duplicate_prefab_files(script, directory, subdirectories=None):
-    """查找重名prefab文件"""
-    script.info("开始检查重名Prefab文件")
-
-    files_dict = defaultdict(list)
-    subdirectories = subdirectories or ['']
-
-    for subdir in subdirectories:
-        current_dir = os.path.join(directory, subdir)
-        if not os.path.exists(current_dir):
-            script.warning(f"子目录不存在 - {current_dir}")
-            continue
-
-        try:
-            for root, _, files in os.walk(current_dir):
-                for file in files:
-                    if file.lower().endswith('.prefab'):
-                        full_path = os.path.join(root, file)
-                        normalized = os.path.normpath(full_path).lower()
-                        files_dict[file.lower()].append((full_path, normalized))
-        except Exception as e:
-            script.error(f"遍历目录时出错 {current_dir}: {e}")
-            continue
-
-    duplicates = {}
-    for name, paths in files_dict.items():
-        if len(paths) > 1:
-            duplicates[name] = sorted(paths, key=lambda x: x[1])
-
-    script.info(f"发现重名文件组: {len(duplicates)} 组")
-    return duplicates
-
-
-def parse_benchmark(script, content):
-    """解析基准文件内容"""
-    script.debug("解析基准文件内容")
-
-    benchmark = {
-        'abnormal': defaultdict(set),
-        'duplicates': defaultdict(set)
-    }
-
-    current_section = None
-    current_group = None
-
-    for line in content.split('\n'):
-        line = line.strip()
-        if '===' in line:
-            if '非法文件后缀检查' in line:
-                current_section = 'abnormal'
-            elif '重名Prefab文件检查' in line:
-                current_section = 'duplicates'
-            else:
-                current_section = None
-            continue
-
-        if current_section == 'abnormal' and line.startswith('->'):
-            path = os.path.normpath(line[2:].strip()).lower()
-            benchmark['abnormal']['非法文件后缀检查'].add(path)
-
-        elif current_section == 'duplicates':
-            if line.startswith(('1.', '2.', '3.')):
-                if '同名文件: ' in line:
-                    current_group = line.split('同名文件: ')[1].strip().lower()
-            elif line.startswith('  -') and current_group:
-                path = os.path.normpath(line[3:].strip()).lower()
-                benchmark['duplicates'][current_group].add(path)
-
-    return benchmark
-
-
-def generate_full_report(script, abnormal, duplicates):
-    """生成完整报告用于更新基准"""
-    script.debug("生成完整报告")
-
-    content = []
-    if abnormal:
-        content.append("=== 非法文件后缀检查 ===\n")
-        for err_type, files in abnormal.items():
-            sorted_files = sorted(files, key=lambda x: x[1])
-            content.append(f"[ERROR] 违规类型：{err_type}（{len(sorted_files)}个）\n")
-            for f in sorted_files:
-                if 'InBundle' in f[0]:
-                    relative_path = f[0].split('InBundle', 1)[-1]
-                else:
-                    relative_path = f[0]
-                content.append(f"   -> {relative_path}\n")
-            content.append("\n")
-
-    if duplicates:
-        content.append("\n=== 重名Prefab文件检查 ===\n")
-        for idx, (name, paths) in enumerate(duplicates.items(), 1):
-            content.append(f"{idx}. 同名文件: {name}\n")
-            sorted_paths = sorted(paths, key=lambda x: x[1])
-            for p in sorted_paths:
-                if 'InBundle' in p[0]:
-                    relative_path = p[0].split('InBundle', 1)[-1]
-                else:
-                    relative_path = p[0]
-                content.append(f"   - {relative_path}\n")
-            content.append("\n")
-
-    return "".join(content)
-
-
-def generate_diff_report(script, current_abnormal, current_dups, benchmark):
-    """生成差异报告"""
-    script.debug("生成差异报告")
-
-    content = []
-    new_abnormal = defaultdict(list)
-    new_duplicates = defaultdict(list)
-    removed_abnormal = defaultdict(list)
-    removed_duplicates = defaultdict(list)
-
-    bench_abnormal_paths = set(item for sublist in benchmark['abnormal'].values() for item in sublist)
-    current_abnormal_paths = set(f[1] for files in current_abnormal.values() for f in files)
-
-    # 检测新增非法后缀文件
-    for err_type, files in current_abnormal.items():
-        filtered = [f for f in files if f[1] not in bench_abnormal_paths]
-        if filtered:
-            new_abnormal[err_type].extend(filtered)
-
-    # 检测减少非法后缀文件
-    for path in bench_abnormal_paths - current_abnormal_paths:
-        for err_type, files in benchmark['abnormal'].items():
-            if path in files:
-                removed_abnormal[err_type].append(path)
+        for root, dirs, files in os.walk(directory_path):
+            # 检查超时
+            if file_count > max_files:
+                script.warning(f"文件数量超过限制 {max_files}，停止遍历")
                 break
 
-    # 检测新增重名文件组
-    for name, paths in current_dups.items():
-        current_paths_set = set(p[1] for p in paths)
-        bench_paths_set = benchmark['duplicates'].get(name.lower(), set())
+            # 过滤危险目录
+            dirs[:] = [d for d in dirs if not _is_dangerous_dir(d)]
 
-        new_paths = current_paths_set - bench_paths_set
-        if new_paths:
-            new_duplicates[name].extend([p for p in paths if p[1] in new_paths])
+            # 限制目录深度
+            processed_dirs += 1
+            if processed_dirs > 1000:
+                script.warning("目录数量过多，停止遍历")
+                break
 
-    # 检测减少重名文件组
-    bench_duplicates = set(benchmark['duplicates'])
-    current_duplicates = set(current_dups)
+            # 批量处理文件
+            batch_files = []
+            for filename in files:
+                if file_count >= max_files:
+                    break
 
-    for name in bench_duplicates - current_duplicates:
-        removed_duplicates[name.lower()].extend(list(benchmark['duplicates'][name]))
+                try:
+                    # 基本文件过滤
+                    if not _is_valid_file(filename, root):
+                        continue
 
-    # 生成报告内容
-    if new_abnormal:
-        content.append("=== 新增非法后缀文件 ===\n")
-        for err_type, files in new_abnormal.items():
-            content.append(f"[ERROR] 违规类型：{err_type}（{len(files)}个）\n")
-            for f in files:
-                if 'InBundle' in f[0]:
-                    relative_path = f[0].split('InBundle', 1)[-1]
-                else:
-                    relative_path = f[0]
-                content.append(f"   -> {relative_path}\n")
-            content.append("\n")
+                    full_path = os.path.join(root, filename)
 
-    if removed_abnormal:
-        content.append("=== 减少非法后缀文件 ===\n")
-        for err_type, files in removed_abnormal.items():
-            content.append(f"[ERROR] 违规类型：{err_type}（{len(files)}个）\n")
-            for f in files:
-                if 'InBundle' in f:
-                    relative_path = f.split('InBundle', 1)[-1]
-                else:
-                    relative_path = f
-                content.append(f"   -> {relative_path}\n")
-            content.append("\n")
+                    # 路径长度检查
+                    if len(full_path) > CheckConfig.MAX_PATH_LENGTH:
+                        continue
 
-    if new_duplicates:
-        content.append("\n=== 新增重名文件 ===\n")
-        for idx, (name, paths) in enumerate(new_duplicates.items(), 1):
-            content.append(f"{idx}. 同名文件: {name}\n")
-            sorted_paths = sorted(paths, key=lambda x: x[1])
-            for p in sorted_paths:
-                if 'InBundle' in p[0]:
-                    relative_path = p[0].split('InBundle', 1)[-1]
-                else:
-                    relative_path = p[0]
-                content.append(f"   - {relative_path}\n")
-            content.append("\n")
+                    # 文件存在性检查
+                    if os.path.isfile(full_path):
+                        batch_files.append(full_path)
+                        file_count += 1
 
-    if removed_duplicates:
-        if content:
-            content.append("\n")
-        content.append("=== 减少重名文件组 ===\n")
-        for idx, (name, paths) in enumerate(removed_duplicates.items(), 1):
-            content.append(f"{idx}. 同名文件组: {name}\n")
-            sorted_paths = sorted(paths, key=lambda x: x if isinstance(x, str) else x[1])
-            for p in sorted_paths:
-                path_str = p if isinstance(p, str) else p[0]
-                if 'InBundle' in path_str:
-                    relative_path = path_str.split('InBundle', 1)[-1]
-                else:
-                    relative_path = path_str
-                content.append(f"   - {relative_path}\n")
-            content.append("\n")
+                except (OSError, UnicodeDecodeError, PermissionError):
+                    continue
 
-    report_content = "".join(content).strip()
-    result = report_content if report_content else "[OK] 无新增或减少异常文件"
+            # 批量添加到结果
+            all_files.extend(batch_files)
 
-    return result, new_abnormal, new_duplicates, removed_abnormal, removed_duplicates
+            # 定期垃圾回收
+            if file_count % CheckConfig.GC_FREQUENCY == 0:
+                gc.collect()
+                script.debug(f"已处理 {file_count} 个文件")
+
+    except Exception as e:
+        script.error(f"目录遍历异常: {str(e)}")
+        raise RuntimeError(f"目录遍历失败: {str(e)}")
+
+    script.info(f"遍历完成，共找到 {len(all_files)} 个文件")
+    return all_files
 
 
-def get_benchmark_path(script, output_dir, unity_root_path):
-    """获取基准文件路径"""
-    script.debug(f"生成基准文件路径，Unity路径: {unity_root_path}")
+def _is_dangerous_dir(dirname):
+    """检查是否为危险目录"""
+    dangerous_patterns = [
+        '.',  # 隐藏目录
+        '__pycache__',  # Python缓存
+        'node_modules',  # Node.js模块
+        '.git',  # Git目录
+        '.svn',  # SVN目录
+        'Temp',  # 临时目录
+        'Library',  # Unity库目录
+    ]
+    return any(dirname.startswith(pattern) for pattern in dangerous_patterns)
 
-    # 基于Unity路径生成唯一的基准文件名
-    path_hash = abs(hash(unity_root_path)) % 100000
-    benchmark_filename = f"checkFileName_{path_hash}.txt"
-    benchmark_path = os.path.join(output_dir, "checkFileNameLogs", benchmark_filename)
 
-    # 确保目录存在
-    os.makedirs(os.path.dirname(benchmark_path), exist_ok=True)
+def _is_valid_file(filename, root_path):
+    """检查文件是否有效"""
+    # 跳过隐藏文件和临时文件
+    if filename.startswith('.') or filename.endswith('.tmp'):
+        return False
 
-    return benchmark_path
-
-def validate_data(script, data):
-    """验证结果数据"""
-    script.debug("验证结果数据")
-
-    required_fields = ['current_abnormal', 'current_duplicates', 'diff_report']
-    for field in required_fields:
-        if field not in data:
-            script.error(f"缺少必要字段: {field}")
-            return False
+    # 跳过特殊文件
+    if filename in ['Thumbs.db', 'desktop.ini', '.DS_Store']:
+        return False
 
     return True
 
 
-# ==================== 主逻辑函数 ====================
-def main_logic(script: ScriptBase):
-    """
-    文件名合规性检查主逻辑
+# ==================== 优化的检查函数 ====================
+def validate_extension_safe(script, ext):
+    """安全的扩展名验证"""
+    try:
+        if not ext:
+            return ["无扩展名"]
 
-    Args:
-        script: ScriptBase实例
-    """
+        ext_part = ext[1:] if ext.startswith('.') else ext
 
-    # 1. 获取参数
-    unity_root_path = script.get_parameter('unity_root_path', 'D:\\fishdev')
-    output_dir = script.get_parameter('output_dir', 'D:\\Users\\Administrator\\Desktop')
+        if not ext_part:
+            return ["空扩展名"]
 
-    script.info("文件名合规性检查开始执行")
-    script.debug(f"参数 - Unity根路径: {unity_root_path}")
+        # 只检查基本规则，避免复杂正则
+        if not ext_part.islower():
+            return ["非小写"]
+
+        if not ext_part.isalpha():
+            return ["包含非字母"]
+
+        return []
+
+    except Exception:
+        return ["验证异常"]
+
+
+def check_illegal_extensions_optimized(script, directory):
+    """优化的非法扩展名检查"""
+    script.info("开始优化的扩展名检查")
+
+    if not os.path.exists(directory):
+        script.warning(f"目录不存在: {directory}")
+        return defaultdict(list)
 
     try:
-        # 2. 获取基准文件路径
-        script.info("获取基准文件路径...")
-        benchmark_path = get_benchmark_path(script, output_dir, unity_root_path)
-        script.info(f"Unity根路径: {unity_root_path}")
-        script.info(f"基准文件路径: {benchmark_path}")
+        # 使用安全遍历
+        all_files = safe_walk_directory(directory, script, CheckConfig.MAX_FILES)
 
-        # 3. 创建输出目录
-        script.info("创建输出目录...")
-        os.makedirs(output_dir, exist_ok=True)
+        illegal_files = defaultdict(list)
 
-        # 4. 检查目录路径
-        inbundle_path = script.get_parameter('inbundle_path', "client/MainProject/Assets/InBundle")
-        script.info("检查目录路径...")
-        full_inbundle_path = os.path.join(unity_root_path, inbundle_path)
-        script.info(f"完整检查路径: {full_inbundle_path}")
+        # 分批处理文件
+        for i in range(0, len(all_files), CheckConfig.BATCH_SIZE):
+            batch = all_files[i:i + CheckConfig.BATCH_SIZE]
 
-        if not os.path.exists(full_inbundle_path):
-            script.warning(f"路径不存在 - {full_inbundle_path}")
-            script.info("程序将创建空报告")
+            for file_path in batch:
+                try:
+                    _, ext = os.path.splitext(file_path)
+                    errors = validate_extension_safe(script, ext)
 
-        # 5. 获取异常文件
-        script.info("开始获取异常文件...")
-        current_abnormal = get_abnormal_extensions(script, full_inbundle_path)
+                    if errors:
+                        error_type = "+".join(errors)
+                        illegal_files[error_type].append(file_path)
 
-        # 6. 查找重复文件
-        script.info("开始查找重复文件...")
-        duplicate_check_dirs = script.get_parameter('duplicate_check_dirs', [
-            'client/MainProject/Assets/ArtImport/Fish',
-            'client/MainProject/Assets/InBundle/Fish'
-        ])
-        current_dups = find_duplicate_prefab_files(script, unity_root_path, duplicate_check_dirs)
+                except Exception as e:
+                    script.debug(f"处理文件异常 {file_path}: {e}")
+                    continue
 
-        # 7. 处理基准文件
-        script.info("处理基准文件...")
-        benchmark = {'abnormal': defaultdict(set), 'duplicates': defaultdict(set)}
+            # 批处理后垃圾回收
+            gc.collect()
 
-        if os.path.exists(benchmark_path):
-            try:
-                with open(benchmark_path, 'r', encoding='utf-8') as f:
-                    benchmark = parse_benchmark(script, f.read())
-                script.info(f"基准文件已加载: {benchmark_path}")
-            except Exception as e:
-                script.warning(f"读取基准文件失败: {e}")
-        else:
-            # 创建新的基准文件
-            try:
-                with open(benchmark_path, 'w', encoding='utf-8') as f:
-                    full_report = generate_full_report(script, current_abnormal, current_dups)
-                    f.write(full_report)
-                script.info(f"基准文件已创建: {benchmark_path}")
-            except Exception as e:
-                return script.error_result(f"创建基准文件失败: {e}", "FileCreateError")
-
-        # 8. 生成差异报告
-        script.info("生成差异报告...")
-        diff_content, new_abnormal, new_duplicates, removed_abnormal, removed_duplicates = generate_diff_report(
-            script, current_abnormal, current_dups, benchmark
-        )
-
-        # 9. 处理输出结果
-        result_data = {
-            'unity_root_path': unity_root_path,
-            'check_path': full_inbundle_path,
-            'benchmark_path': benchmark_path,
-            'current_abnormal': dict(current_abnormal),
-            'current_duplicates': dict(current_dups),
-            'diff_report': diff_content,
-            'statistics': {
-                'abnormal_types': len(current_abnormal),
-                'total_abnormal_files': sum(len(files) for files in current_abnormal.values()),
-                'duplicate_groups': len(current_dups),
-                'new_abnormal_count': sum(len(v) for v in new_abnormal.values()),
-                'removed_abnormal_count': sum(len(v) for v in removed_abnormal.values()),
-                'new_duplicate_groups': len(new_duplicates),
-                'removed_duplicate_groups': len(removed_duplicates)
-            }
-        }
-
-        # 10. 保存差异报告文件
-        if diff_content != "[OK] 无新增或减少异常文件":
-            timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-            result_path = os.path.join(output_dir, f"diff_{timestamp}.txt")
-            try:
-                with open(result_path, 'w', encoding='utf-8') as f:
-                    f.write(diff_content)
-                script.info(f"差异报告已保存: {result_path}")
-                result_data['diff_report_file'] = result_path
-            except Exception as e:
-                script.warning(f"保存差异报告失败: {e}")
-
-        # 11. 验证结果
-        if not validate_data(script, result_data):
-            return script.error_result("数据验证失败", "ValidationError")
-
-        # 12. 输出统计信息
-        stats = result_data['statistics']
-        script.info(f"检查完成 - 异常类型: {stats['abnormal_types']}, 重名组: {stats['duplicate_groups']}")
-        script.info(f"新增异常: {stats['new_abnormal_count']}, 减少异常: {stats['removed_abnormal_count']}")
-
-        # 13. 返回成功结果
-        if diff_content != "[OK] 无新增或减少异常文件":
-            message = f"发现文件变化 - 新增异常{stats['new_abnormal_count']}个，减少异常{stats['removed_abnormal_count']}个"
-        else:
-            message = "文件名检查完成，无异常变化"
-
-        return script.success_result(message, result_data)
+        script.info(f"扩展名检查完成，发现 {len(illegal_files)} 种问题类型")
+        return illegal_files
 
     except Exception as e:
-        script.error(f"文件名检查执行失败: {e}")
-        raise
+        script.error(f"扩展名检查失败: {e}")
+        return defaultdict(list)
+
+
+def check_duplicate_files_optimized(script, directory):
+    """优化的重名文件检查"""
+    script.info("开始优化的重名文件检查")
+
+    if not os.path.exists(directory):
+        script.warning(f"目录不存在: {directory}")
+        return {}
+
+    try:
+        files_dict = defaultdict(list)
+
+        # 直接遍历，不使用递归存储
+        for root, dirs, files in os.walk(directory):
+            # 过滤目录
+            dirs[:] = [d for d in dirs if not _is_dangerous_dir(d)]
+
+            # 只处理prefab文件
+            prefab_files = [f for f in files if f.lower().endswith('.prefab')]
+
+            for file in prefab_files:
+                try:
+                    full_path = os.path.join(root, file)
+                    if os.path.isfile(full_path):
+                        files_dict[file.lower()].append(full_path)
+                except Exception:
+                    continue
+
+        # 只保留重名的
+        duplicates = {name: paths for name, paths in files_dict.items() if len(paths) > 1}
+
+        script.info(f"重名检查完成，发现 {len(duplicates)} 组重名文件")
+        return duplicates
+
+    except Exception as e:
+        script.error(f"重名文件检查失败: {e}")
+        return {}
+
+
+# ==================== 主逻辑（优化版） ====================
+def main_logic(script: ScriptBase):
+    """优化的主逻辑"""
+    start_time = time.time()
+
+    try:
+        # 设置超时保护
+        timer = threading.Timer(CheckConfig.TIMEOUT_SECONDS, timeout_handler)
+        timer.start()
+
+        try:
+            # 初始化
+            gc.collect()
+            script.info("文件名合规性检查开始（优化版）")
+
+            # 1. 获取和验证参数
+            root_path = script.get_parameter('root_path', 'D:\\fishdev')
+            check_extension = script.get_parameter('check_extension', True)
+            check_duplicate = script.get_parameter('check_duplicate', True)
+            inbundle_path = script.get_parameter('inbundle_path', None)
+
+            # 参数验证
+            if not check_extension and not check_duplicate:
+                return script.error_result("至少需要启用一种检查类型", "ParameterError")
+
+            # 2. 构建检查路径
+            check_path = os.path.join(root_path, inbundle_path) if inbundle_path else root_path
+
+            script.info(f"检查路径: {check_path}")
+            script.info(f"检查类型: 扩展名={check_extension}, 重名={check_duplicate}")
+
+            if not os.path.exists(check_path):
+                return script.error_result(f"路径不存在: {check_path}", "PathNotFound")
+
+            # 3. 执行检查
+            illegal_extensions = defaultdict(list)
+            duplicate_files = {}
+
+            if check_extension:
+                script.info("执行扩展名检查...")
+                illegal_extensions = check_illegal_extensions_optimized(script, check_path)
+                gc.collect()
+
+            if check_duplicate:
+                script.info("执行重名文件检查...")
+                duplicate_files = check_duplicate_files_optimized(script, check_path)
+                gc.collect()
+
+            # 4. 统计结果
+            total_illegal = sum(len(files) for files in illegal_extensions.values()) if check_extension else 0
+            total_duplicate_groups = len(duplicate_files) if check_duplicate else 0
+
+            # 5. 构建结果
+            result_data = {
+                'root_path': root_path,
+                'check_path': check_path,
+                'check_extension': check_extension,
+                'check_duplicate': check_duplicate,
+                'statistics': {
+                    'total_illegal_files': total_illegal,
+                    'illegal_extension_types': len(illegal_extensions) if check_extension else 0,
+                    'duplicate_groups': total_duplicate_groups,
+                    'execution_time': time.time() - start_time
+                }
+            }
+
+            # 只在启用检查时添加详细数据
+            if check_extension and illegal_extensions:
+                result_data['illegal_extensions'] = dict(illegal_extensions)
+            if check_duplicate and duplicate_files:
+                result_data['duplicate_files'] = dict(duplicate_files)
+
+            # 6. 判断结果
+            has_issues = (check_extension and total_illegal > 0) or (check_duplicate and total_duplicate_groups > 0)
+
+            if has_issues:
+                issues = []
+                if check_extension and total_illegal > 0:
+                    issues.append(f"发现 {total_illegal} 个非法扩展名文件")
+                if check_duplicate and total_duplicate_groups > 0:
+                    issues.append(f"发现 {total_duplicate_groups} 组重名文件")
+                message = "文件检查发现问题: " + ", ".join(issues)
+            else:
+                message = "文件检查完成，未发现问题"
+
+            script.info(f"检查完成，耗时: {time.time() - start_time:.2f}秒")
+            return script.success_result(message, result_data)
+
+        finally:
+            timer.cancel()
+
+    except TimeoutException:
+        script.error("脚本执行超时")
+        return script.error_result("脚本执行超时", "TimeoutError")
+
+    except Exception as e:
+        script.error(f"执行失败: {str(e)}")
+        return script.error_result(f"执行失败: {str(e)}", "UnknownError")
+
+    finally:
+        # 强制清理
+        gc.collect()
 
 
 if __name__ == '__main__':
-    # 设置递归限制
-    import sys
-
-    sys.setrecursionlimit(3000)
-
     create_simple_script('checkFileName', main_logic)

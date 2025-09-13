@@ -151,12 +151,28 @@
   ],
   "checkFileName": [
     {
-      "name": "unity_root_path",
+      "name": "root_path",
       "type": "text",
       "label": "目录路径",
       "required": true,
-      "default": "C:\\temp",
-      "placeholder": "例如: C:\\temp 或 /home/user/documents"
+      "default": "D:\\fishdev",
+      "placeholder": "例如: D:\\fishdev 或 /path/to/unity/project"
+    },
+    {
+      "name": "check_extension",
+      "type": "switch",
+      "label": "扩展名纯小写",
+      "required": false,
+      "default": true,
+      "description": "文件扩展名纯小写检查\\n(确保跨平台兼容性)"
+    },
+    {
+      "name": "check_duplicate",
+      "type": "switch",
+      "label": "检查重名文件",
+      "required": false,
+      "default": true,
+      "description": "检查Prefab文件是否存在重名"
     }
   ]
 }
