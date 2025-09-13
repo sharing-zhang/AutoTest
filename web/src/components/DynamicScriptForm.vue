@@ -3,8 +3,8 @@
     <!-- 当前脚本信息 -->
     <div class="script-info" v-if="formConfig">
       <div class="script-title">
-        <h3>{{ formConfig.script_name.replace('.py', '').replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()) }}</h3>
-        <el-tag type="info" size="small">{{ formConfig.script_name }}</el-tag>
+        <h3>{{ props.scriptDisplayName || formConfig.script_name.replace('.py', '').replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()) }}</h3>
+        <!-- <el-tag type="info" size="small">{{ formConfig.script_name }}</el-tag> -->
       </div>
       <p v-if="formConfig.parameters" class="script-desc">
         共 {{ formConfig.parameters.length }} 个参数
@@ -44,7 +44,6 @@
       ref="dynamicFormRef"
       :model="formData"
       :rules="validationRules"
-      label-width="120px"
       class="dynamic-form"
     >
       <div v-for="param in formConfig.parameters" :key="param.name" class="form-item-wrapper">
@@ -231,6 +230,7 @@ interface ScriptInfo {
 
 interface Props {
   scriptName?: string
+  scriptDisplayName?: string
   showScriptSelector?: boolean
   showAdvanced?: boolean
   autoExecute?: boolean
@@ -238,6 +238,7 @@ interface Props {
 
 const props = withDefaults(defineProps<Props>(), {
   scriptName: 'test_script.py', // 默认脚本
+  scriptDisplayName: '',        // 默认脚本显示名称
   showScriptSelector: false,    // 默认不显示脚本选择器
   showAdvanced: false,
   autoExecute: false
@@ -596,6 +597,21 @@ defineExpose({
       margin-top: 24px;
       padding-top: 16px;
       border-top: 1px solid #e4e7ed;
+    }
+    
+    // 自适应标签宽度
+    :deep(.el-form-item__label) {
+      width: auto !important;
+      min-width: auto !important;
+      max-width: none !important;
+      white-space: nowrap;
+      text-align: left;
+      padding-right: 12px;
+    }
+    
+    :deep(.el-form-item__content) {
+      margin-left: 0 !important;
+      flex: 1;
     }
   }
   
