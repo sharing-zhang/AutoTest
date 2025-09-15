@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-文件解析检查脚本 - 检查 progressRewards 配置数据
-根据用户输入：目录、文件名（可多项）、最大奖励数值，扫描并输出超过阈值的配置项
+文件解析检查脚本 - 检查指定配置块数据
+根据用户输入：目录、文件名（可多项）、配置块名称、最大奖励数值，扫描并输出超过阈值的配置项
 """
 
 import os
@@ -19,8 +19,7 @@ from typing import Pattern
 
 
 class ScriptBase:
-    """脚本基础类，提供通用功能"""
-
+    # ... ScriptBase 类保持不变 ...
     def __init__(self, script_name: Optional[str] = None):
         """初始化脚本基础环境
 
@@ -40,7 +39,7 @@ class ScriptBase:
 
     def _get_script_name(self) -> str:
         """从环境变量获取脚本名称"""
-        return os.environ.get('SCRIPT_NAME', 'progress_rewards_checker')
+        return os.environ.get('SCRIPT_NAME', 'config_block_checker')
 
     def _get_parameters(self) -> Dict[str, Any]:
         """从环境变量获取脚本参数"""
@@ -190,18 +189,20 @@ def detect_encoding(file_path: str) -> str:
 
 def parse_file(
     file_path: str,
+    block_name: str,
     max_reward: int,
     count: str,
     reward_id_regex: Optional[Pattern[str]] = None,
     reward_id_value: Optional[str] = None
 ) -> List[Dict[str, Any]]:
-    """解析文件并提取大于阈值且匹配奖励ID条件的 progressRewards 配置块"""
+    """解析文件并提取大于阈值且匹配奖励ID条件的指定配置块"""
     encoding = detect_encoding(file_path)
     with open(file_path, 'r', encoding=encoding) as file:
         content = file.read()
 
-    # 匹配所有 progressRewards { ... } 块
-    pattern = r'progressRewards\s*\{\s*([^}]+)\s*\};'
+    # 动态构建正则表达式匹配指定的配置块
+    escaped_block_name = re.escape(block_name)
+    pattern = rf'{escaped_block_name}\s*\{{\s*([^}}]+)\s*\}};'
     blocks = re.findall(pattern, content)
     result: List[Dict[str, Any]] = []
 
@@ -268,7 +269,8 @@ def main_logic(script: ScriptBase) -> Dict[str, Any]:
         "POINT_PROGRESS_REWARD_ENDLESS.data.txt",
         "POINT_PROGRESS_REWARD.data.txt"
     ])
-    count= script.get_parameter('count_id', "count")
+    block_name = script.get_parameter('block_name', 'progressRewards')  # 新增配置块名称参数
+    count = script.get_parameter('count_id', "count")
     recursive = bool(script.get_parameter('recursive', False))
     max_reward_param = script.get_parameter('max_reward', 1)
     reward_id_param = script.get_parameter('reward_id', '')  # 支持正则或精确值
@@ -300,6 +302,7 @@ def main_logic(script: ScriptBase) -> Dict[str, Any]:
 
     script.info(f"开始检查，目录: {directory}")
     script.info(f"目标文件名: {file_names} (递归: {recursive})")
+    script.info(f"配置块名称: {block_name}")  # 新增日志
     script.info(f"最大奖励阈值: {max_reward}")
     script.info(f"配置表数量ID字段: {count}")
     if reward_id_text:
@@ -314,6 +317,7 @@ def main_logic(script: ScriptBase) -> Dict[str, Any]:
             data={
                 "searched_directory": directory,
                 "target_file_names": file_names,
+                "block_name": block_name,  # 新增
                 "recursive": recursive,
                 "max_reward": max_reward,
                 "files": [],
@@ -327,7 +331,8 @@ def main_logic(script: ScriptBase) -> Dict[str, Any]:
     for file_path in target_files:
         script.debug(f"正在检查文件: {file_path}")
         try:
-            filtered_blocks = parse_file(file_path, max_reward, count, reward_id_regex, reward_id_value)
+            # 传入 block_name 参数
+            filtered_blocks = parse_file(file_path, block_name, max_reward, count, reward_id_regex, reward_id_value)
             all_results[file_path] = {
                 "file_path": file_path,
                 "encoding": detect_encoding(file_path),
@@ -359,6 +364,7 @@ def main_logic(script: ScriptBase) -> Dict[str, Any]:
         data={
             "searched_directory": directory,
             "target_file_names": file_names,
+            "block_name": block_name,  # 新增
             "recursive": recursive,
             "max_reward": max_reward,
             "count_field": count,
@@ -380,4 +386,4 @@ def create_simple_script(script_name: str, main_logic):
 
 
 if __name__ == "__main__":
-    create_simple_script('progress_rewards_checker', main_logic)
+    create_simple_script('config_block_checker', main_logic)

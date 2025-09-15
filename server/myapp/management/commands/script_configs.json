@@ -1,178 +1,224 @@
 {
-  "scanner_file": [
-    {
-      "name": "directory",
-      "type": "text",
-      "label": "目录路径",
-      "required": true,
-      "default": "C:\\temp",
-      "placeholder": "例如: C:\\temp 或 /home/user/documents"
-    },
-    {
-      "name": "file_extensions",
-      "type": "checkbox",
-      "label": "文件后缀名",
-      "options": [".txt", ".log", ".json", ".csv", ".xml", ".py", ".js", ".html", ".css", ".md"],
-      "required": false,
-      "multiple": true,
-      "default": [".txt", ".log"]
-    },
-    {
-      "name": "recursive",
-      "type": "switch",
-      "label": "递归扫描",
-      "required": false,
-      "default": true
-    },
-    {
-      "name": "max_depth",
-      "type": "number",
-      "label": "最大深度",
-      "required": false,
-      "default": 3,
-      "min": 0,
-      "max": 10
-    },
-    {
-      "name": "include_hidden",
-      "type": "switch",
-      "label": "包含隐藏文件",
-      "required": false,
-      "default": false
-    },
-    {
-      "name": "output_format",
-      "type": "select",
-      "label": "输出格式",
-      "options": ["list", "detailed", "tree"],
-      "required": false,
-      "default": "list"
-    }
-  ],
-  "check_Reward": [
-    {
-      "name": "directory",
-      "type": "text",
-      "label": "目录路径",
-      "required": true,
-      "default": "C:\\temp",
-      "placeholder": "例如: C:\\temp 或 /home/user/documents"
-    },
-    {
-      "name": "file_names",
-      "type": "tags",
-      "label": "需要检查的文件名",
-      "required": true,
-      "multiple": true,
-      "default": [
-        "POINT_PROGRESS_REWARD_ENDLESS.data.txt",
-        "POINT_PROGRESS_REWARD.data.txt"
-      ],
-      "placeholder": "输入文件名，按回车添加"
-    },
-    {
-      "name": "reward_id",
-      "type": "text",
-      "label": "奖励ID(支持正则)",
-      "required": true,
-      "placeholder": "例如: 971.* 或 9711001"
-    },
-    {
-      "name": "count_id",
-      "type": "text",
-      "label": "配置表数量ID",
-      "required": true,
-      "default": "count"
-    },
-    {
-      "name": "recursive",
-      "type": "switch",
-      "label": "递归扫描子目录",
-      "required": false,
-      "default": false
-    },
-    {
-      "name": "max_reward",
-      "type": "number",
-      "label": "最大奖励数值",
-      "required": true,
-      "default": 1,
-      "min": 1
-    }
-  ],
-  "check_ConfigTime": [
-    {
-      "name": "directory",
-      "type": "text",
-      "label": "目录路径",
-      "required": true,
-      "default": "C:\\temp",
-      "placeholder": "例如: C:\\temp 或 /home/user/documents"
-    },
-    {
-      "name": "file_names",
-      "type": "tags",
-      "label": "需要检查的配置文件",
-      "required": false,
-      "multiple": true,
-      "default": [
-        "TIMER_MAIN.data",
-        "TIMER_MAIN.data.txt",
-        "timer_main.data",
-        "timer_main.data.txt"
-      ],
-      "placeholder": "输入文件名，按回车添加"
-    },
-    {
-      "name": "recursive",
-      "type": "switch",
-      "label": "递归扫描子目录",
-      "required": false,
-      "default": false
-    },
-    {
-      "name": "encoding",
-      "type": "select",
-      "label": "文件编码",
-      "options": ["UTF-16", "UTF-8", "GBK", "ASCII"],
-      "required": false,
-      "default": "UTF-16"
-    },
-    {
-      "name": "expected_days",
-      "type": "tags",
-      "label": "正确的活动天数",
-      "required": false,
-      "multiple": true,
-      "default": [3, 7, 14],
-      "placeholder": "输入天数，按回车添加（例如：3, 7, 14）",
-      "description": "输入允许的活动持续天数，支持多个值"
-    }
-  ],
-  "checkFileName": [
-    {
-      "name": "root_path",
-      "type": "text",
-      "label": "目录路径",
-      "required": true,
-      "default": "D:\\fishdev",
-      "placeholder": "例如: D:\\fishdev 或 /path/to/unity/project"
-    },
-    {
-      "name": "check_extension",
-      "type": "switch",
-      "label": "扩展名纯小写",
-      "required": false,
-      "default": true,
-      "description": "文件扩展名纯小写检查\\n(确保跨平台兼容性)"
-    },
-    {
-      "name": "check_duplicate",
-      "type": "switch",
-      "label": "检查重名文件",
-      "required": false,
-      "default": true,
-      "description": "检查Prefab文件是否存在重名"
-    }
-  ]
+  "scanner_file": {
+    "dialog_title": "扫描文件脚本-参数配置",
+    "parameters": [
+      {
+        "name": "directory",
+        "type": "text",
+        "label": "目录路径",
+        "required": true,
+        "default": "C:\\temp",
+        "placeholder": "例如: C:\\temp 或 /home/user/documents"
+      },
+      {
+        "name": "file_extensions",
+        "type": "checkbox",
+        "label": "文件后缀名",
+        "options": [
+          ".txt",
+          ".log",
+          ".json",
+          ".csv",
+          ".xml",
+          ".py",
+          ".js",
+          ".html",
+          ".css",
+          ".md"
+        ],
+        "required": false,
+        "multiple": true,
+        "default": [
+          ".txt",
+          ".log"
+        ]
+      },
+      {
+        "name": "recursive",
+        "type": "switch",
+        "label": "递归扫描",
+        "required": false,
+        "default": true
+      },
+      {
+        "name": "max_depth",
+        "type": "number",
+        "label": "最大深度",
+        "required": false,
+        "default": 3,
+        "min": 0,
+        "max": 10
+      },
+      {
+        "name": "include_hidden",
+        "type": "switch",
+        "label": "包含隐藏文件",
+        "required": false,
+        "default": false
+      },
+      {
+        "name": "output_format",
+        "type": "select",
+        "label": "输出格式",
+        "options": [
+          "list",
+          "detailed",
+          "tree"
+        ],
+        "required": false,
+        "default": "list"
+      }
+    ]
+  },
+  "check_Reward": {
+    "dialog_title": "检查奖励配置脚本-参数配置",
+    "parameters": [
+      {
+        "name": "directory",
+        "type": "text",
+        "label": "目录路径",
+        "required": true,
+        "default": "C:\\temp",
+        "placeholder": "例如: C:\\temp 或 /home/user/documents"
+      },
+      {
+        "name": "file_names",
+        "type": "tags",
+        "label": "需要检查的文件名",
+        "required": true,
+        "multiple": true,
+        "default": [
+          "POINT_PROGRESS_REWARD_ENDLESS.data.txt",
+          "POINT_PROGRESS_REWARD.data.txt"
+        ],
+        "placeholder": "输入文件名，按回车添加"
+      },
+      {
+        "name": "block_name",
+        "type": "text",
+        "label": "配置块名称",
+        "required": true,
+        "default": "Rewards"
+      },
+      {
+        "name": "reward_id",
+        "type": "text",
+        "label": "奖励ID(支持正则)",
+        "required": true,
+        "placeholder": "例如: 971.* 或 9711001"
+      },
+      {
+        "name": "count_id",
+        "type": "text",
+        "label": "配置表数量ID",
+        "required": true,
+        "default": "count"
+      },
+      {
+        "name": "recursive",
+        "type": "switch",
+        "label": "递归扫描子目录",
+        "required": false,
+        "default": false
+      },
+      {
+        "name": "max_reward",
+        "type": "number",
+        "label": "最大奖励数值",
+        "required": true,
+        "default": 1,
+        "min": 1
+      }
+    ]
+  },
+  "check_ConfigTime": {
+    "dialog_title": "检查配置时间脚本-参数配置",
+    "parameters": [
+      {
+        "name": "directory",
+        "type": "text",
+        "label": "目录路径",
+        "required": true,
+        "default": "C:\\temp",
+        "placeholder": "例如: C:\\temp 或 /home/user/documents"
+      },
+      {
+        "name": "file_names",
+        "type": "tags",
+        "label": "需要检查的配置文件",
+        "required": false,
+        "multiple": true,
+        "default": [
+          "TIMER_MAIN.data",
+          "TIMER_MAIN.data.txt",
+          "timer_main.data",
+          "timer_main.data.txt"
+        ],
+        "placeholder": "输入文件名，按回车添加"
+      },
+      {
+        "name": "recursive",
+        "type": "switch",
+        "label": "递归扫描子目录",
+        "required": false,
+        "default": false
+      },
+      {
+        "name": "encoding",
+        "type": "select",
+        "label": "文件编码",
+        "options": [
+          "UTF-16",
+          "UTF-8",
+          "GBK",
+          "ASCII"
+        ],
+        "required": false,
+        "default": "UTF-16"
+      },
+      {
+        "name": "expected_days",
+        "type": "tags",
+        "label": "正确的活动天数",
+        "required": false,
+        "multiple": true,
+        "default": [
+          3,
+          7,
+          14
+        ],
+        "placeholder": "输入天数，按回车添加（例如：3, 7, 14）",
+        "description": "输入允许的活动持续天数，支持多个值"
+      }
+    ]
+  },
+  "checkFileName": {
+    "dialog_title": "检查文件名脚本-参数配置",
+    "parameters": [
+      {
+        "name": "root_path",
+        "type": "text",
+        "label": "目录路径",
+        "required": true,
+        "default": "D:\\fishdev",
+        "placeholder": "例如: D:\\fishdev 或 /path/to/unity/project"
+      },
+      {
+        "name": "check_extension",
+        "type": "switch",
+        "label": "扩展名纯小写",
+        "required": false,
+        "default": true,
+        "description": "文件扩展名纯小写检查\n(确保跨平台兼容性)"
+      },
+      {
+        "name": "check_duplicate",
+        "type": "switch",
+        "label": "检查重名文件",
+        "required": false,
+        "default": true,
+        "description": "检查Prefab文件是否存在重名"
+      }
+    ]
+  }
 }
