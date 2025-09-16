@@ -99,7 +99,7 @@
       {
         "name": "rules",
         "type": "group-list",
-        "label": "配置项组(奖励ID、奖励数量ID、最大奖励值)",
+        "label": "配置项组",
         "required": true,
         "item_fields": [
           { "name": "reward_id", "type": "text", "label": "reward_id", "placeholder": "奖励ID，支持正则或精确值" },

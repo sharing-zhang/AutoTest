@@ -20,7 +20,6 @@ from typing import Pattern
 
 
 class ScriptBase:
-    # ... ScriptBase 类保持不变 ...
     def __init__(self, script_name: Optional[str] = None):
         """初始化脚本基础环境
 
@@ -149,7 +148,16 @@ class ScriptBase:
             result: 结果字典
         """
         self.debug(f"{self.script_name}执行完成，准备输出结果")
-        print(json.dumps(result, ensure_ascii=False, indent=2))
+
+        # 修复编码问题：确保JSON输出兼容性
+        try:
+            # 先尝试使用ensure_ascii=False
+            json_str = json.dumps(result, ensure_ascii=False, indent=2)
+            print(json_str)
+        except UnicodeEncodeError:
+            # 如果出现编码错误，使用ensure_ascii=True
+            json_str = json.dumps(result, ensure_ascii=True, indent=2)
+            print(json_str)
 
     def run_with_error_handling(self, main_func):
         """运行主函数并处理错误
@@ -373,7 +381,7 @@ def main_logic(script: ScriptBase) -> Dict[str, Any]:
                 "block_name": block_name,
                 "rules": parsed_rules,
                 "files": [],
-                "summary": {"total_files": 0, "problem_files": 0}
+                "summary": {"total_files": 0, "problem_files": 0, "total_exceeded_items": 0}
             }
         )
 
@@ -467,13 +475,55 @@ def main_logic(script: ScriptBase) -> Dict[str, Any]:
             script.error(error_msg)
             all_results[file_path] = {"error": error_msg, "exceeded_blocks": []}
 
+    # 统计信息
     total_files = len(target_files)
     problem_files = len(warning_files)
 
-    message = (
-        f"检查完成，发现 {problem_files}/{total_files} 个文件存在大于阈值的配置"
-        if problem_files > 0 else f"检查完成，所有 {total_files} 个文件都通过检查"
-    )
+    # 统计所有超过阈值的配置项
+    total_exceeded_items = 0
+    exceeded_details = []
+
+    for file_path, result in all_results.items():
+        if "exceeded_blocks" in result:
+            exceeded_blocks = result["exceeded_blocks"]
+            total_exceeded_items += len(exceeded_blocks)
+
+            # 收集详细信息
+            for block in exceeded_blocks:
+                exceeded_details.append({
+                    "file": os.path.basename(file_path),
+                    "line": block.get('line'),
+                    "tpId": block.get('tpId'),
+                    "count_field": block.get('count_field'),
+                    "count_value": block.get('count_value'),
+                    "max_reward": block.get('max_reward')
+                })
+
+    # 生成消息 - 修复编码问题，使用ASCII字符
+    if total_exceeded_items > 0:
+        # 构建详细列表（如果配置项太多，可以考虑只显示前几个）
+        if len(exceeded_details) <= 10:  # 如果配置项不多，全部显示
+            details_text = []
+            for detail in exceeded_details:
+                # 使用ASCII字符替代Unicode字符 "•"
+                details_text.append(
+                    f"  - {detail['file']}(行{detail['line']}) {detail['tpId']}: "
+                    f"{detail['count_field']}={detail['count_value']} > {detail['max_reward']}"
+                )
+            details_str = "\n" + "\n".join(details_text)
+        else:  # 如果配置项太多，只显示前几个
+            details_text = []
+            for detail in exceeded_details[:5]:
+                # 使用ASCII字符替代Unicode字符 "•"
+                details_text.append(
+                    f"  - {detail['file']}(行{detail['line']}) {detail['tpId']}: "
+                    f"{detail['count_field']}={detail['count_value']} > {detail['max_reward']}"
+                )
+            details_str = "\n" + "\n".join(details_text) + f"\n  ... 还有{len(exceeded_details) - 5}个配置项"
+
+        message = f"检查发现{total_exceeded_items}个配置大于阈值，分别为：{details_str}"
+    else:
+        message = "所有配置项都通过检查"
 
     return script.success_result(
         message=message,
@@ -486,9 +536,11 @@ def main_logic(script: ScriptBase) -> Dict[str, Any]:
                 "total_files": total_files,
                 "problem_files": problem_files,
                 "warning_files": warning_files,
-                "total_rules": len(parsed_rules)
+                "total_rules": len(parsed_rules),
+                "total_exceeded_items": total_exceeded_items
             },
-            "detailed_results": all_results
+            "detailed_results": all_results,
+            "exceeded_details": exceeded_details
         }
     )
 

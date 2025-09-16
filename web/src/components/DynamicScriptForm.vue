@@ -65,14 +65,17 @@
                   clearable
                   style="width: 220px;"
                 />
-                <el-input-number
-                  v-else-if="field.type === 'number'"
-                  v-model="groupItem[field.name]"
-                  :min="field.min"
-                  :max="field.max"
-                  :step="1"
-                  controls-position="right"
-                />
+                <div v-else-if="field.type === 'number'" class="number-input-container" style="display:flex; align-items:center; gap:8px;">
+                  <el-input-number
+                    v-model="groupItem[field.name]"
+                    :min="field.min"
+                    :max="field.max"
+                    :step="1"
+                    :placeholder="field.placeholder"
+                    controls-position="right"
+                  />
+                  <span v-if="field.addonAfter" class="addon-after">{{ field.addonAfter }}</span>
+                </div>
                 <el-input
                   v-else
                   v-model="groupItem[field.name]"
@@ -100,22 +103,49 @@
             clearable
           />
         </el-form-item>
-
         <!-- 数字输入框 -->
-        <el-form-item 
-          v-else-if="param.type === 'number'" 
-          :label="param.label" 
-          :prop="param.name"
-          :required="param.required"
-        >
-          <el-input-number
-            v-model="formData[param.name]"
-            :min="param.min"
-            :max="param.max"
-            :step="1"
-            style="width: 100%"
-          />
-        </el-form-item>
+          <div v-else-if="field.type === 'number'" class="field-wrapper">
+            <div class="number-input-container">
+              <el-input-number
+                v-model="groupItem[field.name]"
+                :min="field.min"
+                :max="field.max"
+                :step="1"
+                :placeholder="field.placeholder"
+                controls-position="right"
+                style="width: 180px;"
+              />
+              <!-- addonAfter 提示 -->
+              <span v-if="field.addonAfter" class="addon-after">
+                {{ field.addonAfter }}
+              </span>
+            </div>
+            <!-- 字段描述 -->
+            <div v-if="field.description" class="field-description">
+              {{ field.description }}
+            </div>
+            <!-- 帮助提示 -->
+            <div v-if="field.help" class="field-help">
+              <el-icon><InfoFilled /></el-icon>
+              {{ field.help }}
+            </div>
+          </div>
+
+<!--        &lt;!&ndash; 数字输入框 &ndash;&gt;-->
+<!--        <el-form-item -->
+<!--          v-else-if="param.type === 'number'" -->
+<!--          :label="param.label" -->
+<!--          :prop="param.name"-->
+<!--          :required="param.required"-->
+<!--        >-->
+<!--          <el-input-number-->
+<!--            v-model="formData[param.name]"-->
+<!--            :min="param.min"-->
+<!--            :max="param.max"-->
+<!--            :step="1"-->
+<!--            style="width: 100%"-->
+<!--          />-->
+<!--        </el-form-item>-->
 
         <!-- 开关 -->
         <el-form-item 
@@ -649,7 +679,89 @@ defineExpose({
     .form-item-wrapper {
       margin-bottom: 16px;
     }
-    
+     .group-description {
+    font-size: 13px;
+    color: #606266;
+    margin-bottom: 12px;
+    padding: 8px 12px;
+    background: #f5f7fa;
+    border-radius: 4px;
+    border-left: 3px solid #409eff;
+  }
+
+  // 组项目行样式
+  .group-item-row {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+    padding: 12px;
+    border: 1px solid #e4e7ed;
+    border-radius: 6px;
+    background: #fafafa;
+
+    &:hover {
+      background: #f0f2f5;
+      border-color: #c0c4cc;
+    }
+  }
+
+  // 字段包装器
+  .field-wrapper {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  // 数字输入框容器
+  .number-input-container {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  // addonAfter 样式
+  .addon-after {
+    font-size: 12px;
+    color: #909399;
+    white-space: nowrap;
+    padding: 0 8px;
+    background: #f5f7fa;
+    border: 1px solid #dcdfe6;
+    border-radius: 4px;
+    height: 32px;
+    line-height: 30px;
+
+    // 如果包含emoji或图标，调整样式
+    &:contains("💰") {
+      color: #e6a23c;
+      background: #fdf6ec;
+      border-color: #f5dab1;
+    }
+  }
+
+  // 字段描述样式
+  .field-description {
+    font-size: 11px;
+    color: #909399;
+    line-height: 1.2;
+    max-width: 220px;
+  }
+
+  // 字段帮助样式
+  .field-help {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+    color: #409eff;
+
+    .el-icon {
+      font-size: 12px;
+    }
+  }
+
     .form-actions {
       margin-top: 24px;
       padding-top: 16px;
