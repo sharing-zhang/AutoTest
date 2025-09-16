@@ -47,10 +47,50 @@
       class="dynamic-form"
     >
       <div v-for="param in formConfig.parameters" :key="param.name" class="form-item-wrapper">
-        <!-- 文本输入框 -->
+        <!-- 组列表（可动态增删的一组字段集合，最终输出为数组） -->
         <el-form-item 
-          v-if="param.type === 'text'" 
+          v-if="param.type === 'group-list'" 
           :label="param.label" 
+          :prop="param.name"
+          :required="param.required"
+        >
+          <div style="width:100%">
+            <div v-if="!Array.isArray(formData[param.name])" style="color:#909399;margin-bottom:8px;">无初始数据</div>
+            <div v-for="(groupItem, gi) in (formData[param.name] as any[])" :key="gi" style="display:flex; gap:12px; align-items:flex-start; margin-bottom:12px; flex-wrap:wrap;">
+              <template v-for="field in (param.item_fields || [])" :key="field.name">
+                <el-input
+                  v-if="field.type === 'text'"
+                  v-model="groupItem[field.name]"
+                  :placeholder="field.placeholder || field.label"
+                  clearable
+                  style="width: 220px;"
+                />
+                <el-input-number
+                  v-else-if="field.type === 'number'"
+                  v-model="groupItem[field.name]"
+                  :min="field.min"
+                  :max="field.max"
+                  :step="1"
+                  controls-position="right"
+                />
+                <el-input
+                  v-else
+                  v-model="groupItem[field.name]"
+                  :placeholder="field.placeholder || field.label"
+                  clearable
+                  style="width: 220px;"
+                />
+              </template>
+              <el-button type="danger" plain @click="removeGroupItem(param.name, gi)">删除</el-button>
+            </div>
+            <el-button type="primary" plain @click="addGroupItem(param.name)">添加一组</el-button>
+          </div>
+        </el-form-item>
+
+        <!-- 文本输入框 -->
+        <el-form-item
+          v-else-if="param.type === 'text'"
+          :label="param.label"
           :prop="param.name"
           :required="param.required"
         >
@@ -369,6 +409,9 @@ const initializeFormData = () => {
     } else {
       // 设置类型默认值
       switch (param.type) {
+        case 'group-list':
+          formData[param.name] = []
+          break
         case 'text':
         case 'select':
           formData[param.name] = ''
@@ -394,6 +437,20 @@ const handleScriptChange = (scriptName: string) => {
   executionResult.value = null
   loadScriptConfig(scriptName)
   emit('script-changed', scriptName)
+}
+
+// group-list helpers
+const addGroupItem = (paramName: string) => {
+  if (!Array.isArray(formData[paramName])) {
+    formData[paramName] = []
+  }
+  ;(formData[paramName] as any[]).push({})
+}
+
+const removeGroupItem = (paramName: string, index: number) => {
+  if (Array.isArray(formData[paramName])) {
+    ;(formData[paramName] as any[]).splice(index, 1)
+  }
 }
 
 const handleSubmit = async () => {
@@ -614,7 +671,7 @@ defineExpose({
       flex: 1;
     }
   }
-  
+
   .execution-result {
     margin-top: 24px;
     

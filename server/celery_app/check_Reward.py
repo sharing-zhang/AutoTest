@@ -3,6 +3,7 @@
 """
 文件解析检查脚本 - 检查指定配置块数据
 根据用户输入：目录、文件名（可多项）、配置块名称、最大奖励数值，扫描并输出超过阈值的配置项
+支持多个 reward_id 输入项的依次检查
 """
 
 import os
@@ -14,7 +15,7 @@ import sys
 import time
 import traceback
 from datetime import datetime
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, Union
 from typing import Pattern
 
 
@@ -187,13 +188,85 @@ def detect_encoding(file_path: str) -> str:
     return result['encoding']
 
 
+def parse_reward_ids(reward_id_param: Union[str, List[str]]) -> List[Dict[str, Any]]:
+    """解析多个奖励ID输入项，返回格式化的奖励ID检查列表
+
+    Args:
+        reward_id_param: 单个字符串或字符串列表
+
+    Returns:
+        List[Dict]: 包含 'pattern', 'regex', 'value', 'raw' 字段的字典列表
+    """
+    reward_ids = []
+
+    # 归一化输入为列表
+    if isinstance(reward_id_param, str):
+        # 尝试按逗号分割字符串
+        raw_ids = [item.strip() for item in reward_id_param.split(',') if item.strip()]
+    elif isinstance(reward_id_param, (list, tuple)):
+        raw_ids = [str(item).strip() for item in reward_id_param if str(item).strip()]
+    else:
+        raw_ids = [str(reward_id_param).strip()] if reward_id_param else []
+
+    for raw_id in raw_ids:
+        if not raw_id:
+            continue
+
+        # 尝试编译为正则表达式
+        try:
+            regex_pattern = re.compile(raw_id)
+            reward_ids.append({
+                'pattern': raw_id,
+                'regex': regex_pattern,
+                'value': None,
+                'raw': raw_id,
+                'type': 'regex'
+            })
+        except re.error:
+            # 正则编译失败，作为精确匹配值
+            reward_ids.append({
+                'pattern': raw_id,
+                'regex': None,
+                'value': raw_id,
+                'raw': raw_id,
+                'type': 'exact'
+            })
+
+    return reward_ids
+
+
+def check_reward_id_match(tp_id: str, reward_id_checkers: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    """检查 tp_id 是否匹配任何一个奖励ID检查器
+
+    Args:
+        tp_id: 要检查的奖励ID
+        reward_id_checkers: 奖励ID检查器列表
+
+    Returns:
+        匹配的检查器信息，如果没有匹配返回 None
+    """
+    for checker in reward_id_checkers:
+        try:
+            if checker['regex'] is not None:
+                # 正则匹配
+                if checker['regex'].search(tp_id):
+                    return checker
+            elif checker['value'] is not None:
+                # 精确匹配
+                if tp_id == checker['value']:
+                    return checker
+        except Exception:
+            continue
+
+    return None
+
+
 def parse_file(
-    file_path: str,
-    block_name: str,
-    max_reward: int,
-    count: str,
-    reward_id_regex: Optional[Pattern[str]] = None,
-    reward_id_value: Optional[str] = None
+        file_path: str,
+        block_name: str,
+        max_reward: int,
+        count: str,
+        reward_id_checkers: List[Dict[str, Any]]
 ) -> List[Dict[str, Any]]:
     """解析文件并提取大于阈值且匹配奖励ID条件的指定配置块"""
     encoding = detect_encoding(file_path)
@@ -217,19 +290,25 @@ def parse_file(
         except ValueError:
             count_value = 0
 
-        # 奖励ID过滤（tpId），支持正则或精确匹配
+        # 奖励ID过滤（tpId），支持多个正则或精确匹配
         tp_id = item.get('tpId', '')
-        id_match_ok = True
-        if reward_id_regex is not None:
-            try:
-                id_match_ok = bool(reward_id_regex.search(tp_id))
-            except Exception:
-                id_match_ok = False
-        elif reward_id_value:
-            id_match_ok = (tp_id == str(reward_id_value))
+        matched_checker = None
+
+        if reward_id_checkers:
+            matched_checker = check_reward_id_match(tp_id, reward_id_checkers)
+            id_match_ok = matched_checker is not None
+        else:
+            # 如果没有提供奖励ID过滤器，则全部通过
+            id_match_ok = True
 
         if id_match_ok and count_value > max_reward:
             item['count_value'] = count_value
+            if matched_checker:
+                item['matched_reward_id'] = {
+                    'pattern': matched_checker['pattern'],
+                    'type': matched_checker['type'],
+                    'raw': matched_checker['raw']
+                }
             result.append(item)
 
     return result
@@ -261,65 +340,38 @@ def find_target_files(root_directory: str, file_names: List[str], recursive: boo
 
 
 def main_logic(script: ScriptBase) -> Dict[str, Any]:
-    """主要业务逻辑：扫描大于最大奖励数值的配置项"""
+    """主要业务逻辑：扫描大于最大奖励数值的配置项，支持多个reward_id检查"""
 
     # 读取参数
     directory = script.get_parameter('directory', r"D:\dev")
-    file_names_param = script.get_parameter('file_names', [
-        "POINT_PROGRESS_REWARD_ENDLESS.data.txt",
-        "POINT_PROGRESS_REWARD.data.txt"
-    ])
-    block_name = script.get_parameter('block_name', 'progressRewards')  # 新增配置块名称参数
-    count = script.get_parameter('count_id', "count")
-    recursive = bool(script.get_parameter('recursive', False))
-    max_reward_param = script.get_parameter('max_reward', 1)
-    reward_id_param = script.get_parameter('reward_id', '')  # 支持正则或精确值
+    file_name = script.get_parameter('file_name', "POINT_PROGRESS_REWARD.data.txt")
+    block_name = script.get_parameter('block_name', 'progressRewards')
+    rules_param = script.get_parameter('rules', "[]")
 
-    # 归一化参数
-    if isinstance(file_names_param, str):
-        file_names = [seg.strip() for seg in file_names_param.split(',') if seg.strip()]
-    elif isinstance(file_names_param, (list, tuple)):
-        file_names = [str(x).strip() for x in file_names_param if str(x).strip()]
-    else:
-        file_names = [str(file_names_param)]
+    # 目标文件
+    target_files = [os.path.join(directory, file_name)] if file_name else []
 
+    # 解析规则数组
     try:
-        max_reward = int(max_reward_param)
-    except Exception:
-        max_reward = 1
-
-    # 解析奖励ID过滤器
-    reward_id_regex: Optional[Pattern[str]] = None
-    reward_id_value: Optional[str] = None
-    reward_id_text = str(reward_id_param).strip() if reward_id_param is not None else ''
-    if reward_id_text:
-        # 尝试编译为正则；若失败则作为精确匹配值
-        try:
-            reward_id_regex = re.compile(reward_id_text)
-        except re.error:
-            reward_id_regex = None
-            reward_id_value = reward_id_text
+        parsed_rules = json.loads(rules_param) if isinstance(rules_param, str) else rules_param
+        if not isinstance(parsed_rules, list):
+            raise ValueError('rules 需为数组')
+    except Exception as e:
+        return script.error_result(f"rules 参数解析失败: {e}")
 
     script.info(f"开始检查，目录: {directory}")
-    script.info(f"目标文件名: {file_names} (递归: {recursive})")
-    script.info(f"配置块名称: {block_name}")  # 新增日志
-    script.info(f"最大奖励阈值: {max_reward}")
-    script.info(f"配置表数量ID字段: {count}")
-    if reward_id_text:
-        script.info(f"奖励ID过滤: {'正则' if reward_id_regex else '精确'} = {reward_id_text}")
-
-    # 查找文件
-    target_files = find_target_files(directory, file_names, recursive)
+    script.info(f"目标文件名: {file_name}")
+    script.info(f"配置块名称: {block_name}")
+    script.info(f"规则组数量: {len(parsed_rules)}")
 
     if not target_files:
         return script.success_result(
             message="未找到任何目标文件",
             data={
                 "searched_directory": directory,
-                "target_file_names": file_names,
-                "block_name": block_name,  # 新增
-                "recursive": recursive,
-                "max_reward": max_reward,
+                "target_file_name": file_name,
+                "block_name": block_name,
+                "rules": parsed_rules,
                 "files": [],
                 "summary": {"total_files": 0, "problem_files": 0}
             }
@@ -331,11 +383,70 @@ def main_logic(script: ScriptBase) -> Dict[str, Any]:
     for file_path in target_files:
         script.debug(f"正在检查文件: {file_path}")
         try:
-            # 传入 block_name 参数
-            filtered_blocks = parse_file(file_path, block_name, max_reward, count, reward_id_regex, reward_id_value)
+            # 针对每条规则执行匹配统计
+            encoding = detect_encoding(file_path)
+            with open(file_path, 'r', encoding=encoding) as f:
+                content = f.read()
+
+            escaped_block_name = re.escape(block_name)
+            block_pattern = rf'{escaped_block_name}\s*\{{\s*([^}}]+)\s*\}};'
+            blocks = re.findall(block_pattern, content)
+
+            # 为了返回行号：建立每个匹配块的起始行
+            lines = content.splitlines()
+            line_offsets: List[int] = []
+            for m in re.finditer(block_pattern, content):
+                start_pos = m.start()
+                start_line = content.count('\n', 0, start_pos) + 1
+                line_offsets.append(start_line)
+
+            exceeded: List[Dict[str, Any]] = []
+
+            for idx, block in enumerate(blocks):
+                pairs = re.findall(r'(\w+)\s*=\s*"([^"]+)"', block)
+                item = {k: v for k, v in pairs}
+                tp_id = item.get('tpId', '')
+
+                for rule in parsed_rules:
+                    rid = str(rule.get('reward_id', '')).strip()
+                    count_field = str(rule.get('count_id', 'count')).strip() or 'count'
+                    try:
+                        threshold = int(rule.get('max_reward', 0))
+                    except Exception:
+                        threshold = 0
+
+                    # 匹配奖励ID（支持正则/精确）
+                    match_ok = False
+                    if rid:
+                        try:
+                            rgx = re.compile(rid)
+                            match_ok = bool(rgx.search(tp_id))
+                        except re.error:
+                            match_ok = (tp_id == rid)
+                    else:
+                        match_ok = True
+
+                    # 数量对比
+                    try:
+                        count_val = int(item.get(count_field, '0'))
+                    except ValueError:
+                        count_val = 0
+
+                    if match_ok and count_val > threshold:
+                        exceeded.append({
+                            "line": line_offsets[idx] if idx < len(line_offsets) else None,
+                            "tpId": tp_id,
+                            "count_field": count_field,
+                            "count_value": count_val,
+                            "max_reward": threshold,
+                            "rule": rule,
+                            "block": item
+                        })
+
+            filtered_blocks = exceeded
             all_results[file_path] = {
                 "file_path": file_path,
-                "encoding": detect_encoding(file_path),
+                "encoding": encoding,
                 "exceeded_blocks": filtered_blocks,
                 "exceeded_count": len(filtered_blocks)
             }
@@ -343,6 +454,11 @@ def main_logic(script: ScriptBase) -> Dict[str, Any]:
             if filtered_blocks:
                 script.warning(f"发现大于阈值的配置: {file_path}, 共 {len(filtered_blocks)} 条")
                 warning_files.append(file_path)
+
+                # 输出详细的匹配信息
+                for blk in filtered_blocks:
+                    script.debug(
+                        f"  行{blk.get('line')}: tpId={blk.get('tpId')}, {blk.get('count_field')}={blk.get('count_value')} > {blk.get('max_reward')} 规则={blk.get('rule')}")
             else:
                 script.info(f"文件检查通过: {file_path}")
 
@@ -363,16 +479,14 @@ def main_logic(script: ScriptBase) -> Dict[str, Any]:
         message=message,
         data={
             "searched_directory": directory,
-            "target_file_names": file_names,
-            "block_name": block_name,  # 新增
-            "recursive": recursive,
-            "max_reward": max_reward,
-            "count_field": count,
-            "reward_id": reward_id_text,
+            "target_file_name": file_name,
+            "block_name": block_name,
+            "rules": parsed_rules,
             "summary": {
                 "total_files": total_files,
                 "problem_files": problem_files,
-                "warning_files": warning_files
+                "warning_files": warning_files,
+                "total_rules": len(parsed_rules)
             },
             "detailed_results": all_results
         }

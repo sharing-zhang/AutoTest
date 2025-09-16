@@ -82,52 +82,31 @@
         "placeholder": "例如: C:\\temp 或 /home/user/documents"
       },
       {
-        "name": "file_names",
-        "type": "tags",
+        "name": "file_name",
+        "type": "text",
         "label": "需要检查的文件名",
         "required": true,
-        "multiple": true,
-        "default": [
-          "POINT_PROGRESS_REWARD_ENDLESS.data.txt",
-          "POINT_PROGRESS_REWARD.data.txt"
-        ],
-        "placeholder": "输入文件名，按回车添加"
+        "default": "POINT_PROGRESS_REWARD.data.txt",
+        "placeholder": "仅支持单个文件名"
       },
       {
         "name": "block_name",
         "type": "text",
         "label": "配置块名称",
         "required": true,
-        "default": "Rewards"
+        "default": "progressRewards"
       },
       {
-        "name": "reward_id",
-        "type": "text",
-        "label": "奖励ID(支持正则)",
+        "name": "rules",
+        "type": "group-list",
+        "label": "配置项组(奖励ID、奖励数量ID、最大奖励值)",
         "required": true,
-        "placeholder": "例如: 971.* 或 9711001"
-      },
-      {
-        "name": "count_id",
-        "type": "text",
-        "label": "配置表数量ID",
-        "required": true,
-        "default": "count"
-      },
-      {
-        "name": "recursive",
-        "type": "switch",
-        "label": "递归扫描子目录",
-        "required": false,
-        "default": false
-      },
-      {
-        "name": "max_reward",
-        "type": "number",
-        "label": "最大奖励数值",
-        "required": true,
-        "default": 1,
-        "min": 1
+        "item_fields": [
+          { "name": "reward_id", "type": "text", "label": "reward_id", "placeholder": "奖励ID，支持正则或精确值" },
+          { "name": "count_id", "type": "text", "label": "count_id", "placeholder": "数量ID" },
+          { "name": "max_reward", "type": "number", "label": "max_reward", "min": 0 , "addonAfter": "最大奖励值" }
+        ],
+        "description": "每组包含：奖励ID、数量ID、最大奖励值"
       }
     ]
   },
