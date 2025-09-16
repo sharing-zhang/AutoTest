@@ -110,11 +110,12 @@ def upload_exe(request):
 
     rel_path = os.path.join('plugins', safe_name).replace('\\', '/')
     desc = request.POST.get('description') or request.POST.get('desc') or ''
+    display_name = request.POST.get('display_name') or request.POST.get('name') or original_name
     if desc:
         try:
             with open(save_path + '.json', 'w', encoding='utf-8') as mf:
                 import json as _json
-                _json.dump({"description": desc}, mf, ensure_ascii=False)
+                _json.dump({"description": desc, "display_name": display_name}, mf, ensure_ascii=False)
         except Exception:
             pass
 
@@ -122,7 +123,8 @@ def upload_exe(request):
         'file_name': original_name,
         'stored_name': safe_name,
         'download_url': settings.MEDIA_URL + rel_path,
-        'description': desc
+        'description': desc,
+        'display_name': display_name
     })
 
 
@@ -140,12 +142,14 @@ def list_exe(request):
                     with open(meta_path, 'r', encoding='utf-8') as mf:
                         meta = _json.load(mf)
                         desc = meta.get('description', '')
+                        disp = meta.get('display_name', fname)
                 except Exception:
                     pass
             files.append({
                 'name': fname,
                 'url': settings.MEDIA_URL + 'plugins/' + escape_uri_path(fname),
-                'description': desc
+                'description': desc,
+                'display_name': disp if 'disp' in locals() else fname
             })
     return APIResponse(code=0, msg='查询成功', data=files)
 
