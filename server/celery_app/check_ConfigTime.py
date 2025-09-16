@@ -4,6 +4,7 @@
 活动时间配置检查脚本
 检查TIMER_MAIN.data文件中的活动时间配置是否符合标准
 支持多种文件格式和编码方式
+支持自定义时间字段名称
 """
 
 import os
@@ -94,7 +95,8 @@ def read_file_with_encoding(script, file_path: str, preferred_encoding: str) -> 
     raise Exception("所有编码方式都无法读取文件")
 
 
-def parse_activity_block(script, block: str, block_index: int) -> Optional[Dict[str, str]]:
+def parse_activity_block(script, block: str, block_index: int, start_time_field: str, end_time_field: str) -> Optional[
+    Dict[str, str]]:
     """
     解析单个活动配置块
 
@@ -102,6 +104,8 @@ def parse_activity_block(script, block: str, block_index: int) -> Optional[Dict[
         script: ScriptBase实例
         block: 配置块文本
         block_index: 配置块索引
+        start_time_field: 开始时间字段名
+        end_time_field: 结束时间字段名
 
     Returns:
         Optional[Dict]: 解析后的活动信息，解析失败返回None
@@ -112,25 +116,151 @@ def parse_activity_block(script, block: str, block_index: int) -> Optional[Dict[
     # 提取信息
     id_match = re.search(r'id="(.*?)"', block)
     name_match = re.search(r'name="(.*?)"', block)
-    open_time_match = re.search(r'openTime="(.*?)"', block)
-    end_time_match = re.search(r'endTime="(.*?)"', block)
 
-    if not all([id_match, name_match, open_time_match, end_time_match]):
-        script.warning(f"配置块 {block_index + 1} 信息不完整，跳过")
+    # 使用自定义字段名提取时间信息
+    start_time_pattern = rf'{re.escape(start_time_field)}="(.*?)"'
+    end_time_pattern = rf'{re.escape(end_time_field)}="(.*?)"'
+
+    start_time_match = re.search(start_time_pattern, block)
+    end_time_match = re.search(end_time_pattern, block)
+
+    script.debug(f"配置块 {block_index + 1} 解析:")
+    script.debug(f"  - 使用开始时间字段: {start_time_field}")
+    script.debug(f"  - 使用结束时间字段: {end_time_field}")
+    script.debug(f"  - 开始时间匹配: {start_time_match.group(1) if start_time_match else 'None'}")
+    script.debug(f"  - 结束时间匹配: {end_time_match.group(1) if end_time_match else 'None'}")
+
+    if not all([id_match, name_match, start_time_match, end_time_match]):
+        missing_fields = []
+        if not id_match:
+            missing_fields.append("id")
+        if not name_match:
+            missing_fields.append("name")
+        if not start_time_match:
+            missing_fields.append(start_time_field)
+        if not end_time_match:
+            missing_fields.append(end_time_field)
+
+        script.warning(f"配置块 {block_index + 1} 信息不完整，缺少字段: {missing_fields}，跳过")
         return None
 
     return {
         'id': id_match.group(1),
         'name': name_match.group(1),
-        'open_time': open_time_match.group(1),
-        'end_time': end_time_match.group(1)
+        'open_time': start_time_match.group(1),  # 统一使用open_time作为内部字段名
+        'end_time': end_time_match.group(1)  # 统一使用end_time作为内部字段名
     }
 
 
+# 注释掉时间格式标准检查函数
+# def check_time_format_standard(script, open_time: str, end_time: str) -> Dict[str, Any]:
+#     """
+#     检查时间格式是否符合标准：
+#     - 开始时间必须是 XX:00:00 格式
+#     - 结束时间必须是 XX:59:59 格式
+#
+#     Args:
+#         script: ScriptBase实例
+#         open_time: 开始时间字符串
+#         end_time: 结束时间字符串
+#
+#     Returns:
+#         Dict: 检查结果
+#     """
+#     time_format = "%Y-%m-%d %H:%M:%S"
+#
+#     try:
+#         open_date = datetime.datetime.strptime(open_time, time_format)
+#         end_date = datetime.datetime.strptime(end_time, time_format)
+#
+#         # 检查开始时间的分秒是否为 00:00
+#         open_minutes = open_date.minute
+#         open_seconds = open_date.second
+#         open_format_correct = (open_minutes == 0 and open_seconds == 0)
+#
+#         # 检查结束时间的分秒是否为 59:59
+#         end_minutes = end_date.minute
+#         end_seconds = end_date.second
+#         end_format_correct = (end_minutes == 59 and end_seconds == 59)
+#
+#         result = {
+#             'open_time': open_time,
+#             'end_time': end_time,
+#             'open_minutes': open_minutes,
+#             'open_seconds': open_seconds,
+#             'end_minutes': end_minutes,
+#             'end_seconds': end_seconds,
+#             'open_format_correct': open_format_correct,
+#             'end_format_correct': end_format_correct,
+#             'both_formats_correct': open_format_correct and end_format_correct,
+#             'expected_open_format': 'XX:00:00',
+#             'expected_end_format': 'XX:59:59',
+#             'actual_open_format': f"{open_date.hour:02d}:{open_minutes:02d}:{open_seconds:02d}",
+#             'actual_end_format': f"{end_date.hour:02d}:{end_minutes:02d}:{end_seconds:02d}"
+#         }
+#
+#         return result
+#
+#     except Exception as e:
+#         script.error(f"时间格式标准检查失败: {e}")
+#         return {
+#             'error': str(e),
+#             'check_failed': True,
+#             'both_formats_correct': False
+#         }
+
+def check_int32_timestamp_limit(script, open_time: str, end_time: str) -> Dict[str, Any]:
+    """
+    检查时间是否超过int32时间戳限制 (2038年问题)
+
+    Args:
+        script: ScriptBase实例
+        open_time: 开始时间字符串
+        end_time: 结束时间字符串
+
+    Returns:
+        Dict: 检查结果
+    """
+    # Int32最大时间戳 (2038年1月19日 03:14:07 UTC)
+    INT32_MAX_TIMESTAMP = 2147483647
+    INT32_LIMIT_DATE = datetime.datetime.fromtimestamp(INT32_MAX_TIMESTAMP)
+
+    time_format = "%Y-%m-%d %H:%M:%S"
+
+    try:
+        open_date = datetime.datetime.strptime(open_time, time_format)
+        end_date = datetime.datetime.strptime(end_time, time_format)
+
+        open_timestamp = int(open_date.timestamp())
+        end_timestamp = int(end_date.timestamp())
+
+        result = {
+            'open_timestamp': open_timestamp,
+            'end_timestamp': end_timestamp,
+            'int32_max_timestamp': INT32_MAX_TIMESTAMP,
+            'int32_limit_date': INT32_LIMIT_DATE.strftime(time_format),
+            'open_exceeds_int32': open_timestamp > INT32_MAX_TIMESTAMP,
+            'end_exceeds_int32': end_timestamp > INT32_MAX_TIMESTAMP,
+            'any_exceeds_int32': False
+        }
+
+        # 检查是否有时间超出限制
+        result['any_exceeds_int32'] = result['open_exceeds_int32'] or result['end_exceeds_int32']
+
+        return result
+
+    except Exception as e:
+        script.error(f"Int32时间戳检查失败: {e}")
+        return {
+            'error': str(e),
+            'check_failed': True
+        }
+
 def calculate_duration(script, open_time: str, end_time: str) -> Optional[Dict[str, Any]]:
     """
-    计算活动持续时间
-    特殊处理：当持续时间为x天23:59:59时，直接处理为x+1天
+    计算活动持续时间 (增强版 - 包含Int32检查)
+    使用时间戳计算，特殊处理：当持续时间为x天23:59:59时，直接处理为x+1天
+    同时检查Int32时间戳限制
 
     Args:
         script: ScriptBase实例
@@ -143,44 +273,83 @@ def calculate_duration(script, open_time: str, end_time: str) -> Optional[Dict[s
     time_format = "%Y-%m-%d %H:%M:%S"
 
     try:
+        # 解析时间字符串
         open_date = datetime.datetime.strptime(open_time, time_format)
         end_date = datetime.datetime.strptime(end_time, time_format)
-        delta = end_date - open_date
 
-        if delta.total_seconds() <= 0:
+        # 转换为时间戳（秒）
+        open_timestamp = open_date.timestamp()
+        end_timestamp = end_date.timestamp()
+
+        # 计算时间差（秒）
+        duration_seconds = end_timestamp - open_timestamp
+
+        if duration_seconds <= 0:
             script.warning(f"结束时间早于或等于开始时间: {open_time} -> {end_time}")
             return None
 
-        # 计算基本时间信息
-        days = delta.days
-        hours = delta.seconds // 3600
-        minutes = (delta.seconds // 60) % 60
-        seconds = delta.seconds % 60
+        # 从时间戳差值计算各个时间单位
+        total_seconds = int(duration_seconds)
+        days = total_seconds // (24 * 3600)
+        remaining_seconds = total_seconds % (24 * 3600)
+        hours = remaining_seconds // 3600
+        minutes = (remaining_seconds % 3600) // 60
+        seconds = remaining_seconds % 60
 
-        # 特殊处理：当持续时间为23:59:59时，直接处理为1天
+        # 保存原始计算结果
+        original_days = days
+        adjusted = False
+
+        # 特殊处理：当持续时间为x天23:59:59时，直接处理为x+1天
         if hours == 23 and minutes == 59 and seconds == 59:
             days += 1
             hours = 0
             minutes = 0
             seconds = 0
-            script.debug(f"检测到{days-1}天23:59:59格式，调整为{days-1}天 -> {days}天")
-        
+            adjusted = True
+            script.debug(f"检测到{original_days}天23:59:59格式，调整为{original_days}天 -> {days}天")
+
         # 计算调整后的总小时数
         total_hours = days * 24 + hours + minutes / 60 + seconds / 3600
 
+        # Int32时间戳检查
+        int32_check = check_int32_timestamp_limit(script, open_time, end_time)
+
+        # 注释掉时间格式标准检查
+        # format_check = check_time_format_standard(script, open_time, end_time)
+
+        # 如果发现Int32风险，记录警告
+        if int32_check.get('any_exceeds_int32', False):
+            script.warning(f"活动时间超出Int32时间戳限制(2038年): {open_time} -> {end_time}")
+
+        # 注释掉时间格式不标准的警告
+        # if not format_check.get('both_formats_correct', True):
+        #     if not format_check.get('open_format_correct', True):
+        #         script.warning(f"开始时间格式不标准: {open_time}，期望格式：XX:00:00，实际格式：{format_check.get('actual_open_format', 'Unknown')}")
+        #     if not format_check.get('end_format_correct', True):
+        #         script.warning(f"结束时间格式不标准: {end_time}，期望格式：XX:59:59，实际格式：{format_check.get('actual_end_format', 'Unknown')}")
+
         return {
-            'delta': delta,
+            'duration_seconds': duration_seconds,
+            'total_seconds': total_seconds,
+            'open_timestamp': open_timestamp,
+            'end_timestamp': end_timestamp,
             'days': days,
             'hours': hours,
             'minutes': minutes,
             'seconds': seconds,
-            'total_hours': round(total_hours, 2),
-            'original_days': delta.days,  # 保留原始天数用于调试
-            'adjusted': hours == 0 and minutes == 0 and seconds == 0 and days > delta.days  # 标记是否被调整
+            'total_hours': round(float(total_hours), 2),
+            'original_days': original_days,
+            'adjusted': adjusted,
+            'int32_check': int32_check  # Int32检查结果
+            # 'format_check': format_check  # 注释掉时间格式检查结果
         }
 
     except ValueError as e:
         script.error(f"时间格式错误: {open_time} -> {end_time}, 错误: {e}")
+        return None
+    except OSError as e:
+        script.error(f"时间戳转换错误: {open_time} -> {end_time}, 错误: {e}")
         return None
 
 
@@ -237,7 +406,8 @@ def print_message(message):
             print("无法显示消息内容")
 
 
-def validate_parameters(script, directory: str, encoding: str, expected_days: List[int] = None) -> Tuple[bool, str]:
+def validate_parameters(script, directory: str, encoding: str, expected_days: List[int] = None,
+                        start_time_field: str = None, end_time_field: str = None) -> Tuple[bool, str]:
     """
     验证输入参数
 
@@ -246,12 +416,15 @@ def validate_parameters(script, directory: str, encoding: str, expected_days: Li
         directory: 目录路径
         encoding: 文件编码
         expected_days: 期望天数列表
+        start_time_field: 开始时间字段名
+        end_time_field: 结束时间字段名
 
     Returns:
         Tuple[bool, str]: (验证是否通过, 错误信息)
     """
     script.debug("开始验证输入参数")
     script.info(f"接收到参数 - directory: '{directory}', encoding: '{encoding}', expected_days: {expected_days}")
+    script.info(f"时间字段参数 - start_time_field: '{start_time_field}', end_time_field: '{end_time_field}'")
 
     # 验证目录参数
     if not directory:
@@ -302,31 +475,47 @@ def validate_parameters(script, directory: str, encoding: str, expected_days: Li
             error_msg = "期望天数参数必须是列表或元组"
             script.error(error_msg)
             return False, error_msg
-        
+
         if not expected_days:
             error_msg = "期望天数列表不能为空"
             script.error(error_msg)
             return False, error_msg
-        
+
         # 检查天数是否都是正整数
         for day in expected_days:
             if not isinstance(day, int) or day <= 0:
                 error_msg = f"期望天数必须是正整数，发现无效值: {day}"
                 script.error(error_msg)
                 return False, error_msg
-        
+
         # 检查天数范围是否合理（1-365天）
         max_day = max(expected_days)
         if max_day > 365:
             script.warning(f"发现较大的天数值: {max_day}，请确认是否合理")
-        
+
         script.info(f"期望天数验证通过: {expected_days}")
+
+    # 验证时间字段参数
+    if start_time_field is not None:
+        start_time_field = str(start_time_field).strip()
+        if not start_time_field:
+            error_msg = "开始时间字段名不能为空"
+            script.error(error_msg)
+            return False, error_msg
+
+    if end_time_field is not None:
+        end_time_field = str(end_time_field).strip()
+        if not end_time_field:
+            error_msg = "结束时间字段名不能为空"
+            script.error(error_msg)
+            return False, error_msg
 
     script.info("参数验证通过")
     return True, ""
 
 
-def get_and_validate_parameters(script) -> Tuple[Optional[str], Optional[str], Optional[List[str]], Optional[bool], Optional[List[int]], Optional[str]]:
+def get_and_validate_parameters(script) -> Tuple[Optional[str], Optional[str], Optional[List[str]], Optional[bool],
+Optional[List[int]], Optional[str], Optional[str], Optional[str]]:
     """
     获取并验证脚本参数
 
@@ -334,8 +523,7 @@ def get_and_validate_parameters(script) -> Tuple[Optional[str], Optional[str], O
         script: ScriptBase实例
 
     Returns:
-        Tuple[Optional[str], Optional[str], Optional[List[str]], Optional[bool], Optional[List[int]], Optional[str]]:
-            (目录路径, 编码, 文件名集合, 是否递归, 期望天数集合, 错误信息)
+        Tuple: (目录路径, 编码, 文件名集合, 是否递归, 期望天数集合, 开始时间字段名, 结束时间字段名, 错误信息)
     """
     try:
         script.info("开始获取脚本参数")
@@ -349,8 +537,13 @@ def get_and_validate_parameters(script) -> Tuple[Optional[str], Optional[str], O
         recursive = script.get_parameter('recursive', False)
         expected_days_param = script.get_parameter('expected_days', [3, 7, 14])
 
+        # 获取时间字段名参数
+        start_time_field = script.get_parameter('start_time_field', 'openTime')
+        end_time_field = script.get_parameter('end_time_field', 'endTime')
+
         script.info(f"原始参数 - directory: '{directory}' (类型: {type(directory)})")
         script.info(f"原始参数 - encoding: '{encoding}' (类型: {type(encoding)})")
+        script.info(f"时间字段参数 - start_time_field: '{start_time_field}', end_time_field: '{end_time_field}'")
 
         # 参数类型和格式处理
         if directory is None:
@@ -360,6 +553,19 @@ def get_and_validate_parameters(script) -> Tuple[Optional[str], Optional[str], O
         if encoding is None:
             encoding = 'UTF-16'
             script.warning("encoding参数为None，使用默认值")
+
+        # 处理时间字段参数
+        if start_time_field is None:
+            start_time_field = 'openTime'
+            script.warning("start_time_field参数为None，使用默认值")
+        else:
+            start_time_field = str(start_time_field).strip()
+
+        if end_time_field is None:
+            end_time_field = 'endTime'
+            script.warning("end_time_field参数为None，使用默认值")
+        else:
+            end_time_field = str(end_time_field).strip()
 
         # file_names 处理为列表[str]
         if file_names is None:
@@ -414,12 +620,12 @@ def get_and_validate_parameters(script) -> Tuple[Optional[str], Optional[str], O
             except (ValueError, TypeError):
                 expected_days = [3, 7, 14]
                 script.warning(f"expected_days参数格式无效: {expected_days_param}，使用默认值")
-        
+
         # 确保至少有一个有效值
         if not expected_days:
             expected_days = [3, 7, 14]
             script.warning("没有有效的天数参数，使用默认值")
-        
+
         # 去重并排序
         expected_days = sorted(list(set(expected_days)))
         script.info(f"处理后的期望天数: {expected_days}")
@@ -429,21 +635,23 @@ def get_and_validate_parameters(script) -> Tuple[Optional[str], Optional[str], O
         encoding = str(encoding).strip()
 
         script.info(f"处理后参数 - directory: '{directory}', encoding: '{encoding}'")
+        script.info(f"处理后时间字段 - start_time_field: '{start_time_field}', end_time_field: '{end_time_field}'")
 
         # 验证参数
-        is_valid, error_msg = validate_parameters(script, directory, encoding, expected_days)
+        is_valid, error_msg = validate_parameters(script, directory, encoding, expected_days,
+                                                  start_time_field, end_time_field)
 
         if not is_valid:
-            return None, None, None, None, None, error_msg
+            return None, None, None, None, None, None, None, error_msg
 
-        return directory, encoding, file_names, recursive, expected_days, None
+        return directory, encoding, file_names, recursive, expected_days, start_time_field, end_time_field, None
 
     except Exception as e:
         error_msg = f"获取参数时发生异常: {str(e)}"
         script.error(error_msg)
         import traceback
         script.debug(f"异常堆栈: {traceback.format_exc()}")
-        return None, None, None, None, None, error_msg
+        return None, None, None, None, None, None, None, error_msg
 
 
 # ==================== 主逻辑函数 ====================
@@ -459,12 +667,15 @@ def main_logic(script):
     script.info("=== 开始执行活动时间配置检查 ===")
 
     # 1. 获取并验证参数
-    directory, encoding, file_names, recursive, expected_days, param_error = get_and_validate_parameters(script)
+    directory, encoding, file_names, recursive, expected_days, start_time_field, end_time_field, param_error = get_and_validate_parameters(
+        script)
 
     if param_error:
         return script.error_result(param_error, "ParameterError")
 
-    script.info(f"使用参数 - 检查目录: {directory}, 文件编码: {encoding}, 递归: {recursive}, 期望天数: {expected_days}, 目标文件: {file_names}")
+    script.info(f"使用参数 - 检查目录: {directory}, 文件编码: {encoding}, 递归: {recursive}")
+    script.info(f"期望天数: {expected_days}, 目标文件: {file_names}")
+    script.info(f"时间字段映射 - 开始时间: {start_time_field}, 结束时间: {end_time_field}")
 
     # 2. 查找目标文件
     target_files = find_target_files(script, directory, file_names or [], bool(recursive))
@@ -482,6 +693,9 @@ def main_logic(script):
     total_activities = 0
     invalid_time_activities = 0
     abnormal_duration_activities = []
+    int32_risk_activities = []
+    # format_error_activities = []  # 注释掉时间格式错误活动列表
+    invalid_activities_details = []  # 新增：存储无效时间活动详情
     processed_files_info: List[Dict[str, Any]] = []
 
     script.info("开始解析活动配置块...")
@@ -503,10 +717,12 @@ def main_logic(script):
         file_total = 0
         file_invalid = 0
         file_abnormal = 0
+        file_int32_risk = 0
+        # file_format_error = 0  # 注释掉文件级时间格式错误计数
 
         for i, block in enumerate(blocks):
-            # 解析活动信息
-            activity_info = parse_activity_block(script, block, i)
+            # 解析活动信息 - 传入自定义字段名
+            activity_info = parse_activity_block(script, block, i, start_time_field, end_time_field)
             if not activity_info:
                 continue
 
@@ -524,9 +740,18 @@ def main_logic(script):
             if not duration_info:
                 invalid_time_activities += 1
                 file_invalid += 1
-                print_message(
-                    f"无效的活动时间配置: 文件={os.path.basename(file_path)}, ID={activity_info['id']}, Name={activity_info['name']}, 开始时间={activity_info['open_time']}, 结束时间={activity_info['end_time']}"
-                )
+                # 收集无效时间活动详情
+                invalid_activities_details.append({
+                    'file_path': file_path,
+                    'id': activity_info['id'],
+                    'name': activity_info['name'],
+                    'open_time': activity_info['open_time'],
+                    'end_time': activity_info['end_time']
+                })
+                # 注释掉原有的print_message调用
+                # print_message(
+                #     f"无效的活动时间配置: 文件={os.path.basename(file_path)}, ID={activity_info['id']}, Name={activity_info['name']}, 开始时间={activity_info['open_time']}, 结束时间={activity_info['end_time']}"
+                # )
                 continue
 
             # 检查天数是否在配置范围
@@ -547,16 +772,73 @@ def main_logic(script):
 
                 file_abnormal += 1
 
-                print_message(
-                    f"持续天数不在允许范围 ({expected_days}): 文件={os.path.basename(file_path)}, ID={activity_info['id']}, Name={activity_info['name']}, 开始时间={activity_info['open_time']}, 结束时间={activity_info['end_time']}, 持续时间={abnormal_activity['duration_text']}"
-                )
+                # 注释掉原有的print_message调用
+                # print_message(
+                #     f"持续天数不在允许范围 ({expected_days}): 文件={os.path.basename(file_path)}, ID={activity_info['id']}, Name={activity_info['name']}, 开始时间={activity_info['open_time']}, 结束时间={activity_info['end_time']}, 持续时间={abnormal_activity['duration_text']}"
+                # )
+
+            # 检查Int32时间戳风险
+            if duration_info and duration_info.get('int32_check'):
+                int32_info = duration_info['int32_check']
+
+                if int32_info.get('any_exceeds_int32'):
+                    int32_risk_activity = {
+                        'file_path': file_path,
+                        'id': activity_info['id'],
+                        'name': activity_info['name'],
+                        'open_time': activity_info['open_time'],
+                        'end_time': activity_info['end_time'],
+                        'open_exceeds': int32_info.get('open_exceeds_int32', False),
+                        'end_exceeds': int32_info.get('end_exceeds_int32', False)
+                    }
+                    int32_risk_activities.append(int32_risk_activity)
+                    file_int32_risk += 1
+
+                    # 注释掉原有的print_message调用
+                    # print_message(
+                    #     f"Int32时间戳超出限制(2038年): 文件={os.path.basename(file_path)}, ID={activity_info['id']}, Name={activity_info['name']}, 开始时间={activity_info['open_time']}, 结束时间={activity_info['end_time']}"
+                    # )
+
+            # 注释掉时间格式标准检查
+            # if duration_info and duration_info.get('format_check'):
+            #     format_info = duration_info['format_check']
+            #
+            #     if not format_info.get('both_formats_correct', True):
+            #         format_error_activity = {
+            #             'file_path': file_path,
+            #             'id': activity_info['id'],
+            #             'name': activity_info['name'],
+            #             'open_time': activity_info['open_time'],
+            #             'end_time': activity_info['end_time'],
+            #             'open_format_correct': format_info.get('open_format_correct', True),
+            #             'end_format_correct': format_info.get('end_format_correct', True),
+            #             'actual_open_format': format_info.get('actual_open_format', ''),
+            #             'actual_end_format': format_info.get('actual_end_format', ''),
+            #             'expected_open_format': format_info.get('expected_open_format', 'XX:00:00'),
+            #             'expected_end_format': format_info.get('expected_end_format', 'XX:59:59')
+            #         }
+            #         format_error_activities.append(format_error_activity)
+            #         file_format_error += 1
+            #
+            #         # 打印时间格式错误信息
+            #         error_details = []
+            #         if not format_info.get('open_format_correct', True):
+            #             error_details.append(f"开始时间应为XX:00:00，实际为{format_info.get('actual_open_format', '')}")
+            #         if not format_info.get('end_format_correct', True):
+            #             error_details.append(f"结束时间应为XX:59:59，实际为{format_info.get('actual_end_format', '')}")
+            #
+            #         print_message(
+            #             f"时间格式不符合标准: 文件={os.path.basename(file_path)}, ID={activity_info['id']}, Name={activity_info['name']}, 问题=[{'; '.join(error_details)}]"
+            #         )
 
         processed_files_info.append({
             'file_path': file_path,
             'encoding_used': actual_encoding if 'actual_encoding' in locals() else None,
             'total_activities': file_total,
             'invalid_time_activities': file_invalid,
-            'abnormal_duration_activities': file_abnormal
+            'abnormal_duration_activities': file_abnormal,
+            'int32_risk_activities': file_int32_risk
+            # 'format_error_activities': file_format_error  # 注释掉文件级时间格式错误统计
         })
 
     # 4. 生成检查结果摘要
@@ -565,10 +847,18 @@ def main_logic(script):
     script.info(f"   - 总活动数: {total_activities}")
     script.info(f"   - 时间格式无效的活动数: {invalid_time_activities}")
     script.info(f"   - 持续时间异常的活动数: {len(abnormal_duration_activities)}")
+    script.info(f"   - Int32时间戳风险活动数: {len(int32_risk_activities)}")
+    # script.info(f"   - 时间格式不标准的活动数: {len(format_error_activities)}")  # 注释掉
 
     # 5. 构建结果数据
-    has_issues = len(abnormal_duration_activities) > 0 or invalid_time_activities > 0
-    issues_count = len(abnormal_duration_activities) + invalid_time_activities
+    has_issues = (len(abnormal_duration_activities) > 0 or
+                  invalid_time_activities > 0 or
+                  len(int32_risk_activities) > 0)
+    # len(format_error_activities) > 0)  # 注释掉格式错误检查
+    issues_count = (len(abnormal_duration_activities) +
+                    invalid_time_activities +
+                    len(int32_risk_activities))
+    # len(format_error_activities))  # 注释掉格式错误计数
 
     result_data = {
         'input_parameters': {
@@ -576,7 +866,9 @@ def main_logic(script):
             'encoding_requested': encoding,
             'recursive': bool(recursive),
             'file_names': file_names,
-            'expected_days': expected_days
+            'expected_days': expected_days,
+            'start_time_field': start_time_field,
+            'end_time_field': end_time_field
         },
         'file_info': {
             'searched_directory': directory,
@@ -587,26 +879,120 @@ def main_logic(script):
             'total_activities': total_activities,
             'invalid_time_activities': invalid_time_activities,
             'abnormal_duration_count': len(abnormal_duration_activities),
-            'abnormal_duration_activities': abnormal_duration_activities
+            'abnormal_duration_activities': abnormal_duration_activities,
+            'int32_risk_count': len(int32_risk_activities),
+            'int32_risk_activities': int32_risk_activities,
+            'invalid_activities_details': invalid_activities_details  # 新增字段
+            # 'format_error_count': len(format_error_activities),  # 注释掉
+            # 'format_error_activities': format_error_activities   # 注释掉
         },
         'check_summary': {
             'has_issues': has_issues,
             'issues_count': issues_count,
             'check_passed': not has_issues
+        },
+        'field_mapping': {
+            'config_start_time_field': start_time_field,
+            'config_end_time_field': end_time_field,
+            'internal_start_time_field': 'open_time',
+            'internal_end_time_field': 'end_time'
+        },
+        'int32_limit_info': {
+            'limit_timestamp': 2147483647,
+            'limit_date': '2038-01-19 03:14:07'
         }
+        # 'format_standard_info': {  # 注释掉时间格式标准信息
+        #     'required_start_format': 'XX:00:00',
+        #     'required_end_format': 'XX:59:59',
+        #     'description': '开始时间必须是整点（00分00秒），结束时间必须是XX:59:59'
+        # }
     }
 
-    # 6. 生成最终消息并返回结果
-    if has_issues:
-        message = f"检查完成：发现 {issues_count} 个活动时间配置问题，需要关注"
-        print_message(message)
-        script.warning(message)
-    else:
-        message = "检查完成：所有活动时间配置都符合标准"
-        print_message(message)
-        script.info(message)
+    # 6. 生成详细的最终消息
+    def build_detailed_message():
+        """构建包含详细问题信息的消息"""
+        message_parts = []
 
-    return script.success_result(message, result_data)
+        # 基本统计信息
+        message_parts.append(f"活动时间配置检查完成")
+        message_parts.append(f"总活动数: {total_activities}")
+        message_parts.append(f"发现问题数: {issues_count}")
+
+        if not has_issues:
+            message_parts.append("[OK] 所有活动时间配置都符合标准")
+            return "\n".join(message_parts)
+
+        message_parts.append("")  # 空行分隔
+        message_parts.append("详细问题列表:")
+
+        # 1. 无效时间格式的活动
+        if invalid_activities_details:
+            message_parts.append(f"\n[ERROR] 无效时间格式活动 ({len(invalid_activities_details)}个):")
+            for idx, activity in enumerate(invalid_activities_details[:5], 1):  # 最多显示5个
+                file_name = os.path.basename(activity['file_path'])
+                message_parts.append(
+                    f"  {idx}. ID:{activity['id']} | {activity['name']} | "
+                    f"文件:{file_name} | 时间:{activity['open_time']} ~ {activity['end_time']}"
+                )
+            if len(invalid_activities_details) > 5:
+                message_parts.append(f"  ... 还有 {len(invalid_activities_details) - 5} 个相似问题")
+
+        # 2. 持续时间异常的活动
+        if abnormal_duration_activities:
+            message_parts.append(f"\n[WARNING] 持续时间异常活动 ({len(abnormal_duration_activities)}个):")
+            message_parts.append(f"   (允许范围: {expected_days}天)")
+            for idx, activity in enumerate(abnormal_duration_activities[:5], 1):  # 最多显示5个
+                file_name = os.path.basename(activity['file_path'])
+                message_parts.append(
+                    f"  {idx}. ID:{activity['id']} | {activity['name']} | "
+                    f"文件:{file_name} | 实际:{activity['duration_days']}天 | "
+                    f"时间:{activity['open_time']} ~ {activity['end_time']}"
+                )
+            if len(abnormal_duration_activities) > 5:
+                message_parts.append(f"  ... 还有 {len(abnormal_duration_activities) - 5} 个相似问题")
+
+        # 3. Int32时间戳风险活动
+        if int32_risk_activities:
+            message_parts.append(f"\n[CRITICAL] Int32时间戳风险活动 ({len(int32_risk_activities)}个):")
+            message_parts.append("   (超过2038年限制)")
+            for idx, activity in enumerate(int32_risk_activities[:5], 1):  # 最多显示5个
+                file_name = os.path.basename(activity['file_path'])
+                risk_type = []
+                if activity['open_exceeds']:
+                    risk_type.append("开始时间")
+                if activity['end_exceeds']:
+                    risk_type.append("结束时间")
+
+                message_parts.append(
+                    f"  {idx}. ID:{activity['id']} | {activity['name']} | "
+                    f"文件:{file_name} | 风险:{'/'.join(risk_type)} | "
+                    f"时间:{activity['open_time']} ~ {activity['end_time']}"
+                )
+            if len(int32_risk_activities) > 5:
+                message_parts.append(f"  ... 还有 {len(int32_risk_activities) - 5} 个相似问题")
+
+        message_parts.append("")  # 空行分隔
+        message_parts.append("建议: 请检查并修复上述问题活动的时间配置")
+
+        return "\n".join(message_parts)
+
+    # 7. 生成最终消息并返回结果
+    detailed_message = build_detailed_message()  # 使用详细消息
+
+    if has_issues:
+        # 保留原有的简短消息用于日志
+        simple_message = f"检查完成：发现 {issues_count} 个活动时间配置问题，需要关注"
+        # 注释掉原有的print_message调用
+        # print_message(simple_message)
+        script.warning(simple_message)
+    else:
+        # 保留原有的简短消息用于日志
+        simple_message = "检查完成：所有活动时间配置都符合标准"
+        # 注释掉原有的print_message调用
+        # print_message(simple_message)
+        script.info(simple_message)
+
+    return script.success_result(detailed_message, result_data)  # 返回详细消息
 
 
 if __name__ == '__main__':
