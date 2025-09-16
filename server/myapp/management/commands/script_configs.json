@@ -172,7 +172,7 @@
     ]
   },
   "checkFileName": {
-    "dialog_title": "检查文件名脚本-参数配置",
+    "dialog_title": "检查文件名脚本-文件名合法性",
     "parameters": [
       {
         "name": "root_path",
@@ -183,20 +183,31 @@
         "placeholder": "例如: D:\\fishdev 或 /path/to/unity/project"
       },
       {
-        "name": "check_extension",
-        "type": "switch",
-        "label": "扩展名纯小写",
-        "required": false,
-        "default": true,
-        "description": "文件扩展名纯小写检查\n(确保跨平台兼容性)"
+        "name": "regex_pattern",
+        "type": "text",
+        "label": "正则表达式",
+        "required": true,
+        "default": "^[a-zA-Z0-9_]+\\.[a-z]+$",
+        "description": "用于匹配文件名的正则表达式，例如：^[A-Z][a-zA-Z0-9]*\\.cs$ 表示PascalCase的C#文件"
       },
       {
-        "name": "check_duplicate",
-        "type": "switch",
-        "label": "检查重名文件",
+        "name": "file_extensions",
+        "type": "checkbox",
+        "label": "文件后缀名",
+        "options": [
+          ".txt", ".log", ".json", ".py", ".pdb",
+          ".cs", ".java", ".png", ".jpg", ".gif",
+          ".lua", ".md", ".asmdef", ".xml", ".mp4",
+          ".mp3", ".pdf", ".xlsx", ".prefab",
+          ".meta", ".FBX", ".tga", ".controller",
+          ".anim", ".mat", ".unity", ".dll", ".exr",
+          ".shader", ".exe", ".svg", ".cmake", ".psd",
+          ".bat", ".c", ".h"
+        ],
         "required": false,
-        "default": true,
-        "description": "检查Prefab文件是否存在重名"
+        "multiple": true,
+        "default": [".txt"],
+        "description": "选择要检查的文件后缀类型，可多选。如果不选择任何项，将检查所有文件"
       }
     ]
   }
