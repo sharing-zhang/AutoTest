@@ -104,48 +104,48 @@
           />
         </el-form-item>
         <!-- 数字输入框 -->
-          <div v-else-if="field.type === 'number'" class="field-wrapper">
-            <div class="number-input-container">
-              <el-input-number
-                v-model="groupItem[field.name]"
-                :min="field.min"
-                :max="field.max"
-                :step="1"
-                :placeholder="field.placeholder"
-                controls-position="right"
-                style="width: 180px;"
-              />
-              <!-- addonAfter 提示 -->
-              <span v-if="field.addonAfter" class="addon-after">
-                {{ field.addonAfter }}
-              </span>
-            </div>
-            <!-- 字段描述 -->
-            <div v-if="field.description" class="field-description">
-              {{ field.description }}
-            </div>
-            <!-- 帮助提示 -->
-            <div v-if="field.help" class="field-help">
-              <el-icon><InfoFilled /></el-icon>
-              {{ field.help }}
-            </div>
-          </div>
+<!--          <div v-else-if="field.type === 'number'" class="field-wrapper">-->
+<!--            <div class="number-input-container">-->
+<!--              <el-input-number-->
+<!--                v-model="groupItem[field.name]"-->
+<!--                :min="field.min"-->
+<!--                :max="field.max"-->
+<!--                :step="1"-->
+<!--                :placeholder="field.placeholder"-->
+<!--                controls-position="right"-->
+<!--                style="width: 180px;"-->
+<!--              />-->
+<!--              &lt;!&ndash; addonAfter 提示 &ndash;&gt;-->
+<!--              <span v-if="field.addonAfter" class="addon-after">-->
+<!--                {{ field.addonAfter }}-->
+<!--              </span>-->
+<!--            </div>-->
+<!--            &lt;!&ndash; 字段描述 &ndash;&gt;-->
+<!--            <div v-if="field.description" class="field-description">-->
+<!--              {{ field.description }}-->
+<!--            </div>-->
+<!--            &lt;!&ndash; 帮助提示 &ndash;&gt;-->
+<!--            <div v-if="field.help" class="field-help">-->
+<!--              <el-icon><InfoFilled /></el-icon>-->
+<!--              {{ field.help }}-->
+<!--            </div>-->
+<!--          </div>-->
 
 <!--        &lt;!&ndash; 数字输入框 &ndash;&gt;-->
-<!--        <el-form-item -->
-<!--          v-else-if="param.type === 'number'" -->
-<!--          :label="param.label" -->
-<!--          :prop="param.name"-->
-<!--          :required="param.required"-->
-<!--        >-->
-<!--          <el-input-number-->
-<!--            v-model="formData[param.name]"-->
-<!--            :min="param.min"-->
-<!--            :max="param.max"-->
-<!--            :step="1"-->
-<!--            style="width: 100%"-->
-<!--          />-->
-<!--        </el-form-item>-->
+        <el-form-item
+          v-else-if="param.type === 'number'"
+          :label="param.label"
+         :prop="param.name"
+          :required="param.required"
+        >
+          <el-input-number
+            v-model="formData[param.name]"
+            :min="param.min"
+            :max="param.max"
+            :step="1"
+            style="width: 100%"
+         />
+        </el-form-item>
 
         <!-- 开关 -->
         <el-form-item 
