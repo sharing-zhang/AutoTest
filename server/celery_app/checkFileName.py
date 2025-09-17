@@ -1,442 +1,449 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-文件名正则表达式检查脚本
+文件名正则表达式检查脚本 - 高性能完整展示版本
 功能：根据用户提供的正则表达式和选择的文件后缀检查项目中的文件名是否符合规范
 """
 
 import os
 import re
 import sys
-import gc
 import time
-import threading
-from collections import defaultdict
+import traceback
+import gc
+from pathlib import Path
 from script_base import ScriptBase, create_simple_script
 
-# 设置更保守递归限制
-sys.setrecursionlimit(500)
+
+# ==================== 高性能配置 ====================
+class PerformanceConfig:
+    MAX_FILES = 20000  # 增加文件数量限制
+    MAX_DEPTH = 8  # 增加深度限制
+    PROGRESS_INTERVAL = 2000  # 减少进度报告频率
+    MEMORY_CHECK_INTERVAL = 5000  # 减少内存检查频率
+    MAX_PATH_LENGTH = 280
+    BATCH_SIZE = 1000  # 批处理大小
+    # 移除 MAX_DISPLAY_FILES 限制，显示所有文件
 
 
-# ==================== 全局配置 ====================
-class CheckConfig:
-    MAX_FILES = 20000  # 文件数量限制
-    BATCH_SIZE = 500  # 批处理大小
-    GC_FREQUENCY = 200  # 垃圾回收频率
-    TIMEOUT_SECONDS = 3000  # 超时时间
-    MAX_PATH_LENGTH = 260  # 最大路径长度
+# ==================== 性能优化：预编译跳过模式 ====================
+class SkipPatterns:
+    """预编译跳过模式，避免重复计算"""
+
+    def __init__(self):
+        # 跳过目录（使用集合，O(1)查找）
+        self.skip_dirs = frozenset({
+            '.git', '.svn', '__pycache__', 'node_modules',
+            '.idea', '.vscode', 'temp', 'library', 'bin', 'obj',
+            'build', 'dist', 'debug', 'release', '.pytest_cache',
+            'coverage', '.nyc_output', 'logs'
+        })
+
+        # 跳过文件
+        self.skip_files = frozenset({
+            'thumbs.db', 'desktop.ini', '.ds_store',
+            '.gitignore', '.gitkeep', '.env'
+        })
+
+        # 预编译文件名模式（避免重复startswith检查）
+        self.hidden_prefixes = ('.', '~', '#')
+
+    def should_skip_dir(self, dirname):
+        """快速目录跳过检查"""
+        return (dirname.lower() in self.skip_dirs or
+                dirname.startswith(self.hidden_prefixes))
+
+    def should_skip_file(self, filename):
+        """快速文件跳过检查"""
+        filename_lower = filename.lower()
+        return (filename_lower in self.skip_files or
+                filename.startswith(self.hidden_prefixes) or
+                filename.endswith(('.tmp', '.bak', '.log')))
 
 
-# ==================== 超时控制 ====================
-class TimeoutException(Exception):
-    pass
+# ==================== 性能优化：快速扩展名解析 ====================
+def fast_parse_extensions(extensions):
+    """快速解析文件后缀"""
+    if not extensions:
+        return None
 
+    # 使用集合，提供O(1)查找性能
+    result = set()
 
-def timeout_handler():
-    raise TimeoutException("脚本执行超时")
-
-
-# ==================== 导入和路径设置 ====================
-def setup_imports():
-    """设置导入路径并解决相对导入问题"""
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    if current_dir not in sys.path:
-        sys.path.insert(0, current_dir)
-
-
-setup_imports()
-
-
-# ==================== 安全文件遍历 ====================
-def safe_walk_directory(directory_path, script, max_files=None):
-    """安全的目录遍历，带有更多保护机制"""
-    if max_files is None:
-        max_files = CheckConfig.MAX_FILES
-
-    all_files = []
-    file_count = 0
-    processed_dirs = 0
-
-    try:
-        script.info(f"开始遍历目录: {directory_path}")
-
-        for root, dirs, files in os.walk(directory_path):
-            # 检查超时
-            if file_count > max_files:
-                script.warning(f"文件数量超过限制 {max_files}，停止遍历")
-                break
-
-            # 过滤危险目录
-            dirs[:] = [d for d in dirs if not _is_dangerous_dir(d)]
-
-            # 限制目录深度
-            processed_dirs += 1
-            if processed_dirs > 1000:
-                script.warning("目录数量过多，停止遍历")
-                break
-
-            # 批量处理文件
-            batch_files = []
-            for filename in files:
-                if file_count >= max_files:
-                    break
-
-                try:
-                    # 基本文件过滤
-                    if not _is_valid_file(filename, root):
-                        continue
-
-                    full_path = os.path.join(root, filename)
-
-                    # 路径长度检查
-                    if len(full_path) > CheckConfig.MAX_PATH_LENGTH:
-                        continue
-
-                    # 文件存在性检查
-                    if os.path.isfile(full_path):
-                        batch_files.append(full_path)
-                        file_count += 1
-
-                except (OSError, UnicodeDecodeError, PermissionError):
-                    continue
-
-            # 批量添加到结果
-            all_files.extend(batch_files)
-
-            # 定期垃圾回收
-            if file_count % CheckConfig.GC_FREQUENCY == 0:
-                gc.collect()
-                script.debug(f"已处理 {file_count} 个文件")
-
-    except Exception as e:
-        script.error(f"目录遍历异常: {str(e)}")
-        raise RuntimeError(f"目录遍历失败: {str(e)}")
-
-    script.info(f"遍历完成，共找到 {len(all_files)} 个文件")
-    return all_files
-
-
-def _is_dangerous_dir(dirname):
-    """检查是否为危险目录"""
-    dangerous_patterns = [
-        '.',  # 隐藏目录
-        '__pycache__',  # Python缓存
-        'node_modules',  # Node.js模块
-        '.git',  # Git目录
-        '.svn',  # SVN目录
-        'Temp',  # 临时目录
-        'Library',  # Unity库目录
-    ]
-    return any(dirname.startswith(pattern) for pattern in dangerous_patterns)
-
-
-def _is_valid_file(filename, root_path):
-    """检查文件是否有效"""
-    # 跳过隐藏文件和临时文件
-    if filename.startswith('.') or filename.endswith('.tmp'):
-        return False
-
-    # 跳过特殊文件
-    if filename in ['Thumbs.db', 'desktop.ini', '.DS_Store']:
-        return False
-
-    return True
-
-
-# ==================== 正则表达式组合函数 ====================
-def build_regex_patterns(base_pattern, file_extensions):
-    """根据基础正则表达式和文件后缀构建完整的正则表达式列表"""
-    patterns = []
-
-    if not file_extensions:
-        # 如果没有选择后缀，直接使用原始模式
-        patterns.append(base_pattern)
+    if isinstance(extensions, str):
+        # 优化字符串分割
+        exts = extensions.replace(',', ' ').split()
     else:
-        # 为每个选中的后缀构建正则表达式
-        for ext in file_extensions:
-            # 转义点号，因为在正则表达式中点号是特殊字符
-            escaped_ext = ext.replace('.', '\\.')
-            combined_pattern = base_pattern + escaped_ext
-            patterns.append(combined_pattern)
+        exts = extensions if isinstance(extensions, (list, tuple)) else [extensions]
 
-    return patterns
+    for ext in exts:
+        ext = str(ext).strip().lower()
+        if ext and len(ext) < 10:
+            # 标准化扩展名格式
+            result.add(ext if ext.startswith('.') else '.' + ext)
 
-
-# ==================== 正则表达式验证函数 ====================
-def validate_regex_pattern(script, pattern):
-    """验证正则表达式的有效性"""
-    try:
-        re.compile(pattern)
-        script.info(f"正则表达式验证通过: {pattern}")
-        return True, None
-    except re.error as e:
-        error_msg = f"正则表达式无效: {pattern} - 错误: {str(e)}"
-        script.error(error_msg)
-        return False, error_msg
+    return result if result else None
 
 
-def check_filename_against_multiple_regex(script, filename, regex_patterns, case_sensitive=True):
-    """检查单个文件名是否符合多个正则表达式中的任意一个"""
-    try:
-        # 编译正则表达式
-        flags = 0 if case_sensitive else re.IGNORECASE
+# ==================== 性能优化：高速文件扫描 ====================
+def fast_scan_files(directory, target_extensions, script):
+    """高速文件扫描 - 使用pathlib和优化算法"""
 
-        # 检查是否匹配任意一个模式
-        for pattern in regex_patterns:
-            try:
-                compiled_pattern = re.compile(pattern, flags)
-                if compiled_pattern.match(filename):
-                    return True, f"匹配模式: {pattern}"
-            except re.error as e:
-                script.debug(f"正则表达式编译失败 {pattern}: {e}")
-                continue
+    skip_patterns = SkipPatterns()
+    matched_files = []
+    total_files = 0
+    skipped_files = 0
 
-        return False, f"不匹配任何模式: {regex_patterns}"
-
-    except Exception as e:
-        script.debug(f"检查文件名时出错 {filename}: {e}")
-        return False, f"检查异常: {str(e)}"
-
-
-def should_check_file_by_extension(filename, selected_extensions):
-    """根据选中的后缀判断是否需要检查该文件"""
-    if not selected_extensions:
-        # 如果没有选择后缀，检查所有文件
-        return True
-
-    # 获取文件的实际后缀
-    _, file_ext = os.path.splitext(filename)
-    file_ext = file_ext.lower()
-
-    # 检查是否在选中的后缀列表中
-    return file_ext in [ext.lower() for ext in selected_extensions]
-
-
-def check_files_regex_compliance(script, directory, base_regex_pattern, file_extensions, case_sensitive=True,
-                                 check_full_name=True):
-    """检查目录中的文件名是否符合正则表达式规范（支持多后缀）"""
-
-    # 构建正则表达式模式列表
-    regex_patterns = build_regex_patterns(base_regex_pattern, file_extensions)
-
-    script.info(f"开始正则表达式检查")
-    script.info(f"基础模式: {base_regex_pattern}")
-    script.info(f"选中后缀: {file_extensions if file_extensions else '全部'}")
-    script.info(f"生成的模式: {regex_patterns}")
-    script.info(f"检查配置 - 大小写敏感: {case_sensitive}, 检查完整文件名: {check_full_name}")
-
-    if not os.path.exists(directory):
-        script.warning(f"目录不存在: {directory}")
-        return {
-            'compliant_files': [],
-            'non_compliant_files': [],
-            'error_files': [],
-            'skipped_files': 0
-        }
-
-    # 验证正则表达式
-    for pattern in regex_patterns:
-        is_valid, error_msg = validate_regex_pattern(script, pattern)
-        if not is_valid:
-            raise ValueError(f"正则表达式无效: {error_msg}")
-
-    try:
-        # 获取所有文件
-        all_files = safe_walk_directory(directory, script, CheckConfig.MAX_FILES)
-
-        compliant_files = []
-        non_compliant_files = []
-        error_files = []
-        skipped_files = 0
-
-        # 分批处理文件
-        for i in range(0, len(all_files), CheckConfig.BATCH_SIZE):
-            batch = all_files[i:i + CheckConfig.BATCH_SIZE]
-
-            for file_path in batch:
-                try:
-                    # 获取文件名
-                    full_filename = os.path.basename(file_path)
-
-                    # 根据后缀过滤判断是否需要检查此文件
-                    if not should_check_file_by_extension(full_filename, file_extensions):
-                        skipped_files += 1
-                        continue
-
-                    # 根据配置决定检查什么
-                    if check_full_name:
-                        # 检查完整文件名（包含扩展名）
-                        filename = full_filename
-                    else:
-                        # 只检查文件名部分（不包含扩展名）
-                        filename = os.path.splitext(full_filename)[0]
-
-                    # 检查是否符合任意一个正则表达式
-                    is_compliant, reason = check_filename_against_multiple_regex(
-                        script, filename, regex_patterns, case_sensitive
-                    )
-
-                    file_info = {
-                        'file_path': file_path,
-                        'filename': filename,
-                        'full_filename': full_filename,
-                        'reason': reason
-                    }
-
-                    if is_compliant:
-                        compliant_files.append(file_info)
-                    else:
-                        non_compliant_files.append(file_info)
-
-                except Exception as e:
-                    error_info = {
-                        'file_path': file_path,
-                        'filename': os.path.basename(file_path) if file_path else 'unknown',
-                        'error': str(e)
-                    }
-                    error_files.append(error_info)
-                    script.debug(f"处理文件异常 {file_path}: {e}")
-
-            # 批处理后垃圾回收
-            gc.collect()
-
-        result = {
-            'compliant_files': compliant_files,
-            'non_compliant_files': non_compliant_files,
-            'error_files': error_files,
-            'skipped_files': skipped_files
-        }
-
-        script.info(
-            f"正则检查完成 - 符合: {len(compliant_files)}, 不符合: {len(non_compliant_files)}, 错误: {len(error_files)}, 跳过: {skipped_files}")
-        return result
-
-    except Exception as e:
-        script.error(f"正则表达式检查失败: {e}")
-        raise
-
-
-# ==================== 主逻辑（正则表达式版） ====================
-def main_logic(script: ScriptBase):
-    """正则表达式检查主逻辑"""
+    script.info(f"开始高速扫描目录: {directory}")
     start_time = time.time()
 
     try:
-        # 设置超时保护
-        timer = threading.Timer(CheckConfig.TIMEOUT_SECONDS, timeout_handler)
-        timer.start()
+        # 使用pathlib，性能更好
+        root_path = Path(directory)
+        if not root_path.is_dir():
+            raise ValueError(f"目录不存在或不可访问: {directory}")
 
-        try:
-            # 初始化
+        # 获取根目录深度（pathlib版本）
+        root_depth = len(root_path.parts)
+
+        # 使用iterdir()而不是os.walk()，在某些情况下更快
+        def scan_directory(current_path, current_depth):
+            nonlocal total_files, skipped_files, matched_files
+
+            try:
+                # 深度检查
+                if current_depth - root_depth > PerformanceConfig.MAX_DEPTH:
+                    return
+
+                # 路径长度检查
+                if len(str(current_path)) > PerformanceConfig.MAX_PATH_LENGTH:
+                    return
+
+                # 获取目录内容，一次性读取
+                try:
+                    items = list(current_path.iterdir())
+                except (PermissionError, OSError):
+                    return
+
+                # 分离文件和目录
+                files = []
+                dirs = []
+
+                for item in items:
+                    if item.is_file():
+                        files.append(item)
+                    elif item.is_dir():
+                        dirs.append(item)
+
+                # 批量处理文件
+                for file_path in files:
+                    filename = file_path.name
+
+                    # 快速跳过检查
+                    if skip_patterns.should_skip_file(filename):
+                        continue
+
+                    # 文件名长度检查
+                    if len(filename) > 200:
+                        continue
+
+                    # 扩展名检查（优化版本）
+                    if target_extensions:
+                        file_suffix = file_path.suffix.lower()
+                        if file_suffix not in target_extensions:
+                            skipped_files += 1
+                            continue
+
+                    # 路径长度检查
+                    if len(str(file_path)) > PerformanceConfig.MAX_PATH_LENGTH:
+                        continue
+
+                    matched_files.append(str(file_path))
+                    total_files += 1
+
+                    # 文件数量限制
+                    if total_files >= PerformanceConfig.MAX_FILES:
+                        raise StopIteration("文件数量限制")
+
+                # 进度报告（减少频率）
+                if total_files % PerformanceConfig.PROGRESS_INTERVAL == 0:
+                    script.info(f"已扫描 {total_files} 个文件，深度: {current_depth - root_depth}")
+
+                # 内存管理（减少频率）
+                if total_files % PerformanceConfig.MEMORY_CHECK_INTERVAL == 0:
+                    gc.collect()
+
+                # 递归处理子目录
+                for dir_path in dirs:
+                    dirname = dir_path.name
+
+                    # 快速跳过检查
+                    if skip_patterns.should_skip_dir(dirname):
+                        continue
+
+                    # 路径长度检查
+                    if len(str(dir_path)) > PerformanceConfig.MAX_PATH_LENGTH:
+                        continue
+
+                    # 递归扫描
+                    scan_directory(dir_path, current_depth + 1)
+
+            except Exception as e:
+                script.warning(f"扫描目录异常 {current_path}: {e}")
+
+        # 开始扫描
+        scan_directory(root_path, root_depth)
+
+    except StopIteration:
+        script.info("达到文件数量限制，停止扫描")
+    except Exception as e:
+        script.error(f"文件扫描异常: {e}")
+        raise
+
+    scan_time = time.time() - start_time
+    script.info(f"高速扫描完成: {total_files} 个文件, {skipped_files} 个跳过, 耗时 {scan_time:.2f}秒")
+
+    return matched_files, skipped_files
+
+
+# ==================== 性能优化：批量正则检查 ====================
+def fast_regex_check(files, regex_pattern, case_sensitive, check_full_name, script):
+    """批量正则检查 - 使用批处理优化"""
+
+    script.info(f"开始高速正则检查 {len(files)} 个文件...")
+    start_time = time.time()
+
+    # 预编译正则表达式
+    try:
+        if len(regex_pattern) > 150:
+            raise ValueError("正则表达式过长")
+
+        flags = 0 if case_sensitive else re.IGNORECASE
+        compiled_pattern = re.compile(regex_pattern, flags)
+        script.info(f"正则表达式编译成功")
+    except re.error as e:
+        raise ValueError(f"正则表达式无效: {e}")
+
+    # 结果容器
+    compliant_paths = []
+    non_compliant_info = []
+    error_info = []
+
+    # 批量处理优化
+    total_files = len(files)
+    processed = 0
+
+    for batch_start in range(0, total_files, PerformanceConfig.BATCH_SIZE):
+        batch_end = min(batch_start + PerformanceConfig.BATCH_SIZE, total_files)
+        batch_files = files[batch_start:batch_end]
+
+        # 批量处理文件
+        for file_path in batch_files:
+            try:
+                # 基础验证（优化版本）
+                if not isinstance(file_path, str) or len(file_path) > PerformanceConfig.MAX_PATH_LENGTH:
+                    continue
+
+                # 文件名提取（优化）
+                if os.sep in file_path:
+                    basename = file_path.split(os.sep)[-1]  # 比os.path.basename更快
+                else:
+                    basename = file_path
+
+                # 检查名称确定
+                if check_full_name:
+                    check_name = basename
+                else:
+                    # 优化的扩展名移除
+                    dot_pos = basename.rfind('.')
+                    check_name = basename[:dot_pos] if dot_pos != -1 else basename
+
+                # 文件名长度检查
+                if len(check_name) > 80:
+                    continue
+
+                # 正则匹配
+                if compiled_pattern.match(check_name):
+                    compliant_paths.append(file_path)
+                else:
+                    non_compliant_info.append({
+                        'path': file_path,
+                        'name': check_name,
+                        'full_name': basename
+                    })
+
+                processed += 1
+
+            except Exception as fe:
+                error_info.append({
+                    'path': str(file_path)[:100],
+                    'name': 'ERROR',
+                    'error': str(fe)[:100]
+                })
+                processed += 1
+
+        # 批次完成后的进度报告
+        if batch_end % PerformanceConfig.PROGRESS_INTERVAL < PerformanceConfig.BATCH_SIZE:
+            script.info(f"已检查 {batch_end}/{total_files} 个文件 ({(batch_end / total_files * 100):.1f}%)")
+
+        # 批次间内存管理
+        if batch_end % PerformanceConfig.MEMORY_CHECK_INTERVAL < PerformanceConfig.BATCH_SIZE:
             gc.collect()
-            script.info("文件名正则表达式检查开始")
 
-            # 1. 获取和验证参数
-            root_path = script.get_parameter('root_path', 'D:\\fishdev')
+    check_time = time.time() - start_time
+    script.info(f"高速正则检查完成: 耗时 {check_time:.2f}秒")
 
-            # 正则表达式相关参数
-            regex_pattern = script.get_parameter('regex_pattern', None)  # 用户输入的基础正则表达式
-            file_extensions = script.get_parameter('file_extensions', [])  # 用户选择的文件后缀
-            case_sensitive = script.get_parameter('case_sensitive', True)
-            check_full_name = script.get_parameter('check_full_name', True)
+    return compliant_paths, non_compliant_info, error_info
 
-            # 参数验证
-            if not regex_pattern:
-                return script.error_result("必须提供 regex_pattern 参数", "ParameterError")
 
-            if not isinstance(regex_pattern, str) or regex_pattern.strip() == "":
-                return script.error_result("regex_pattern 参数不能为空", "ParameterError")
+# ==================== 性能优化：完整展示消息生成 ====================
+def fast_generate_complete_message(compliant_count, non_compliant_info, error_info, total_time, regex_pattern):
+    """快速消息生成 - 显示所有不符合规范的文件"""
 
-            # 清理正则表达式字符串
-            regex_pattern = regex_pattern.strip()
+    total_checked = compliant_count + len(non_compliant_info) + len(error_info)
+    total_issues = len(non_compliant_info) + len(error_info)
 
-            # 处理文件后缀参数
-            if isinstance(file_extensions, str):
-                file_extensions = [file_extensions] if file_extensions else []
-            elif not isinstance(file_extensions, list):
-                file_extensions = []
+    if total_issues == 0:
+        return f"[SUCCESS] 检查完成，所有 {total_checked} 个文件都符合规范 (耗时 {total_time:.2f}秒)"
 
-            # 2. 构建检查路径
-            check_path = root_path
+    # 使用列表拼接，比字符串连接更快
+    message_parts = [
+        f"[RESULT] 发现 {total_issues} 个问题文件 (共检查 {total_checked} 个，耗时 {total_time:.2f}秒)"
+    ]
 
-            script.info(f"检查路径: {check_path}")
-            script.info(f"基础正则表达式: {regex_pattern}")
-            script.info(f"选择的文件后缀: {file_extensions if file_extensions else '全部文件'}")
-            script.info(f"检查配置 - 大小写敏感: {case_sensitive}, 检查完整文件名: {check_full_name}")
+    # 显示所有不符合规范的文件
+    if non_compliant_info:
+        message_parts.append(f"\n[NON-COMPLIANT] {len(non_compliant_info)} 个文件不符合规则:")
 
-            if not os.path.exists(check_path):
-                return script.error_result(f"路径不存在: {check_path}", "PathNotFound")
+        # 显示所有文件，不进行省略
+        for i, info in enumerate(non_compliant_info):
+            message_parts.append(f"  {i + 1:>3}. {info['full_name']}")
 
-            # 3. 执行正则表达式检查
-            script.info("开始执行正则表达式检查...")
-            check_result = check_files_regex_compliance(
-                script, check_path, regex_pattern, file_extensions, case_sensitive, check_full_name
-            )
+        # 如果文件数量很多，添加分隔线提高可读性
+        if len(non_compliant_info) > 20:
+            message_parts.append(f"\n--- 共 {len(non_compliant_info)} 个不符合规范的文件 ---")
 
-            # 4. 统计结果
-            total_files = len(check_result['compliant_files']) + len(check_result['non_compliant_files']) + len(
-                check_result['error_files'])
-            compliant_count = len(check_result['compliant_files'])
-            non_compliant_count = len(check_result['non_compliant_files'])
-            error_count = len(check_result['error_files'])
-            skipped_count = check_result.get('skipped_files', 0)
+    # 显示所有错误文件
+    if error_info:
+        message_parts.append(f"\n[ERROR] {len(error_info)} 个文件检查异常:")
 
-            # 5. 构建结果数据
-            result_data = {
-                'root_path': root_path,
-                'check_path': check_path,
-                'base_regex_pattern': regex_pattern,
-                'file_extensions': file_extensions,
-                'combined_patterns': build_regex_patterns(regex_pattern, file_extensions),
-                'case_sensitive': case_sensitive,
-                'check_full_name': check_full_name,
-                'statistics': {
-                    'total_files': total_files,
-                    'compliant_files': compliant_count,
-                    'non_compliant_files': non_compliant_count,
-                    'error_files': error_count,
-                    'skipped_files': skipped_count,
-                    'compliance_rate': round((compliant_count / total_files * 100) if total_files > 0 else 0, 2),
-                    'execution_time': time.time() - start_time
-                },
-                'compliant_files': check_result['compliant_files'],
-                'non_compliant_files': check_result['non_compliant_files'],
-                'error_files': check_result['error_files']
-            }
+        # 显示所有错误文件
+        for i, info in enumerate(error_info):
+            # 获取文件名
+            error_filename = "UNKNOWN"
+            if 'path' in info:
+                try:
+                    if os.sep in info['path']:
+                        error_filename = info['path'].split(os.sep)[-1]
+                    else:
+                        error_filename = info['path']
+                except:
+                    error_filename = str(info['path'])[:50]
 
-            # 6. 生成结果消息
-            if non_compliant_count > 0 or error_count > 0:
-                issues = []
-                if non_compliant_count > 0:
-                    issues.append(f"{non_compliant_count} 个文件不符合规范")
-                if error_count > 0:
-                    issues.append(f"{error_count} 个文件检查异常")
-                message = f"文件名检查完成，发现问题: " + ", ".join(issues)
-                if skipped_count > 0:
-                    message += f"，跳过 {skipped_count} 个不相关文件"
-            else:
-                message = f"文件名检查完成，所有 {total_files} 个文件都符合规范"
-                if skipped_count > 0:
-                    message += f"，跳过 {skipped_count} 个不相关文件"
+            error_reason = info.get('error', 'Unknown error')[:100]
+            message_parts.append(f"  {i + 1:>3}. {error_filename} - {error_reason}")
 
-            script.info(f"检查完成，耗时: {time.time() - start_time:.2f}秒")
-            script.info(f"符合率: {result_data['statistics']['compliance_rate']}%")
+        if len(error_info) > 10:
+            message_parts.append(f"\n--- 共 {len(error_info)} 个检查异常的文件 ---")
 
-            return script.success_result(message, result_data)
+    # 成功统计
+    if compliant_count > 0:
+        message_parts.append(f"\n[COMPLIANT] {compliant_count} 个文件符合规范")
 
-        finally:
-            timer.cancel()
+    # 添加正则表达式信息
+    message_parts.append(f"\n[REGEX] 使用规则: {regex_pattern}")
 
-    except TimeoutException:
-        script.error("脚本执行超时")
-        return script.error_result("脚本执行超时", "TimeoutError")
+    # 添加符合率统计
+    compliance_rate = (compliant_count / total_checked * 100) if total_checked > 0 else 0
+    message_parts.append(f"[STATS] 符合率: {compliance_rate:.1f}% ({compliant_count}/{total_checked})")
+
+    return "".join(message_parts)
+
+
+# ==================== 高性能主逻辑 ====================
+def main_logic(script: ScriptBase):
+    """高性能主逻辑"""
+    total_start = time.time()
+
+    try:
+        script.info("=== 高性能文件名检查开始 (完整展示版本) ===")
+
+        # 快速参数获取
+        root_path = script.get_parameter('root_path', 'D:\\fishdev')
+        regex_pattern = script.get_parameter('regex_pattern', None)
+        file_extensions = script.get_parameter('file_extensions', [])
+        case_sensitive = script.get_parameter('case_sensitive', True)
+        check_full_name = script.get_parameter('check_full_name', False)
+
+        script.info(f"参数: {root_path}, 正则: {regex_pattern}")
+
+        # 快速验证
+        if not regex_pattern or not regex_pattern.strip():
+            return script.error_result("regex_pattern 参数不能为空", "ParameterError")
+
+        regex_pattern = regex_pattern.strip()
+
+        if not os.path.exists(root_path):
+            return script.error_result(f"路径不存在: {root_path}", "PathNotFound")
+
+        if not os.path.isdir(root_path):
+            return script.error_result(f"路径不是目录: {root_path}", "PathNotDirectory")
+
+        # 快速解析扩展名
+        target_extensions = fast_parse_extensions(file_extensions)
+        script.info(f"目标扩展名: {list(target_extensions) if target_extensions else '全部文件'}")
+
+        # 高速文件扫描
+        matched_files, skipped_count = fast_scan_files(root_path, target_extensions, script)
+
+        if not matched_files:
+            return script.success_result("未找到匹配的文件", {
+                'statistics': {'total_files': 0, 'skipped_files': skipped_count}
+            })
+
+        # 高速正则检查
+        compliant_paths, non_compliant_info, error_info = fast_regex_check(
+            matched_files, regex_pattern, case_sensitive, check_full_name, script
+        )
+
+        # 快速结果生成 - 完整展示版本
+        total_time = time.time() - total_start
+        compliant_count = len(compliant_paths)
+        total_checked = compliant_count + len(non_compliant_info) + len(error_info)
+        compliance_rate = (compliant_count / total_checked * 100) if total_checked > 0 else 0
+
+        # 使用完整展示的消息生成函数
+        message = fast_generate_complete_message(compliant_count, non_compliant_info, error_info, total_time,
+                                                 regex_pattern)
+
+        result_data = {
+            'statistics': {
+                'total_checked': total_checked,
+                'compliant_files': compliant_count,
+                'non_compliant_files': len(non_compliant_info),
+                'error_files': len(error_info),
+                'compliance_rate': round(compliance_rate, 2),
+                'execution_time': round(total_time, 3)
+            },
+            'regex_pattern': regex_pattern,
+            'non_compliant_files': non_compliant_info,  # 返回所有不符合规范的文件
+            'error_files': error_info  # 返回所有错误文件
+        }
+
+        script.info(f"=== 高性能检查完成 ===")
+        script.info(f"符合率: {compliance_rate:.1f}%, 速度: {total_checked / total_time:.0f} 文件/秒")
+        script.info(f"不符合规范文件: {len(non_compliant_info)} 个")
+        script.info(f"错误文件: {len(error_info)} 个")
+
+        return script.success_result(message, result_data)
 
     except Exception as e:
-        script.error(f"执行失败: {str(e)}")
-        return script.error_result(f"执行失败: {str(e)}", "UnknownError")
+        script.error(f"高性能检查失败: {e}")
+        script.error(f"异常堆栈: {traceback.format_exc()}")
+        return script.error_result(f"检查失败: {e}", "UnknownError")
 
     finally:
-        # 强制清理
+        # 最终清理
         gc.collect()
 
 

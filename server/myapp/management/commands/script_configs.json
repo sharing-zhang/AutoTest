@@ -138,7 +138,7 @@
       {
         "name": "start_time_field",
         "type": "text",
-        "label": "开始时间",
+        "label": "开始时间对应参数",
         "required": true,
         "default": "openTime",
         "placeholder": "输入配置中开始时间的参数"
@@ -146,7 +146,7 @@
       {
         "name": "end_time_field",
         "type": "text",
-        "label": "结束时间",
+        "label": "结束时间对应参数",
         "required": true,
         "default": "endTime",
         "placeholder": "输入配置中结束时间的参数"
@@ -211,14 +211,14 @@
         "type": "checkbox",
         "label": "文件后缀名",
         "options": [
-          ".txt", ".log", ".json", ".py", ".pdb",
-          ".cs", ".java", ".png", ".jpg", ".gif",
-          ".lua", ".md", ".asmdef", ".xml", ".mp4",
-          ".mp3", ".pdf", ".xlsx", ".prefab",
-          ".meta", ".FBX", ".tga", ".controller",
-          ".anim", ".mat", ".unity", ".dll", ".exr",
-          ".shader", ".exe", ".svg", ".cmake", ".psd",
-          ".bat", ".c", ".h"
+          ".anim", ".asmdef", ".bat", ".c", ".cmake",
+          ".controller", ".cs", ".dll", ".exe", ".exr",
+          ".FBX", ".gif", ".h", ".java", ".jpg",
+          ".json", ".log", ".lua", ".mat", ".md",
+          ".meta", ".mp3", ".mp4", ".pdb", ".pdf",
+          ".png", ".prefab", ".psd", ".py", ".shader",
+          ".svg", ".tga", ".txt", ".unity", ".xlsx",
+          ".xml"
         ],
         "required": false,
         "multiple": true,
