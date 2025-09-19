@@ -4,14 +4,14 @@
     <div class="page-view">
       <div class="table-operations">
         <a-space>
-          <a-button type="primary" @click="openUploadModal">上传exe</a-button>
+          <a-button type="primary" @click="openUploadModal">上传文件</a-button>
           <a-button @click="reloadList">刷新</a-button>
         </a-space>
       </div>
       <a-table size="middle" rowKey="name" :loading="data.loading" :columns="columns" :data-source="data.list" :pagination="false">
-        <template #bodyCell="{ text, record, column }">
+          <template #bodyCell="{ text, record, column }">
           <template v-if="column.key === 'action'">
-            <a :href="BASE_URL + record.url" target="_blank">下载</a>
+            <a :href="`${BASE_URL}/myapp/admin/plugin/download?name=${encodeURIComponent(record.name)}`" :download="record.name">下载</a>
           </template>
           <template v-else-if="column.key === 'desc'">
             <span :title="record.description">{{ record.description || '暂无描述' }}</span>
@@ -34,7 +34,7 @@
         </a-form-item>
         <a-form-item label="选择文件">
           <a-upload :before-upload="beforeExePick" :show-upload-list="true" :multiple="false">
-            <a-button>选择exe文件</a-button>
+            <a-button>选择文件</a-button>
           </a-upload>
           <div v-if="upload.fileName" style="margin-top: 8px; color: #666">已选择: {{ upload.fileName }}</div>
         </a-form-item>
@@ -88,10 +88,10 @@
 
   const beforeExePick = async (file: File) => {
     const ext = file.name.split('.').pop()?.toLowerCase();
-    if (ext !== 'exe') {
-      message.error('只允许上传 .exe 文件');
-      return false;
-    }
+    // if (ext !== 'exe') {
+    //   message.error('只允许上传 .exe 文件');
+    //   return false;
+    // }
     upload.file = file;
     upload.fileName = file.name;
     selectedFile.value = file; // 同步更新 selectedFile
@@ -131,7 +131,6 @@
 
   onMounted(() => reloadList());
 
-  // 打开上传弹窗（已在上方实现：重置并显示 upload 弹窗）
 
   // 确认上传
   const handleUploadConfirm = async () => {
@@ -195,7 +194,7 @@
 
   const confirmUpload = async () => {
     if (!upload.file) {
-      message.warning('请先选择exe文件');
+      message.warning('请先选择文件');
       return;
     }
     const fd = new FormData();

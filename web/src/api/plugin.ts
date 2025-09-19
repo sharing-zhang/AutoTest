@@ -3,22 +3,23 @@ import { get, post } from '/@/utils/http/axios';
 import { UserState } from '/@/store/modules/user/types';
 // import axios from 'axios';
 enum URL {
-    list = '/myapp/admin/plugin/list',
-    create = '/myapp/admin/plugin/create',
-    update = '/myapp/admin/plugin/update',
-    delete = '/myapp/admin/plugin/delete',
-    upload = '/myapp/admin/plugin/upload',
-    listExe = '/myapp/admin/plugin/listExe',
+  list = '/myapp/admin/plugin/list',
+  create = '/myapp/admin/plugin/create',
+  update = '/myapp/admin/plugin/update',
+  delete = '/myapp/admin/plugin/delete',
+  upload = '/myapp/admin/plugin/upload',
+  listExe = '/myapp/admin/plugin/listExe',
 }
 
-const listApi = async (params: any) => get<any>({ url: URL.list, params: params, data: {}, headers: {'Content-Type': 'application/x-www-form-urlencoded'} });
+const listApi = async (params: any) =>
+  get<any>({ url: URL.list, params: params, data: {}, headers: { 'Content-Type': 'application/x-www-form-urlencoded' } });
 const createApi = async (data: any) =>
-    post<any>({ url: URL.create, params: {}, data: data, timeout:20000, headers: { 'Content-Type': 'multipart/form-data;charset=utf-8' } });
-const updateApi = async (params:any, data: any) =>
-    post<any>({ url: URL.update,params: params, data: data, headers: { 'Content-Type': 'multipart/form-data;charset=utf-8' } });
+  post<any>({ url: URL.create, params: {}, data: data, timeout: 20000, headers: { 'Content-Type': 'multipart/form-data;charset=utf-8' } });
+const updateApi = async (params: any, data: any) =>
+  post<any>({ url: URL.update, params: params, data: data, headers: { 'Content-Type': 'multipart/form-data;charset=utf-8' } });
 const deleteApi = async (params: any) => post<any>({ url: URL.delete, params: params, headers: {} });
 
-const uploadExeApi = async (data: FormData) => post<any>({ url: URL.upload, data, headers: { 'Content-Type': 'multipart/form-data;charset=utf-8' } });
+const uploadExeApi = async (data: any) => post<any>({ url: URL.upload, data, headers: { 'Content-Type': 'multipart/form-data;charset=utf-8' } });
 const listExeApi = async () => get<any>({ url: URL.listExe });
 
 export { listApi, createApi, updateApi, deleteApi, uploadExeApi, listExeApi };

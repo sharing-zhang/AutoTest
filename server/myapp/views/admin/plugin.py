@@ -73,7 +73,7 @@ def delete(request):
     return APIResponse(code=0, msg='删除成功')
 
 
-# ============ EXE 上传/下载 ============
+# ============ 插件文件上传/下载 ============
 
 PLUGIN_DIR = os.path.join(settings.MEDIA_ROOT, 'plugins')
 
@@ -91,14 +91,15 @@ def upload_exe(request):
     if isDemoAdminUser(request):
         return APIResponse(code=1, msg='演示帐号无法操作')
 
-    file_obj = request.FILES.get('file') or request.FILES.get('exe')
+    #file_obj = request.FILES.get('file') or request.FILES.get('exe')
+    file_obj = request.FILES.get('file')
     if not file_obj:
-        return APIResponse(code=1, msg='未接收到文件，表单字段应为 file 或 exe')
+        return APIResponse(code=1, msg='未接收到文件')
 
     original_name = file_obj.name
-    ext = os.path.splitext(original_name)[1].lower()
-    if ext != '.exe':
-        return APIResponse(code=1, msg='只允许上传 .exe 文件')
+    # ext = os.path.splitext(original_name)[1].lower()
+    # if ext != '.exe':
+    #     return APIResponse(code=1, msg='只允许上传 .exe 文件')
 
     _ensure_plugin_dir()
     safe_name = f"{int(time.time())}_{original_name}"
@@ -113,7 +114,7 @@ def upload_exe(request):
     display_name = request.POST.get('display_name') or request.POST.get('name') or original_name
     if desc:
         try:
-            with open(save_path + '.json', 'w', encoding='utf-8') as mf:
+            with open(save_path + '.meta.json', 'w', encoding='utf-8') as mf:
                 import json as _json
                 _json.dump({"description": desc, "display_name": display_name}, mf, ensure_ascii=False)
         except Exception:
@@ -130,12 +131,20 @@ def upload_exe(request):
 
 @api_view(['GET'])
 def list_exe(request):
-    _ensure_plugin_dir()
-    files = []
-    for fname in os.listdir(PLUGIN_DIR):
-        if fname.lower().endswith('.exe'):
+    try:
+        _ensure_plugin_dir()
+        files = []
+
+        for fname in os.listdir(PLUGIN_DIR):
+            # 跳过元数据文件
+            if fname.endswith('.meta.json'):
+                continue
+
             desc = ''
-            meta_path = os.path.join(PLUGIN_DIR, fname + '.json')
+            disp = fname
+
+            # 查找对应的元数据文件
+            meta_path = os.path.join(PLUGIN_DIR, fname + '.meta.json')
             if os.path.exists(meta_path):
                 try:
                     import json as _json
@@ -143,27 +152,54 @@ def list_exe(request):
                         meta = _json.load(mf)
                         desc = meta.get('description', '')
                         disp = meta.get('display_name', fname)
-                except Exception:
-                    pass
+                except Exception as e:
+                    print(f"读取元数据失败 {meta_path}: {e}")
+
             files.append({
                 'name': fname,
                 'url': settings.MEDIA_URL + 'plugins/' + escape_uri_path(fname),
                 'description': desc,
-                'display_name': disp if 'disp' in locals() else fname
+                'display_name': disp
             })
-    return APIResponse(code=0, msg='查询成功', data=files)
+
+        return APIResponse(code=0, msg='查询成功', data=files)
+
+    except Exception as e:
+        return APIResponse(code=1, msg=f'获取文件列表失败: {str(e)}')
 
 
 @api_view(['GET'])
-def download_exe(request):
+def download_exe(request):  # 注：现在支持所有文件类型，不仅限于exe
     filename = request.GET.get('name')
     if not filename:
-        return HttpResponseNotFound('missing name')
+        return JsonResponse({'error': '缺少文件名参数'}, status=400)
+
+    # 安全检查
+    if '..' in filename or '/' in filename or '\\' in filename:
+        return JsonResponse({'error': '非法文件名'}, status=400)
 
     path = os.path.join(PLUGIN_DIR, filename)
     if not os.path.exists(path):
-        return HttpResponseNotFound('file not found')
+        return HttpResponseNotFound('文件不存在')
 
-    response = FileResponse(open(path, 'rb'), as_attachment=True)
-    response['Content-Disposition'] = f"attachment; filename*=UTF-8''{escape_uri_path(filename)}"
-    return response
+    try:
+        response = FileResponse(
+            open(path, 'rb'),
+            as_attachment=True,  # 这个很重要，强制下载
+            filename=filename
+        )
+
+        # 强制设置为下载模式
+        response['Content-Type'] = 'application/octet-stream'  # 通用二进制类型
+        response[
+            'Content-Disposition'] = f'attachment; filename="{filename}"; filename*=UTF-8\'\'{escape_uri_path(filename)}'
+
+        # 添加缓存控制
+        response['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+        response['Pragma'] = 'no-cache'
+        response['Expires'] = '0'
+
+        return response
+
+    except Exception as e:
+        return JsonResponse({'error': '文件下载失败'}, status=500)
