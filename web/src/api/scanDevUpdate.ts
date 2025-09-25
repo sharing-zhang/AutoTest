@@ -9,6 +9,8 @@ enum URL {
     update = '/myapp/admin/scanDevUpdate/scanResultupdate',
     delete = '/myapp/admin/scanDevUpdate/scanResultdelete',
     detail = '/myapp/admin/scanDevUpdate/scanResultdetail',
+    // 钉钉机器人发送消息接口
+    sendmessage = '/myapp/admin/scanDevUpdate/scanResultsendmessage',
     // 方案1 Celery任务接口
     executeScript = '/myapp/admin/celery/execute-script',
     scriptTaskResult = '/myapp/admin/celery/script-task-result',
@@ -23,6 +25,10 @@ const updateApi = async (params:any, data: any) =>
     post<any>({ url: URL.update, params: params, data: data, headers: { 'Content-Type': 'multipart/form-data;charset=utf-8' } });
 const deleteApi = async (params: any) => post<any>({ url: URL.delete, params: params, headers: {} });
 const detailApi = async (params: any) => get<any>({ url: URL.detail, params: params, headers: {} });
+
+//钉钉机器人发送消息接口
+const sendmessageApi = async (params:any, data: any) =>
+    post<any>({ url: URL.sendmessage, params: params, data: data, headers: { 'Content-Type': 'multipart/form-data;charset=utf-8' } });
 
 // 方案1任务相关API
 const getScriptTaskResultApi = async (taskId: string, executionId?: string) => {
@@ -39,6 +45,6 @@ const executeScriptApi = async (data: any) => post<any>({ url: URL.executeScript
 const getScriptDetailApi = async (scriptId: number) => get<any>({ url: `${URL.scriptDetail}/${scriptId}`, params: {}, headers: {} });
 
 export { 
-    listApi, createApi, updateApi, deleteApi, detailApi, 
+    listApi, createApi, updateApi, deleteApi, detailApi, sendmessageApi,
     getScriptTaskResultApi, listScriptsApi, executeScriptApi, getScriptDetailApi 
 };
