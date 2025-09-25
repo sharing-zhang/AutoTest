@@ -2,14 +2,14 @@
 
 ## 概述
 
-本文档详细说明了脚本模板系统的实现流程，以及如何在`check_Reward.py`中套用模板系统，并添加相应的参数配置。
+本文档详细说明了脚本模板系统的实现流程，以及如何在脚本中套用模板系统，并添加相应的参数配置。系统提供了完整的脚本开发框架，包括基础库、模板文件和高级模板。
 
 ## 模板系统架构
 
 ### 1. 核心组件
 
 ```
-script_template.py (模板文件)
+advanced_script_template.py (高级模板)
     ↓ 继承
 script_base.py (基础库)
     ↓ 提供
@@ -22,25 +22,28 @@ ScriptBase类 (核心功能)
 - 从环境变量获取`SCRIPT_PARAMETERS`、`SCRIPT_NAME`、`PAGE_CONTEXT`等
 - 提供`get_parameter(key, default)`方法获取参数
 - 自动解析JSON格式的参数
+- 支持复杂参数类型（字符串、数字、布尔值、列表等）
 
 #### 日志系统
-- `debug(message)`: 调试信息
-- `info(message)`: 普通信息
-- `warning(message)`: 警告信息
-- `error(message)`: 错误信息
+- `debug(message)`: 调试信息（输出到stderr）
+- `info(message)`: 普通信息（输出到stderr）
+- `warning(message)`: 警告信息（输出到stderr）
+- `error(message)`: 错误信息（输出到stderr）
 
 #### 结果格式化
 - `success_result(message, data)`: 创建成功结果
 - `error_result(message, error_type)`: 创建错误结果
 - 统一的结果格式，包含执行时间、元数据等
+- 自动输出到stdout，支持UTF-8编码
 
 #### 错误处理
 - `run_with_error_handling(main_func)`: 自动捕获异常
 - 统一的错误格式化和输出
+- 完整的异常堆栈跟踪
 
 ## 模板使用流程
 
-### 1. 基本使用模式
+### 1. 基本使用模式（推荐）
 
 ```python
 from script_base import create_simple_script
@@ -63,7 +66,24 @@ if __name__ == '__main__':
     create_simple_script('script_name', main_logic)
 ```
 
-### 2. 执行流程
+### 2. 高级模板使用模式
+
+对于复杂的脚本，可以使用高级模板：
+
+```python
+from script_base import ScriptBase, create_simple_script
+from advanced_script_template import AdvancedScript
+
+def main_logic(script: ScriptBase) -> Dict[str, Any]:
+    """使用高级模板的主逻辑"""
+    advanced_script = AdvancedScript(script)
+    return advanced_script.run()
+
+if __name__ == '__main__':
+    create_simple_script('advanced_script_name', main_logic)
+```
+
+### 3. 执行流程
 
 ```
 1. 环境变量设置
@@ -79,133 +99,17 @@ if __name__ == '__main__':
 6. 输出到stdout
 ```
 
-## check_Reward.py模板套用
+## 可用的模板文件
 
-### 原始实现问题
+### 1. advanced_script_template.py（高级模板）
+- 适合复杂的业务逻辑
+- 包含完整的验证、处理、报告流程
+- 支持多步骤处理和数据验证
 
-原始的`check_Reward.py`存在以下问题：
-1. 重复实现了ScriptBase的功能
-2. 没有统一的参数配置管理
-3. 缺少标准化的配置接口
-4. 硬编码的配置参数
-
-### 模板化改造
-
-#### 1. 创建基于模板的版本
-
-创建了`check_Reward_template.py`，主要改进：
-
-```python
-# 使用模板系统
-from script_base import create_simple_script
-
-def main_logic(script):
-    # 从参数获取配置
-    root_path = script.get_parameter('root_path', r"D:\dev")
-    mission_paths = script.get_parameter('mission_paths', [...])
-    check_tp_id_prefix = script.get_parameter('check_tp_id_prefix', '971')
-    min_count = script.get_parameter('min_count', 1)
-    
-    # 执行业务逻辑...
-    
-    return script.success_result(message, data)
-
-if __name__ == '__main__':
-    create_simple_script('progress_rewards_checker', main_logic)
-```
-
-#### 2. 辅助函数模块化
-
-将复杂逻辑拆分为辅助函数：
-- `detect_encoding()`: 文件编码检测
-- `parse_file()`: 文件解析
-- `validate_file_path()`: 文件路径验证
-
-#### 3. 参数化配置
-
-所有硬编码的配置都改为参数化：
-- `root_path`: 根路径
-- `mission_paths`: 检查文件列表
-- `check_tp_id_prefix`: tpId前缀检查
-- `min_count`: 最小count值
-- `enable_detailed_logging`: 详细日志开关
-
-## 参数配置系统
-
-### 1. script_configs.json结构
-
-```json
-{
-  "script_name.py": [
-    {
-      "name": "parameter_name",
-      "type": "text|number|switch|select|checkbox|textarea",
-      "label": "显示标签",
-      "required": true|false,
-      "default": "默认值",
-      "placeholder": "占位符文本",
-      "description": "参数说明",
-      "options": ["选项1", "选项2"],  // 仅select和checkbox类型
-      "min": 0,  // 仅number类型
-      "max": 100,  // 仅number类型
-      "multiple": true  // 仅checkbox类型
-    }
-  ]
-}
-```
-
-### 2. check_Reward.py参数配置
-
-```json
-{
-  "check_Reward.py": [
-    {
-      "name": "root_path",
-      "type": "text",
-      "label": "根路径",
-      "required": true,
-      "default": "D:\\dev",
-      "placeholder": "例如: D:\\dev 或 /home/user/project"
-    },
-    {
-      "name": "mission_paths",
-      "type": "textarea",
-      "label": "检查文件路径列表",
-      "required": true,
-      "default": "datapool\\ElementData\\BaseData\\POINT_PROGRESS_REWARD_ENDLESS.data.txt\ndatapool\\ElementData\\BaseData\\POINT_PROGRESS_REWARD.data.txt",
-      "placeholder": "每行一个文件路径，相对于根路径",
-      "description": "要检查的文件路径列表，每行一个路径"
-    },
-    {
-      "name": "check_tp_id_prefix",
-      "type": "text",
-      "label": "检查的tpId前缀",
-      "required": false,
-      "default": "971",
-      "placeholder": "例如: 971",
-      "description": "只检查tpId以此前缀开头的数据块"
-    },
-    {
-      "name": "min_count",
-      "type": "number",
-      "label": "最小count值",
-      "required": false,
-      "default": 1,
-      "min": 0,
-      "max": 1000,
-      "description": "只检查count大于此值的数据块"
-    },
-    {
-      "name": "enable_detailed_logging",
-      "type": "switch",
-      "label": "启用详细日志",
-      "required": false,
-      "default": true,
-      "description": "是否输出详细的调试信息"
-    }
-  ]
-}
-```
+### 2. check_Reward_template.py（实际应用示例）
+- 基于模板系统重构的奖励检查脚本
+- 展示了如何处理文件解析、数据验证等复杂逻辑
+- 包含编码检测、错误处理等实用功能
 
 ## 使用方式
 
@@ -276,9 +180,9 @@ python check_Reward_template.py
 
 ### 1. 脚本开发流程
 
-1. 复制`script_template.py`作为起点
+1. 复制`advanced_script_template.py`作为起点
 2. 修改脚本名称和描述
-3. 实现`main_logic`函数
+3. 实现`main_logic`函数或使用`AdvancedScript`类
 4. 添加必要的辅助函数
 5. 在`script_configs.json`中添加参数配置
 6. 测试脚本执行
@@ -311,4 +215,3 @@ python check_Reward_template.py
 4. **易于维护**: 减少重复代码，提高可维护性
 5. **良好的扩展性**: 易于添加新功能和参数
 
-通过使用模板系统，`check_Reward.py`从硬编码的独立脚本转变为可配置、可维护的标准化脚本，大大提高了代码质量和可维护性。

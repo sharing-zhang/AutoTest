@@ -356,6 +356,11 @@ def main_logic(script: ScriptBase) -> Dict[str, Any]:
     block_name = script.get_parameter('block_name', 'progressRewards')
     rules_param = script.get_parameter('rules', "[]")
 
+    # 规范化路径：处理多重转义的反斜杠
+    if directory:
+        # 处理多重转义：\\\\\\\\ -> \\ -> /
+        directory = directory.replace('\\\\\\\\', '\\').replace('\\\\', '\\').replace('\\', os.sep)
+
     # 目标文件
     target_files = [os.path.join(directory, file_name)] if file_name else []
 

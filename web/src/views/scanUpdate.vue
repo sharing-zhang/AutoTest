@@ -16,9 +16,9 @@
           7.2 showSizeChanger：属性用于控制是否显示每页显示条数的选择器
 
       -->
-
+      
       <!-- 操作按钮区域 -->
-      <div style="margin-bottom: 16px">
+      <div style="margin-bottom: 16px;">
         <a-button type="primary" @click="handleAdd">
           <template #icon>
             <PlusOutlined />
@@ -26,7 +26,7 @@
           新增项目
         </a-button>
       </div>
-
+      
       <a-table
         size="middle"
         rowKey="id"
@@ -85,7 +85,7 @@
             4. rules‌：定义表单验证规则，确保用户输入的数据符合预期格式和要求‌
             5. gutter：调整列与列之间的间距
           -->
-          <a-form ref="myform" :label-col="{ style: { width: '120px' } }" :model="modal.form" :rules="modal.rules">
+          <a-form ref="myform" :label-col="{ style: { width: '120px'} }" :model="modal.form" :rules="modal.rules">
             <a-row :gutter="24">
               <a-col span="24">
                 <a-form-item label="项目" name="projectname">
@@ -136,138 +136,139 @@
 </template>
 
 <script setup lang="ts">
-  import { FormInstance, message, SelectProps } from 'ant-design-vue';
-  import { createApi, listApi, updateApi, deleteApi } from '/@/api/scanUpdate';
-  import { BASE_URL } from '/@/store/constants';
-  import { FileImageOutlined, VideoCameraOutlined, PlusOutlined } from '@ant-design/icons-vue';
-  import dayjs from 'dayjs';
-  import { useRouter } from 'vue-router';
+import { FormInstance, message, SelectProps } from 'ant-design-vue';
+import { createApi, listApi, updateApi, deleteApi } from '/@/api/scanUpdate';
+import {BASE_URL} from "/@/store/constants";
+import { FileImageOutlined, VideoCameraOutlined, PlusOutlined } from '@ant-design/icons-vue';
+import dayjs from 'dayjs';
+import {useRouter} from "vue-router";
 
-  const columns = reactive([
-    {
-      title: '序号',
-      dataIndex: 'index',
-      key: 'index',
-      align: 'center',
-      width: 60,
-    },
-    {
-      title: '项目',
-      dataIndex: 'projectname',
-      align: 'center',
-      key: 'projectname',
-      width: 160,
-    },
-    {
-      title: '说明',
-      dataIndex: 'description',
-      align: 'center',
-      key: 'description',
-      width: 300,
-    },
-    {
-      title: '版本号',
-      dataIndex: 'versionnumber',
-      align: 'center',
-      key: 'versionnumber',
-      width: 100,
-    },
-    {
-      title: '最近更新日期',
-      dataIndex: 'lastupdatetime',
-      align: 'center',
-      key: 'lastupdatetime',
-      width: 160,
-    },
-    {
-      title: '最新更新内容',
-      dataIndex: 'lastupdates',
-      align: 'center',
-      key: 'lastupdates',
-      width: 300,
-    },
-    {
-      title: '负责人',
-      dataIndex: 'director',
-      align: 'center',
-      key: 'director',
-      width: 90,
-    },
-    {
-      title: '备注',
-      dataIndex: 'remark',
-      align: 'center',
-      key: 'remark',
-      width: 260,
-    },
-    {
-      title: '操作',
-      dataIndex: 'action',
-      key: 'operation',
-      align: 'center',
-      fixed: 'right',
-      width: 140,
-    },
-  ]);
+const columns = reactive([
 
-  // 文件列表
-  const fileList = ref<any[]>([]);
+  {
+    title: '序号',
+    dataIndex: 'index',
+    key: 'index',
+    align: "center",
+    width: 60
+  },
+  {
+    title: '项目',
+    dataIndex: 'projectname',
+    align: "center",
+    key: 'projectname',
+    width: 160
+  },
+  {
+    title: '说明',
+    dataIndex: 'description',
+    align: "center",
+    key: 'description',
+    width: 300
+  },
+  {
+    title: '版本号',
+    dataIndex: 'versionnumber',
+    align: "center",
+    key: 'versionnumber',
+    width: 100
+  },
+  {
+    title: '最近更新日期',
+    dataIndex: 'lastupdatetime',
+    align: "center",
+    key: 'lastupdatetime',
+    width: 160
+  },
+  {
+    title: '最新更新内容',
+    dataIndex: 'lastupdates',
+    align: "center",
+    key: 'lastupdates',
+    width: 300
+  },
+  {
+    title: '负责人',
+    dataIndex: 'director',
+    align: "center",
+    key: 'director',
+    width: 90
+  },
+  {
+    title: '备注',
+    dataIndex: 'remark',
+    align: "center",
+    key: 'remark',
+    width: 260
+  },
+  {
+    title: '操作',
+    dataIndex: 'action',
+    key: 'operation',
+    align: 'center',
+    fixed: 'right',
+    width: 140,
+  },
+]);
 
-  const submitting = ref<boolean>(false);
+// 文件列表
+const fileList = ref<any[]>([]);
 
-  // 页面数据:一些页面参数比如是否加载、分页参数等通过这里定义，直接调用
-  // selectedRowKeys: 用于用户勾选内容时，每个勾选内容都会被存在这个数组中
-  const data = reactive({
-    dataList: [],
-    loading: false,
-    keyword: '',
-    selectedRowKeys: [] as any[],
-    pageSize: 10,
-    page: 1,
-  });
+const submitting = ref<boolean>(false);
 
-  // 弹窗数据源:编辑修改项目信息弹窗
-  const modal = reactive({
-    visile: false,
-    editFlag: false,
-    title: '',
-    form: {
-      id: undefined,
-      projectname: undefined,
-      description: undefined,
-      versionnumber: undefined,
-      lastupdatetime: undefined,
-      lastupdates: undefined,
-      director: undefined,
-      remark: undefined,
-      status: undefined,
-      child_url_key: undefined,
-    },
-    rules: {
-      projectname: [{ required: true, message: '请输入项目名', trigger: 'change' }],
-      description: [{ required: false, message: '请输入项目说明', trigger: 'change' }],
-      versionnumber: [{ required: false, message: '请输入版本号', trigger: 'change' }],
-      lastupdatetime: [{ required: true, message: '请输入最近更新日期', trigger: 'change' }],
-      lastupdates: [{ required: true, message: '请输入最新更新内容', trigger: 'change' }],
-      director: [{ required: true, message: '请输入负责人', trigger: 'change' }],
-      remark: [{ required: false, message: '请输入备注', trigger: 'change' }],
-      child_url_key: [{ required: true, message: '请输入路由键', trigger: 'change' }],
-    },
-  });
+// 页面数据:一些页面参数比如是否加载、分页参数等通过这里定义，直接调用
+// selectedRowKeys: 用于用户勾选内容时，每个勾选内容都会被存在这个数组中
+const data = reactive({
+  dataList: [],
+  loading: false,
+  keyword: '',
+  selectedRowKeys: [] as any[],
+  pageSize: 10,
+  page: 1,
+});
 
-  //获取表单实例后，可以调用其方法进行操作
-  const myform = ref<FormInstance>();
+// 弹窗数据源:编辑修改项目信息弹窗
+const modal = reactive({
+  visile: false,
+  editFlag: false,
+  title: '',
+  form: {
+    id: undefined,
+    projectname: undefined,
+    description: undefined,
+    versionnumber: undefined,
+    lastupdatetime: undefined,
+    lastupdates: undefined,
+    director: undefined,
+    remark: undefined,
+    status: undefined,
+    child_url_key: undefined,
+  },
+  rules: {
+    projectname: [{ required: true, message: '请输入项目名', trigger: 'change' }],
+    description: [{ required: false, message: '请输入项目说明', trigger: 'change' }],
+    versionnumber: [{ required: false, message: '请输入版本号', trigger: 'change' }],
+    lastupdatetime: [{ required: true, message: '请输入最近更新日期', trigger: 'change' }],
+    lastupdates: [{ required: true, message: '请输入最新更新内容', trigger: 'change' }],
+    director: [{ required: true, message: '请输入负责人', trigger: 'change' }],
+    remark: [{ required: false, message: '请输入备注', trigger: 'change' }],
+    child_url_key: [{ required: true, message: '请输入路由键', trigger: 'change' }]
+  },
+});
 
-  //onMounted:用于在组件挂载到 DOM 后执行逻辑,当组件挂载时，onMounted 中的代码会执行，初始化要执行的内容
-  onMounted(() => {
-    getDataList();
-  });
+//获取表单实例后，可以调用其方法进行操作
+const myform = ref<FormInstance>();
 
-  const getDataList = () => {
-    data.loading = true;
-    listApi({
-      keyword: data.keyword,
-    })
+//onMounted:用于在组件挂载到 DOM 后执行逻辑,当组件挂载时，onMounted 中的代码会执行，初始化要执行的内容
+onMounted(() => {
+  getDataList();
+});
+
+const getDataList = () => {
+  data.loading = true;
+  listApi({
+    keyword: data.keyword,
+  })
       .then((res) => {
         data.loading = false;
         console.log(res);
@@ -282,183 +283,188 @@
         data.loading = false;
         console.log(err);
       });
-  };
+}
 
-  //搜索功能
-  const onSearchChange = (e: Event) => {
-    data.keyword = e?.target?.value;
-    console.log(data.keyword);
-  };
+//搜索功能
+const onSearchChange = (e: Event) => {
+  data.keyword = e?.target?.value;
+  console.log(data.keyword);
+};
 
-  const onSearch = () => {
-    getDataList();
-  };
+const onSearch = () => {
+  getDataList();
+};
 
-  // 新增项目
-  const handleAdd = () => {
-    resetModal();
-    modal.visile = true;
-    modal.editFlag = false;
-    modal.title = '新增项目';
-    // 重置表单
-    for (const key in modal.form) {
-      modal.form[key] = undefined;
+// 新增项目
+const handleAdd = () => {
+  resetModal();
+  modal.visile = true;
+  modal.editFlag = false;
+  modal.title = '新增项目';
+  // 重置表单
+  for (const key in modal.form) {
+    modal.form[key] = undefined;
+  }
+  // 自动填充当前时间
+  modal.form.lastupdatetime = dayjs().format('YYYY-MM-DD HH:mm:ss');
+  // 自动填充版本号（V + 时间去掉符号）
+  modal.form.versionnumber = 'V' + dayjs().format('YYMMDDHHmmss');
+};
+
+const handleEdit = (record: any) => {
+  resetModal();
+  modal.visile = true;
+  modal.editFlag = true;
+  modal.title = '编辑项目信息';
+  // 重置
+  for (const key in modal.form) {
+    modal.form[key] = undefined;
+  }
+  for (const key in record) {
+    if(record[key]) {
+      modal.form[key] = record[key];
     }
-  };
+  }
+};
 
-  const handleEdit = (record: any) => {
-    resetModal();
-    modal.visile = true;
-    modal.editFlag = true;
-    modal.title = '编辑项目信息';
-    // 重置
-    for (const key in modal.form) {
-      modal.form[key] = undefined;
-    }
-    for (const key in record) {
-      if (record[key]) {
-        modal.form[key] = record[key];
-      }
-    }
-  };
-
-  const handleOk = () => {
-    myform.value
+const handleOk = () => {
+  myform.value
       ?.validate()
       .then(() => {
         const formData = new FormData();
-        formData.append('id', modal.form.id);
-        formData.append('projectname', modal.form.projectname);
-        formData.append('description', modal.form.description);
-        formData.append('versionnumber', modal.form.versionnumber);
-        formData.append('lastupdatetime', modal.form.lastupdatetime);
-        formData.append('lastupdates', modal.form.lastupdates);
-        formData.append('director', modal.form.director);
-        formData.append('remark', modal.form.remark);
-        formData.append('child_url_key', modal.form.child_url_key);
+        formData.append('id', modal.form.id)
+        formData.append('projectname', modal.form.projectname)
+        formData.append('description', modal.form.description)
+        formData.append('versionnumber', modal.form.versionnumber)
+        formData.append('lastupdatetime', modal.form.lastupdatetime)
+        formData.append('lastupdates', modal.form.lastupdates)
+        formData.append('director', modal.form.director)
+        formData.append('remark', modal.form.remark)
+        formData.append('child_url_key', modal.form.child_url_key)
         if (modal.editFlag) {
-          submitting.value = true;
-          updateApi(
-            {
-              id: modal.form.id,
-            },
-            formData,
-          )
-            .then((res) => {
-              submitting.value = false;
-              hideModal();
-              getDataList();
-              message.success('项目信息更新成功');
-            })
-            .catch((err) => {
-              submitting.value = false;
-              console.log(err);
-              message.error(err.msg || '项目信息更新失败');
-            });
+          submitting.value = true
+          updateApi({
+            id: modal.form.id
+          },formData)
+              .then((res) => {
+                submitting.value = false
+                hideModal();
+                getDataList();
+                message.success('项目信息更新成功')
+              })
+              .catch((err) => {
+                submitting.value = false
+                console.log(err);
+                message.error(err.msg || '项目信息更新失败');
+              });
         } else {
-          submitting.value = true;
+          submitting.value = true
           createApi(formData)
-            .then(async (res) => {
-              submitting.value = false;
-              hideModal();
-              getDataList();
-
-              // 如果是新增项目且有路由键，自动创建前端页面
-              if (modal.form.child_url_key) {
-                try {
-                  await createFrontendPage(modal.form.child_url_key, modal.form.projectname);
-                  message.success('项目创建成功，前端页面已自动生成！');
-                } catch (error) {
-                  console.error('创建前端页面失败:', error);
-                  message.warning('项目创建成功，但前端页面生成失败，请手动创建');
+              .then(async (res) => {
+                submitting.value = false
+                hideModal();
+                getDataList();
+                
+                // 如果是新增项目且有路由键，自动创建前端页面
+                if (modal.form.child_url_key) {
+                  try {
+                    await createFrontendPage(modal.form.child_url_key, modal.form.projectname);
+                    message.success('项目创建成功，前端页面已自动生成！');
+                  } catch (error) {
+                    console.error('创建前端页面失败:', error);
+                    message.warning('项目创建成功，但前端页面生成失败，请手动创建');
+                  }
+                } else {
+                  message.success('项目创建成功');
                 }
-              } else {
-                message.success('项目创建成功');
-              }
-            })
-            .catch((err) => {
-              submitting.value = false;
-              console.log(err);
-              message.error(err.msg || '操作失败');
-            });
+              })
+              .catch((err) => {
+                submitting.value = false
+                console.log(err);
+                message.error(err.msg || '操作失败');
+              });
         }
       })
       .catch((err) => {
         console.log('不能为空');
       });
-  };
+};
 
-  const handleCancel = () => {
-    hideModal();
-  };
+const handleCancel = () => {
+  hideModal();
+};
 
-  // 恢复表单初始状态
-  const resetModal = () => {
-    myform.value?.resetFields();
-    fileList.value = [];
-  };
+// 恢复表单初始状态
+const resetModal = () => {
+  myform.value?.resetFields();
+  fileList.value = []
+};
 
-  // 关闭弹窗
-  const hideModal = () => {
-    modal.visile = false;
-  };
+// 关闭弹窗
+const hideModal = () => {
+  modal.visile = false;
+};
 
-  // 点击【进入项目】实现指定路由跳转
-  const router = useRouter();
-  const handleClick = (record: any) => {
-    console.log('点击路由===>', record.child_url_key);
-    //导航到新的url中
-    router.push({
-      name: record.child_url_key,
+
+// 点击【进入项目】实现指定路由跳转
+const router = useRouter()
+const handleClick = (record: any) => {
+  console.log('点击路由===>', record.child_url_key)
+  //导航到新的url中
+  router.push({
+    name: record.child_url_key,
+  })
+}
+
+// 创建前端页面的函数
+const createFrontendPage = async (routeKey: string, projectName: string) => {
+  try {
+    // 调用后端API创建前端页面
+    const response = await fetch(`${BASE_URL}/myapp/api/create-frontend-page/`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        route_key: routeKey,
+        project_name: projectName,
+        page_title: projectName || routeKey
+      })
     });
-  };
-
-  // 创建前端页面的函数
-  const createFrontendPage = async (routeKey: string, projectName: string) => {
-    try {
-      // 调用后端API创建前端页面
-      const response = await fetch(`${BASE_URL}/myapp/api/create-frontend-page/`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          route_key: routeKey,
-          project_name: projectName,
-          page_title: projectName || routeKey,
-        }),
-      });
-
-      const result = await response.json();
-
-      if (result.success) {
-        console.log('前端页面创建成功:', result);
-        return result;
-      } else {
-        throw new Error(result.error || '创建前端页面失败');
-      }
-    } catch (error) {
-      console.error('创建前端页面API调用失败:', error);
-      throw error;
+    
+    const result = await response.json();
+    
+    if (result.success) {
+      console.log('前端页面创建成功:', result);
+      return result;
+    } else {
+      throw new Error(result.error || '创建前端页面失败');
     }
-  };
+  } catch (error) {
+    console.error('创建前端页面API调用失败:', error);
+    throw error;
+  }
+}
+
 </script>
 
 <style scoped lang="less">
-  .page-view {
-    min-height: 100%;
-    background: #fff;
-    padding: 24px;
-    display: flex;
-    flex-direction: column;
-  }
+.page-view {
+  min-height: 100%;
+  background: #fff;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+}
 
-  .table-operations {
-    margin-bottom: 16px;
-    text-align: right;
-  }
+.table-operations {
+  margin-bottom: 16px;
+  text-align: right;
+}
 
-  .table-operations > button {
-    margin-right: 8px;
-  }
+.table-operations > button {
+  margin-right: 8px;
+}
+
+
 </style>

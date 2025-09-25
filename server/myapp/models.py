@@ -37,6 +37,9 @@ class User(models.Model):
     admin_token = models.CharField(max_length=32, blank=True, null=True)
     token = models.CharField(max_length=32, blank=True, null=True)
 
+    def __str__(self):
+        return self.username or f"用户{self.id}"
+    
     class Meta:
         db_table = "b_user"
 
@@ -176,6 +179,9 @@ class Script(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    def __str__(self):
+        return self.name or f"脚本{self.id}"
+    
     class Meta:
         db_table = 'c_scripts'
         verbose_name = "脚本配置"
@@ -264,6 +270,7 @@ class PageScriptConfig(models.Model):
         ('bottom-right', '右下角'),
         ('custom', '自定义位置'),
     ], default='top-right')
+    custom_position = models.JSONField(default=dict, verbose_name="自定义位置配置")
     is_enabled = models.BooleanField(default=True)
     display_order = models.IntegerField(default=0, verbose_name="显示顺序")
 

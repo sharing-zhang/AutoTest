@@ -87,13 +87,13 @@ class ScriptConfigManager:
         if isinstance(config, dict):
             return {
                 'dialog_title': config.get('dialog_title', f'{script_name} - 参数配置'),
-                'script_display_name': config.get('script_display_name', script_name)
+                'display_name': config.get('display_name', script_name)
             }
         else:
-            # 兼容旧格式，返回默认值
+            # 容错，返回默认值
             return {
                 'dialog_title': f'{script_name} - 参数配置',
-                'script_display_name': script_name
+                'display_name': script_name
             }
     
     def validate_parameters(self, script_name: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
@@ -214,7 +214,7 @@ class ScriptConfigManager:
             'parameters': config,
             'form_layout': self._generate_form_layout(config),
             'dialog_title': display_info.get('dialog_title', f'{script_name} - 参数配置'),
-            'script_display_name': display_info.get('script_display_name', script_name)
+            'display_name': display_info.get('display_name', script_name)
         }
         
         return schema

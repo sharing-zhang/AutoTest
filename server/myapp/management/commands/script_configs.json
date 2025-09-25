@@ -196,7 +196,7 @@
         "type": "text",
         "label": "配置文件地址",
         "required": true,
-        "default": "D:\\TimeConfig\\FISH.data11.txt",
+        "default": "F:\\fish_test\\FISH.data11.txt",
         "placeholder": "配置文件文件地址，例如D:\\TimeConfig\\FISH.data.txt"
       },
       {
@@ -204,7 +204,7 @@
         "type": "text",
         "label": "工程文件目录",
         "required": true,
-        "default": "D:\\fishdev\\client\\MainProject\\Assets\\InBundle\\Character",
+        "default": "E:\\Dev_2024_3_30\\client\\MainProject\\Assets\\InBundle",
         "description": "输入工程文件的目录，支持输入精确or大致路径"
       },
       {

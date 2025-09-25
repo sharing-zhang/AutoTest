@@ -12,8 +12,8 @@
       </p>
     </div>
 
-    <!-- 脚本选择 - 暂时注释掉 -->
-    <!-- 
+    <!-- 脚本选择 -->
+    
     <div class="script-selector" v-if="showScriptSelector">
       <el-form-item label="选择脚本">
         <el-select 
@@ -36,7 +36,7 @@
         </el-select>
       </el-form-item>
     </div>
-    -->
+   
 
     <!-- 动态表单 -->
     <el-form 
@@ -104,7 +104,7 @@
           />
         </el-form-item>
         <!-- 数字输入框 -->
-<!--          <div v-else-if="field.type === 'number'" class="field-wrapper">-->
+         <!-- <div v-else-if="field.type === 'number'" class="field-wrapper">-->
 <!--            <div class="number-input-container">-->
 <!--              <el-input-number-->
 <!--                v-model="groupItem[field.name]"-->
@@ -131,7 +131,7 @@
 <!--            </div>-->
 <!--          </div>-->
 
-<!--        &lt;!&ndash; 数字输入框 &ndash;&gt;-->
+       <!-- &lt;!&ndash; 数字输入框 &ndash;&gt; -->
         <el-form-item
           v-else-if="param.type === 'number'"
           :label="param.label"
@@ -282,6 +282,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { VideoPlay, Refresh, Setting } from '@element-plus/icons-vue'
 import type { FormInstance, FormRules } from 'element-plus'
 import { BASE_URL } from '/@/store/constants'
+import { executeScriptApi, getScriptTaskResultApi } from '/@/api/scanDevUpdate'
 
 interface ScriptParameter {
   name: string
@@ -300,6 +301,8 @@ interface ScriptConfig {
   script_name: string
   parameters: ScriptParameter[]
   form_layout?: any
+  dialog_title?: string
+  display_name?: string
 }
 
 interface ScriptInfo {
@@ -318,7 +321,7 @@ interface Props {
 }
 
 const props = withDefaults(defineProps<Props>(), {
-  scriptName: 'test_script.py', // 默认脚本
+  scriptName: 'check_Reward.py', // 默认脚本
   scriptDisplayName: '',        // 默认脚本显示名称
   showScriptSelector: false,    // 默认不显示脚本选择器
   showAdvanced: false,
@@ -396,7 +399,7 @@ watch(formData, (newFormData) => {
   emit('form-updated', { ...newFormData })
 }, { deep: true })
 
-// 方法
+
 // 注释掉加载脚本列表的逻辑，因为现在直接指定脚本
 // const loadAvailableScripts = async () => {
 //   try {
@@ -509,7 +512,8 @@ const handleSubmit = async () => {
   // 确认执行
   try {
     await ElMessageBox.confirm(
-      `确认要执行脚本 "${formConfig.value.script_name}" 吗？`,
+      // `确认要执行脚本 "${formConfig.value.script_name}" 吗？`,
+      `确认要执行 "${formConfig.value.dialog_title}" 脚本吗？`,
       '确认执行',
       {
         confirmButtonText: '执行',
@@ -534,15 +538,13 @@ const handleSubmit = async () => {
     
     console.log('发送执行请求:', requestData)
     
-    const response = await fetch(`${BASE_URL}/myapp/api/execute-dynamic-script/`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(requestData)
+    const response = await executeScriptApi({
+      script_name: selectedScript.value,
+      parameters: { ...formData },
+      page_context: 'dynamic_form'
     })
     
-    const data = await response.json()
+    const data = response.data || response
     
     if (data.success) {
       ElMessage.success('脚本启动成功，正在执行...')
@@ -575,8 +577,8 @@ const monitorExecution = async (taskId: string, executionId: string) => {
   const poll = async () => {
     try {
       attempts++
-      const response = await fetch(`${BASE_URL}/myapp/api/get-script-task-result/?task_id=${taskId}&execution_id=${executionId}`)
-      const data = await response.json()
+      const response = await getScriptTaskResultApi(taskId, executionId)
+      const data = response.data || response
       
       if (data.ready) {
         executionResult.value = data

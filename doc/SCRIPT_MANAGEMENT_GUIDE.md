@@ -9,10 +9,8 @@
 ### 核心表结构
 - `c_scripts`: 脚本配置表，存储脚本元信息
 - `c_task_executions`: 任务执行记录表
-- `c_execution_outputs`: 执行输出表
-- `c_execution_artifacts`: 执行产物表（文件、图表等）
 - `c_page_script_configs`: 页面脚本配置表
-- `c_execution_summaries`: 执行汇总统计表
+- `c_execution_summaries`: 执行汇总统计表（待添加）
 
 ## 使用流程
 
@@ -134,6 +132,46 @@ celery -A celery_app worker --loglevel=info --pool=solo
   - 分析任务: `data_size`, `analysis_type`
   - 报告任务: `report_type`, `include_charts`
 
+### 4. scanner_file.py（基于模板系统）
+- **功能**: 文件扫描脚本，支持递归扫描和多种文件类型
+- **任务**: `unified_execution`
+- **参数**: 
+  - `directory`: 目录路径
+  - `file_extensions`: 文件后缀名（多选）
+  - `recursive`: 递归扫描（开关）
+  - `max_depth`: 最大深度
+  - `include_hidden`: 包含隐藏文件
+  - `output_format`: 输出格式
+
+### 5. check_Reward_template.py（基于模板系统）
+- **功能**: 奖励配置检查脚本，解析配置文件并验证数据
+- **任务**: `unified_execution`
+- **参数**:
+  - `directory`: 目录路径
+  - `file_name`: 需要检查的文件名
+  - `block_name`: 配置块名称
+  - `rules`: 配置项组（分组列表）
+
+### 6. check_ConfigTime.py（基于模板系统）
+- **功能**: 配置时间检查脚本，验证活动时间配置
+- **任务**: `unified_execution`
+- **参数**:
+  - `directory`: 目录路径
+  - `file_names`: 需要检查的配置文件（标签输入）
+  - `start_time_field`: 开始时间对应参数
+  - `end_time_field`: 结束时间对应参数
+  - `recursive`: 递归扫描子目录
+  - `encoding`: 文件编码
+  - `expected_days`: 正确的活动天数
+
+### 7. checkFileName.py（基于模板系统）
+- **功能**: 文件名检查脚本，验证文件名是否符合规范
+- **任务**: `unified_execution`
+- **参数**:
+  - `root_path`: 目录路径
+  - `regex_pattern`: 正则表达式
+  - `file_extensions`: 文件后缀名（多选）
+
 ## API 接口
 
 ### 脚本管理
@@ -172,6 +210,50 @@ celery -A celery_app worker --loglevel=info --pool=solo
 - 系统会生成执行汇总统计（`c_execution_summaries`）
 - 可用于分析脚本性能和使用情况
 
+## 脚本执行流程
+
+### 完整执行流程
+
+系统支持两种脚本执行方式：
+
+#### 1. 传统脚本执行（方案1）
+- 基于数据库Script表配置
+- 使用统一任务执行器 `execute_python_script`
+- 通过 `script_id` 识别脚本
+
+#### 2. 动态脚本执行
+- 基于 `script_configs.json` 配置
+- 使用动态脚本执行器 `execute_dynamic_script_task`
+- 通过 `script_name` 识别脚本
+
+### 执行流程步骤
+
+1. **用户点击按钮** → 前端判断脚本类型
+2. **API调用** → 调用对应的执行接口
+3. **参数验证** → 验证脚本和参数
+4. **创建执行记录** → 创建TaskExecution记录
+5. **启动Celery任务** → 异步执行脚本
+6. **subprocess执行** → 在独立进程中运行
+7. **环境变量传递** → 传递参数到脚本
+8. **脚本执行** → 脚本执行业务逻辑
+9. **结果输出** → 输出标准JSON格式
+10. **状态更新** → 更新执行状态
+11. **前端轮询** → 轮询执行状态
+12. **页面刷新** → 刷新页面数据
+
+### 环境变量
+
+脚本执行时自动设置的环境变量：
+
+```bash
+SCRIPT_PARAMETERS='{"param1": "value1", "param2": "value2"}'
+PAGE_CONTEXT="/scanDevUpdate"
+SCRIPT_NAME="script_name"
+EXECUTION_ID="1704038400.123456"
+```
+
+详细执行流程请参考：[脚本执行完整流程详解](SCRIPT_EXECUTION_FLOW_GUIDE.md)
+
 ## 故障排除
 
 ### 脚本未显示
@@ -189,6 +271,11 @@ celery -A celery_app worker --loglevel=info --pool=solo
 1. 检查前端控制台错误
 2. 确认 API 接口返回正确数据
 3. 检查脚本的 `parameters_schema` 是否正确
+
+### 脚本执行超时
+1. 检查脚本执行时间是否超过540秒
+2. 优化脚本性能
+3. 考虑分批处理大数据量
 
 ## 扩展功能
 

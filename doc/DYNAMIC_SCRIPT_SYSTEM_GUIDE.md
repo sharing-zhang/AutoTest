@@ -24,22 +24,35 @@ JSON配置文件 (script_configs.json)
 
 ```json
 {
-  "script_name.py": [
-    {
-      "name": "参数名",
-      "type": "组件类型",
-      "label": "显示标签",
-      "required": true/false,
-      "default": "默认值",
-      "placeholder": "占位符文本",
-      "options": ["选项1", "选项2"],
-      "multiple": true/false,
-      "min": 最小值,
-      "max": 最大值
-    }
-  ]
+  "script_name": {
+    "dialog_title": "脚本参数配置对话框标题",
+    "parameters": [
+      {
+        "name": "参数名",
+        "type": "组件类型",
+        "label": "显示标签",
+        "required": true/false,
+        "default": "默认值",
+        "placeholder": "占位符文本",
+        "options": ["选项1", "选项2"],
+        "multiple": true/false,
+        "min": 最小值,
+        "max": 最大值,
+        "description": "参数说明",
+        "addonAfter": "输入框后缀文本"
+      }
+    ]
+  }
 }
 ```
+
+### 实际配置示例
+
+当前系统已配置的脚本包括：
+- `scanner_file`: 文件扫描脚本
+- `check_Reward`: 奖励检查脚本  
+- `check_ConfigTime`: 配置时间检查脚本
+- `checkFileName`: 文件名检查脚本
 
 ### 支持的组件类型
 
@@ -64,7 +77,8 @@ JSON配置文件 (script_configs.json)
   "required": false,
   "default": 3,
   "min": 0,
-  "max": 10
+  "max": 10,
+  "addonAfter": "层"
 }
 ```
 
@@ -101,6 +115,35 @@ JSON配置文件 (script_configs.json)
   "required": false,
   "multiple": true,
   "default": [".txt", ".log"]
+}
+```
+
+6. **tags** - 标签输入（新增）
+```json
+{
+  "name": "file_names",
+  "type": "tags",
+  "label": "需要检查的配置文件",
+  "required": false,
+  "multiple": true,
+  "default": ["file1.txt", "file2.txt"],
+  "placeholder": "输入文件名，按回车添加"
+}
+```
+
+7. **group-list** - 分组列表（新增）
+```json
+{
+  "name": "rules",
+  "type": "group-list",
+  "label": "配置项组",
+  "required": true,
+  "item_fields": [
+    { "name": "reward_id", "type": "text", "label": "reward_id" },
+    { "name": "count_id", "type": "text", "label": "count_id" },
+    { "name": "max_reward", "type": "number", "label": "max_reward", "min": 0 }
+  ],
+  "description": "每组包含：奖励ID、数量ID、最大奖励值"
 }
 ```
 
@@ -401,6 +444,37 @@ if __name__ == '__main__':
     create_simple_script('file_scanner', scan_files)
 ```
 
+## 脚本执行流程
+
+### 动态脚本执行流程
+
+动态脚本的执行遵循以下流程：
+
+1. **用户点击按钮** → 前端检测到动态脚本（以.py结尾）
+2. **API调用** → 调用 `/myapp/api/execute-dynamic-script/` 接口
+3. **参数验证** → 使用 `script_config_manager` 验证参数
+4. **脚本路径构建** → 自动构建 `celery_app/script_name.py` 路径
+5. **创建执行记录** → 创建或获取Script记录和TaskExecution记录
+6. **启动Celery任务** → 调用 `execute_dynamic_script_task`
+7. **subprocess执行** → 在独立进程中运行脚本
+8. **环境变量传递** → 通过环境变量传递验证后的参数
+9. **脚本执行** → 脚本获取参数并执行业务逻辑
+10. **结果返回** → 解析脚本输出并更新执行状态
+11. **前端轮询** → 前端轮询执行状态
+12. **页面刷新** → 执行完成后刷新页面数据
+
+### 与传统脚本的区别
+
+| 特性 | 传统脚本 | 动态脚本 |
+|------|----------|----------|
+| **配置方式** | 数据库Script表 | script_configs.json |
+| **参数验证** | 基础验证 | 完整参数验证 |
+| **API接口** | `/execute-script` | `/execute-dynamic-script` |
+| **Celery任务** | `execute_python_script` | `execute_dynamic_script_task` |
+| **Script记录** | 预先创建 | 动态创建 |
+
+详细执行流程请参考：[脚本执行完整流程详解](SCRIPT_EXECUTION_FLOW_GUIDE.md)
+
 ## 故障排除
 
 ### 常见问题
@@ -419,6 +493,11 @@ if __name__ == '__main__':
    - 检查 API 接口是否正常
    - 确认组件导入路径
    - 查看浏览器控制台错误
+
+4. **参数验证失败**
+   - 检查参数名称是否匹配
+   - 验证参数类型是否正确
+   - 确认必需参数是否提供
 
 ### 调试方法
 

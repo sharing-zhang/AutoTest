@@ -9,7 +9,7 @@
       v-model="activeName"
       class="el-tabs__content"
       >
-        <el-tab-pane label="扫描结果" name="mainContent" >
+        <el-tab-pane label="扫描结果" name="scanResult" >
           <a-table
           size="middle"
           rowKey="scanResult_id"
@@ -28,6 +28,8 @@
             <template #bodyCell="{ text, record, index, column }">
               <template v-if="column.key === 'operation'">
                 <span>
+                  <a @click="handleSend(record)">消息同步</a>
+                  <a-divider type="vertical" />
                   <a @click="handleEdit(record)">编辑</a>
                   <a-divider type="vertical" />
                   <a @click="handleClick(record)">查看详情</a>
@@ -61,42 +63,42 @@
 
       <!--弹窗区域-->
       <div>
-      <a-modal
-        :visible="modal.scanResult_visile"
-        :forceRender="true"
-        :title="modal.title"
-        ok-text="确认"
-        cancel-text="取消"
-        @ok="handleOk"
-        @cancel="handleCancel"
-      >
-        <div>
-          <a-form ref="myform" :label-col="{ style: { width: '120px'} }" :model="modal.form" :rules="modal.rules">
-            <a-row :gutter="24">
-              <a-col span="24">
-                <a-form-item label="文件名" name="scandevresult_filename">
-                  <a-input placeholder="请输入文件名" v-model:value="modal.form.scandevresult_filename" allowClear />
-                </a-form-item>
-              </a-col>
-              <a-col span="24">
-                <a-form-item label="时间" name="scandevresult_time">
-                  <a-input placeholder="时间" v-model:value="modal.form.scandevresult_time" allowClear />
-                </a-form-item>
-              </a-col>
-              <a-col span="24">
-                <a-form-item label="负责人" name="director">
-                  <a-input placeholder="请输入负责人" v-model:value="modal.form.director" allowClear />
-                </a-form-item>
-              </a-col>
-              <a-col span="24">
-                <a-form-item label="备注" name="remark">
-                  <a-input placeholder="请输入备注" v-model:value="modal.form.remark" allowClear />
-                </a-form-item>
-              </a-col>
-            </a-row>
-          </a-form>
-        </div>
-      </a-modal>
+        <a-modal
+          :visible="modal.scanResult_visile"
+          :forceRender="true"
+          :title="modal.title"
+          ok-text="确认"
+          cancel-text="取消"
+          @ok="handleOk"
+          @cancel="handleCancel"
+        >
+          <div>
+            <a-form ref="myform" :label-col="{ style: { width: '120px'} }" :model="modal.form" :rules="modal.rules">
+              <a-row :gutter="24">
+                <a-col span="24">
+                  <a-form-item label="文件名" name="scandevresult_filename">
+                    <a-input placeholder="请输入文件名" v-model:value="modal.form.scandevresult_filename" allowClear />
+                  </a-form-item>
+                </a-col>
+                <a-col span="24">
+                  <a-form-item label="时间" name="scandevresult_time">
+                    <a-input placeholder="时间" v-model:value="modal.form.scandevresult_time" allowClear />
+                  </a-form-item>
+                </a-col>
+                <a-col span="24">
+                  <a-form-item label="负责人" name="director">
+                    <a-input placeholder="请输入负责人" v-model:value="modal.form.director" allowClear />
+                  </a-form-item>
+                </a-col>
+                <a-col span="24">
+                  <a-form-item label="备注" name="remark">
+                    <a-input placeholder="请输入备注" v-model:value="modal.form.remark" allowClear />
+                  </a-form-item>
+                </a-col>
+              </a-row>
+            </a-form>
+          </div>
+        </a-modal>
       <a-modal
         width="1600px"
         :destroyOnClose="true"
@@ -108,32 +110,32 @@
         cancelText="取消"
       >
         <!-- 根据结果类型显示不同的内容 -->
-        <div v-if="scanResultContentDetail.form['result_type'] === 'script' || scanResultContentDetail.form['result_type'] === 'task'">
+        <div v-if="scanResultContentDetail.form.result_type === 'script' || scanResultContentDetail.form.result_type === 'task'">
           <!-- 脚本执行结果显示 -->
           <el-descriptions title="脚本执行信息" :column="2" border>
             <el-descriptions-item label="脚本名称">
-              { scanResultContentDetail.form['script_name'] || '未知' }
+              {{ scanResultContentDetail.form.script_name || '未知' }}
             </el-descriptions-item>
             <el-descriptions-item label="任务ID">
-              { scanResultContentDetail.form['task_id'] || '无' }
+              {{ scanResultContentDetail.form.task_id || '无' }}
             </el-descriptions-item>
             <el-descriptions-item label="执行时间">
-              { scanResultContentDetail.form['scandevresult_time'] }
+              {{ scanResultContentDetail.form.scandevresult_time }}
             </el-descriptions-item>
             <el-descriptions-item label="执行耗时">
-              { scanResultContentDetail.form['execution_time'] ? `${scanResultContentDetail.form['execution_time']}秒` : '未知' }
+              {{ scanResultContentDetail.form.execution_time ? scanResultContentDetail.form.execution_time + '秒' : '未知' }}
             </el-descriptions-item>
             <el-descriptions-item label="执行者">
-              { scanResultContentDetail.form['director'] }
+              {{ scanResultContentDetail.form.director }}
             </el-descriptions-item>
             <el-descriptions-item label="结果类型">
-              { scanResultContentDetail.form['result_type'] === 'script' ? '脚本执行' : '任务执行' }
+              {{ scanResultContentDetail.form.result_type === 'script' ? '脚本执行' : '任务执行' }}
             </el-descriptions-item>
           </el-descriptions>
           
           <!-- 脚本输出结果 -->
           <el-divider content-position="left">脚本输出结果</el-divider>
-          <el-card v-if="scanResultContentDetail.form['script_output']" shadow="never" style="margin-bottom: 16px;">
+          <el-card v-if="scanResultContentDetail.form.script_output" shadow="never" style="margin-bottom: 16px;">
             <template #header>
               <span style="color: #67C23A;">
                 <el-icon><SuccessFilled /></el-icon>
@@ -141,12 +143,12 @@
               </span>
             </template>
             <div style="white-space: pre-wrap; font-family: 'Courier New', monospace; background: #f5f5f5; padding: 12px; border-radius: 4px;">
-              { scanResultContentDetail.form['script_output'] }
+              {{ scanResultContentDetail.form.script_output }}
             </div>
           </el-card>
           
           <!-- 错误信息 -->
-          <el-card v-if="scanResultContentDetail.form['error_message']" shadow="never" style="margin-bottom: 16px;">
+          <el-card v-if="scanResultContentDetail.form.error_message" shadow="never" style="margin-bottom: 16px;">
             <template #header>
               <span style="color: #F56C6C;">
                 <el-icon><CircleCloseFilled /></el-icon>
@@ -154,7 +156,7 @@
               </span>
             </template>
             <div style="white-space: pre-wrap; font-family: 'Courier New', monospace; background: #fef0f0; padding: 12px; border-radius: 4px; color: #F56C6C;">
-              { scanResultContentDetail.form['error_message'] }
+              {{ scanResultContentDetail.form.error_message }}
             </div>
           </el-card>
           
@@ -162,7 +164,7 @@
           <el-collapse style="margin-top: 16px;">
             <el-collapse-item title="查看完整JSON结果" name="json">
               <div style="white-space: pre-wrap; font-family: 'Courier New', monospace; background: #f8f8f8; padding: 12px; border-radius: 4px; max-height: 400px; overflow-y: auto;">
-                { formatJsonContent(scanResultContentDetail.form['scandevresult_content']) }
+                {{ formatJsonContent(scanResultContentDetail.form.scandevresult_content) }}
               </div>
             </el-collapse-item>
           </el-collapse>
@@ -170,7 +172,7 @@
         
         <!-- 传统扫描结果显示 -->
         <div v-else style="white-space: pre-wrap">
-          { scanResultContentDetail.form['scandevresult_content'] }
+          {{ scanResultContentDetail.form.scandevresult_content }}
         </div>
         <template #footer="footer">
           <a-button @click="dataBackup_handleCancel">关闭</a-button>
@@ -189,8 +191,8 @@ import { SuccessFilled, CircleCloseFilled } from '@element-plus/icons-vue';
 import dayjs from 'dayjs';
 import { ref, reactive, onMounted } from 'vue'
 
-// 进来页面后默认定位到主内容页面
-const activeName = ref('mainContent')
+// 进来页面后默认定位到扫描结果页面
+const activeName = ref('scanResult')
 
 
 // 扫描结果表格列配置
@@ -204,54 +206,25 @@ const scanResultcolumns = reactive([
     width: 100
   },
   {
-    title: '文件名',
+    title: '脚本名称',
     dataIndex: 'scandevresult_filename',
     align: "center",
     key: 'scandevresult_filename',
     width: 600
   },
   {
-    title: '时间',
+    title: '执行时间',
     dataIndex: 'scandevresult_time',
     align: "center",
     key: 'scandevresult_time',
     width: 200
   },
   {
-    title: '负责人',
+    title: '执行人',
     dataIndex: 'director',
     align: "center",
     key: 'director',
     width: 110
-  },
-  {
-    title: '备注',
-    dataIndex: 'remark',
-    align: "center",
-    key: 'remark',
-    width: 250
-  },
-  {
-    title: '结果类型',
-    dataIndex: 'result_type',
-    align: "center",
-    key: 'result_type',
-    width: 100,
-    customRender: ({ text }) => {
-      const typeMap = {
-        'manual': '手动扫描',
-        'script': '脚本执行', 
-        'task': '任务执行'
-      };
-      return typeMap[text] || text || '手动扫描';
-    }
-  },
-  {
-    title: '脚本名称',
-    dataIndex: 'script_name',
-    align: "center",
-    key: 'script_name',
-    width: 120
   },
   {
     title: '操作',
@@ -326,8 +299,6 @@ const data = reactive({
   page: 1,
 });
 
-
-
 // 编辑弹窗数据
 const modal = reactive({
   scanResult_visile: false,
@@ -354,7 +325,7 @@ const modal = reactive({
 const scanResultContentDetail = reactive({
   scanResultContentDetail_visile: false,
   scanResultContentDetail_editFlag: false,
-  title: 'AI文本检查结果',
+  title: 'CheckText结果',
   form: {
     id: undefined,
     scandevresult_content: undefined,
@@ -372,24 +343,18 @@ const scriptManager = ref();
 onMounted(() => {
   getDataList();
   
-  // 脚本执行完成后刷新结果列表（确保在ref可用后注册）
-  const tryRegister = () => {
-    if (scriptManager.value && typeof scriptManager.value.onDataRefresh === 'function') {
+  // 延迟注册脚本执行完成后的数据刷新回调，确保组件已完全挂载
+  setTimeout(() => {
+    if (scriptManager.value) {
       scriptManager.value.onDataRefresh(() => {
         console.log('脚本执行完成，刷新扫描结果数据...')
         getDataList();
-        activeName.value = 'mainContent';
       });
-      return true;
+      console.log('CheckText页面刷新回调已注册');
+    } else {
+      console.error('scriptManager组件引用未找到');
     }
-    return false;
-  };
-  
-  if (!tryRegister()) {
-    setTimeout(() => {
-      tryRegister();
-    }, 0);
-  }
+  }, 100);
 });
 
 const getDataList = () => {
@@ -423,11 +388,18 @@ const onSearch = () => {
   getDataList();
 };
 
+const handleSend = (record: any) => {
+  // 调用 ScriptManagerLayout 的钉钉机器人弹窗方法
+  if (scriptManager.value) {
+    scriptManager.value.openDingtalkDialog(record);
+  }
+};
+
 const handleEdit = (record: any) => {
   resetModal();
   modal.scanResult_visile = true;
   modal.scanResult_editFlag = true;
-  modal.title = '编辑AI文本检查信息';
+  modal.title = '编辑CheckText信息';
   for (const key in modal.form) {
     modal.form[key] = undefined;
   }
@@ -517,7 +489,7 @@ const handleClick = (record: any) => {
       scanResultContentDetail.form[key] = record[key];
     }
   }
-  console.log(scanResultContentDetail.form['scandevresult_content'] )
+  console.log(scanResultContentDetail.form.scandevresult_content )
 }
 
 // 格式化JSON内容

@@ -1,4 +1,4 @@
-// 配置路径字段存在性扫描 API接口
+// checkConfigExist API接口
 import { get, post } from '/@/utils/http/axios';
 
 enum URL {

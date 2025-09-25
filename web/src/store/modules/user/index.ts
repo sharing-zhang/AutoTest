@@ -17,13 +17,13 @@ import {USER_ID, USER_NAME, USER_TOKEN, ADMIN_USER_ID,ADMIN_USER_NAME,ADMIN_USER
 export const useUserStore = defineStore('user', {
   //固定写法，调用UserState中的各个属性进行初始化定义，undefined表示未定义
   state: (): UserState => ({
-    user_id: undefined,
-    user_name: undefined,
-    user_token: undefined,
+    user_id: localStorage.getItem('USER_ID') || undefined,
+    user_name: localStorage.getItem('USER_NAME') || undefined,
+    user_token: localStorage.getItem('USER_TOKEN') || undefined,
 
-    admin_user_id: undefined,
-    admin_user_name: undefined,
-    admin_user_token: undefined,
+    admin_user_id: localStorage.getItem(ADMIN_USER_ID) || undefined,
+    admin_user_name: localStorage.getItem(ADMIN_USER_NAME) || undefined,
+    admin_user_token: localStorage.getItem(ADMIN_USER_TOKEN) || undefined,
   }),
   //getters 是一种特殊的函数，用于处理和计算 state 中的数据,接收 state 作为参数，并返回一个新的值或对象。
   getters: {},
@@ -64,6 +64,41 @@ export const useUserStore = defineStore('user', {
         state.admin_user_id = undefined
         state.admin_user_name = undefined
         state.admin_user_token = undefined
+      })
+    },
+
+    // 普通用户登录
+    async userLogin(loginForm) {
+      const { userLoginApi } = await import('/@/api/user');
+      const result = await userLoginApi(loginForm);
+      console.log('userLogin result==>', result)
+
+      if(result.code === 0) {
+        this.$patch((state)=>{
+          state.user_id = result.data.id
+          state.user_name = result.data.username
+          state.user_token = result.data.token
+          console.log('user state==>', state)
+        })
+
+        localStorage.setItem('USER_TOKEN', result.data.token)
+        localStorage.setItem('USER_NAME', result.data.username)
+        localStorage.setItem('USER_ID', result.data.id)
+      }
+
+      return result;
+    },
+
+    // 普通用户登出
+    async userLogout() {
+      this.$patch((state)=>{
+        localStorage.removeItem('USER_ID')
+        localStorage.removeItem('USER_NAME')
+        localStorage.removeItem('USER_TOKEN')
+
+        state.user_id = undefined
+        state.user_name = undefined
+        state.user_token = undefined
       })
     },
   },

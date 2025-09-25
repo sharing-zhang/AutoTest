@@ -43,7 +43,6 @@ python manage.py migrate
 1. **启动Celery Worker**
 ```bash
 python manage.py celery_worker --loglevel=info --concurrency=4
-celery -A celery_app worker --loglevel=info --pool=solo
 ```
 
 2. **启动Celery Beat定时任务调度器**
@@ -114,14 +113,6 @@ CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 CELERY_ACCEPT_CONTENT = ['json']
 ```
-
-### 任务定义（myapp/tasks.py）
-已创建以下示例任务：
-- `test_task`: 测试任务
-- `send_email_task`: 邮件发送任务
-- `process_data_task`: 数据处理任务
-- `cleanup_old_files`: 文件清理任务
-- `generate_report_task`: 报告生成任务
 
 ## API接口
 
