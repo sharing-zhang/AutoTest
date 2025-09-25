@@ -23,7 +23,6 @@ class PerformanceConfig:
     MEMORY_CHECK_INTERVAL = 5000  # 减少内存检查频率
     MAX_PATH_LENGTH = 280
     BATCH_SIZE = 1000  # 批处理大小
-    # 移除 MAX_DISPLAY_FILES 限制，显示所有文件
 
 
 # ==================== 性能优化：预编译跳过模式 ====================
@@ -296,41 +295,74 @@ def fast_regex_check(files, regex_pattern, case_sensitive, check_full_name, scri
     return compliant_paths, non_compliant_info, error_info
 
 
-# ==================== 性能优化：完整展示消息生成 ====================
-def fast_generate_complete_message(compliant_count, non_compliant_info, error_info, total_time, regex_pattern):
-    """快速消息生成 - 显示所有不符合规范的文件"""
+# ==================== 性能优化：中文ASCII格式的消息生成 ====================
+def format_chinese_ascii_message(compliant_count, non_compliant_info, error_info, total_time, regex_pattern):
+    """生成中文ASCII格式的检查结果消息"""
 
     total_checked = compliant_count + len(non_compliant_info) + len(error_info)
     total_issues = len(non_compliant_info) + len(error_info)
 
+    # 使用列表拼接，确保每部分都分行显示
+    message_parts = []
+
+    # ====== 头部标题 ======
+    message_parts.append("=" * 80)
+    message_parts.append("                         文件名规范检查结果报告")
+    message_parts.append("=" * 80)
+
+    # ====== 概览统计 ======
+    compliance_rate = (compliant_count / total_checked * 100) if total_checked > 0 else 0
+    message_parts.append("\n[检查概览] 统计信息:")
+    message_parts.append(f"   +-- 总计检查文件: {total_checked} 个")
+    message_parts.append(f"   +-- 符合规范文件: {compliant_count} 个")
+    message_parts.append(f"   +-- 不符合规范文件: {len(non_compliant_info)} 个")
+    message_parts.append(f"   +-- 检查异常文件: {len(error_info)} 个")
+    message_parts.append(f"   +-- 符合率: {compliance_rate:.1f}%")
+    message_parts.append(f"   +-- 执行耗时: {total_time:.2f} 秒")
+
+    # ====== 正则表达式信息 ======
+    message_parts.append(f"\n[正则规则] 使用的表达式:")
+    message_parts.append(f"   {regex_pattern}")
+
+    # ====== 检查结果判定 ======
     if total_issues == 0:
-        return f"[SUCCESS] 检查完成，所有 {total_checked} 个文件都符合规范 (耗时 {total_time:.2f}秒)"
+        message_parts.append("\n[检查结果] 状态: 通过")
+        message_parts.append("   所有文件都符合命名规范!")
+    else:
+        message_parts.append("\n[检查结果] 状态: 未通过")
+        message_parts.append(f"   发现 {total_issues} 个问题文件需要处理")
 
-    # 使用列表拼接，比字符串连接更快
-    message_parts = [
-        f"[RESULT] 发现 {total_issues} 个问题文件 (共检查 {total_checked} 个，耗时 {total_time:.2f}秒)"
-    ]
-
-    # 显示所有不符合规范的文件
+    # ====== 不符合规范的文件详情 ======
     if non_compliant_info:
-        message_parts.append(f"\n[NON-COMPLIANT] {len(non_compliant_info)} 个文件不符合规则:")
+        message_parts.append(f"\n[不符合规范] 文件列表 (共 {len(non_compliant_info)} 个):")
+        message_parts.append("   " + "-" * 76)
 
-        # 显示所有文件，不进行省略
-        for i, info in enumerate(non_compliant_info):
-            message_parts.append(f"  {i + 1:>3}. {info['full_name']}")
+        # 按文件名排序，便于查看
+        sorted_non_compliant = sorted(non_compliant_info, key=lambda x: x['full_name'])
 
-        # 如果文件数量很多，添加分隔线提高可读性
-        if len(non_compliant_info) > 20:
-            message_parts.append(f"\n--- 共 {len(non_compliant_info)} 个不符合规范的文件 ---")
+        for i, info in enumerate(sorted_non_compliant, 1):
+            # 格式化序号和文件名
+            prefix = f"   {i:>3}."
+            filename = info['full_name']
 
-    # 显示所有错误文件
+            # 如果文件名太长，适当截断并添加省略号
+            if len(filename) > 60:
+                display_name = filename[:57] + "..."
+            else:
+                display_name = filename
+
+            message_parts.append(f"{prefix} {display_name}")
+
+        message_parts.append("   " + "-" * 76)
+
+    # ====== 检查异常的文件详情 ======
     if error_info:
-        message_parts.append(f"\n[ERROR] {len(error_info)} 个文件检查异常:")
+        message_parts.append(f"\n[检查异常] 文件列表 (共 {len(error_info)} 个):")
+        message_parts.append("   " + "-" * 76)
 
-        # 显示所有错误文件
-        for i, info in enumerate(error_info):
+        for i, info in enumerate(error_info, 1):
             # 获取文件名
-            error_filename = "UNKNOWN"
+            error_filename = "未知文件"
             if 'path' in info:
                 try:
                     if os.sep in info['path']:
@@ -340,24 +372,148 @@ def fast_generate_complete_message(compliant_count, non_compliant_info, error_in
                 except:
                     error_filename = str(info['path'])[:50]
 
-            error_reason = info.get('error', 'Unknown error')[:100]
-            message_parts.append(f"  {i + 1:>3}. {error_filename} - {error_reason}")
+            error_reason = info.get('error', '未知错误')
 
-        if len(error_info) > 10:
-            message_parts.append(f"\n--- 共 {len(error_info)} 个检查异常的文件 ---")
+            # 截断过长的错误信息
+            if len(error_reason) > 40:
+                error_reason = error_reason[:37] + "..."
 
-    # 成功统计
-    if compliant_count > 0:
-        message_parts.append(f"\n[COMPLIANT] {compliant_count} 个文件符合规范")
+            message_parts.append(f"   {i:>3}. {error_filename}")
+            message_parts.append(f"        错误: {error_reason}")
 
-    # 添加正则表达式信息
-    message_parts.append(f"\n[REGEX] 使用规则: {regex_pattern}")
+        message_parts.append("   " + "-" * 76)
 
-    # 添加符合率统计
+    # ====== 建议和总结 ======
+    message_parts.append("\n[处理建议] 操作指南:")
+    if non_compliant_info:
+        message_parts.append("   +-- 根据正则表达式规则重命名不符合规范的文件")
+        message_parts.append("   +-- 建议优先处理使用频率较高的核心文件")
+    if error_info:
+        message_parts.append("   +-- 检查异常文件的访问权限和文件完整性")
+    if total_issues == 0:
+        message_parts.append("   +-- 文件命名规范良好，请继续保持")
+    else:
+        message_parts.append("   +-- 建议建立文件命名规范文档，避免类似问题")
+
+    # ====== 性能统计 ======
+    files_per_second = total_checked / total_time if total_time > 0 else 0
+    message_parts.append(f"\n[性能统计] 执行效率:")
+    message_parts.append(f"   +-- 处理速度: {files_per_second:.0f} 文件/秒")
+    message_parts.append(
+        f"   +-- 平均每文件: {(total_time / total_checked * 1000):.2f} 毫秒") if total_checked > 0 else message_parts.append(
+        "   +-- 平均每文件: 0 毫秒")
+
+    # ====== 结尾 ======
+    message_parts.append("\n" + "=" * 80)
+
+    # 使用换行符连接所有部分
+    return "\n".join(message_parts)
+
+
+# ==================== 输出优化函数 (中文ASCII版本) ====================
+def print_detailed_results_chinese_ascii(script, compliant_count, non_compliant_info, error_info, total_time,
+                                         regex_pattern):
+    """分段打印详细结果，使用中文和ASCII字符"""
+
+    total_checked = compliant_count + len(non_compliant_info) + len(error_info)
     compliance_rate = (compliant_count / total_checked * 100) if total_checked > 0 else 0
-    message_parts.append(f"[STATS] 符合率: {compliance_rate:.1f}% ({compliant_count}/{total_checked})")
 
-    return "".join(message_parts)
+    # 打印概览信息
+    script.info("=" * 80)
+    script.info("                         文件名规范检查结果报告")
+    script.info("=" * 80)
+
+    script.info("[检查概览] 统计信息:")
+    script.info(f"   +-- 总计检查文件: {total_checked} 个")
+    script.info(f"   +-- 符合规范文件: {compliant_count} 个")
+    script.info(f"   +-- 不符合规范文件: {len(non_compliant_info)} 个")
+    script.info(f"   +-- 检查异常文件: {len(error_info)} 个")
+    script.info(f"   +-- 符合率: {compliance_rate:.1f}%")
+    script.info(f"   +-- 执行耗时: {total_time:.2f} 秒")
+
+    script.info(f"\n[正则规则] 使用的表达式:")
+    script.info(f"   {regex_pattern}")
+
+    # 打印结果判定
+    total_issues = len(non_compliant_info) + len(error_info)
+    if total_issues == 0:
+        script.info("\n[检查结果] 状态: 通过")
+        script.info("   所有文件都符合命名规范!")
+    else:
+        script.info("\n[检查结果] 状态: 未通过")
+        script.info(f"   发现 {total_issues} 个问题文件需要处理")
+
+    # 分批打印不符合规范的文件
+    if non_compliant_info:
+        script.info(f"\n[不符合规范] 文件列表 (共 {len(non_compliant_info)} 个):")
+        script.info("   " + "-" * 76)
+
+        # 按文件名排序
+        sorted_non_compliant = sorted(non_compliant_info, key=lambda x: x['full_name'])
+
+        # 分批显示，每批20个
+        batch_size = 20
+        for batch_start in range(0, len(sorted_non_compliant), batch_size):
+            batch_end = min(batch_start + batch_size, len(sorted_non_compliant))
+            batch = sorted_non_compliant[batch_start:batch_end]
+
+            for i, info in enumerate(batch, batch_start + 1):
+                filename = info['full_name']
+                if len(filename) > 60:
+                    display_name = filename[:57] + "..."
+                else:
+                    display_name = filename
+
+                script.info(f"   {i:>3}. {display_name}")
+
+        script.info("   " + "-" * 76)
+
+    # 分批打印异常文件
+    if error_info:
+        script.info(f"\n[检查异常] 文件列表 (共 {len(error_info)} 个):")
+        script.info("   " + "-" * 76)
+
+        for i, info in enumerate(error_info, 1):
+            error_filename = "未知文件"
+            if 'path' in info:
+                try:
+                    if os.sep in info['path']:
+                        error_filename = info['path'].split(os.sep)[-1]
+                    else:
+                        error_filename = info['path']
+                except:
+                    error_filename = str(info['path'])[:50]
+
+            error_reason = info.get('error', '未知错误')
+            if len(error_reason) > 40:
+                error_reason = error_reason[:37] + "..."
+
+            script.info(f"   {i:>3}. {error_filename}")
+            script.info(f"        错误: {error_reason}")
+
+        script.info("   " + "-" * 76)
+
+    # 打印建议
+    script.info("\n[处理建议] 操作指南:")
+    if non_compliant_info:
+        script.info("   +-- 根据正则表达式规则重命名不符合规范的文件")
+        script.info("   +-- 建议优先处理使用频率较高的核心文件")
+    if error_info:
+        script.info("   +-- 检查异常文件的访问权限和文件完整性")
+    if total_issues == 0:
+        script.info("   +-- 文件命名规范良好，请继续保持")
+    else:
+        script.info("   +-- 建议建立文件命名规范文档，避免类似问题")
+
+    # 打印性能统计
+    files_per_second = total_checked / total_time if total_time > 0 else 0
+    avg_time_per_file = (total_time / total_checked * 1000) if total_checked > 0 else 0
+
+    script.info(f"\n[性能统计] 执行效率:")
+    script.info(f"   +-- 处理速度: {files_per_second:.0f} 文件/秒")
+    script.info(f"   +-- 平均每文件: {avg_time_per_file:.2f} 毫秒")
+
+    script.info("\n" + "=" * 80)
 
 
 # ==================== 高性能主逻辑 ====================
@@ -366,7 +522,7 @@ def main_logic(script: ScriptBase):
     total_start = time.time()
 
     try:
-        script.info("=== 高性能文件名检查开始 (完整展示版本) ===")
+        script.info("=== 高性能文件名检查开始 (中文ASCII版本) ===")
 
         # 快速参数获取
         root_path = script.get_parameter('root_path', 'D:\\fishdev')
@@ -375,7 +531,7 @@ def main_logic(script: ScriptBase):
         case_sensitive = script.get_parameter('case_sensitive', True)
         check_full_name = script.get_parameter('check_full_name', False)
 
-        script.info(f"参数: {root_path}, 正则: {regex_pattern}")
+        script.info(f"参数配置: {root_path}, 正则: {regex_pattern}")
 
         # 快速验证
         if not regex_pattern or not regex_pattern.strip():
@@ -406,15 +562,19 @@ def main_logic(script: ScriptBase):
             matched_files, regex_pattern, case_sensitive, check_full_name, script
         )
 
-        # 快速结果生成 - 完整展示版本
+        # 计算统计数据
         total_time = time.time() - total_start
         compliant_count = len(compliant_paths)
         total_checked = compliant_count + len(non_compliant_info) + len(error_info)
         compliance_rate = (compliant_count / total_checked * 100) if total_checked > 0 else 0
 
-        # 使用完整展示的消息生成函数
-        message = fast_generate_complete_message(compliant_count, non_compliant_info, error_info, total_time,
-                                                 regex_pattern)
+        # 使用中文ASCII版本的分段打印
+        print_detailed_results_chinese_ascii(script, compliant_count, non_compliant_info, error_info, total_time,
+                                             regex_pattern)
+
+        # 生成中文ASCII格式的消息（用于返回结果）
+        message = format_chinese_ascii_message(compliant_count, non_compliant_info, error_info, total_time,
+                                               regex_pattern)
 
         result_data = {
             'statistics': {
@@ -426,14 +586,11 @@ def main_logic(script: ScriptBase):
                 'execution_time': round(total_time, 3)
             },
             'regex_pattern': regex_pattern,
-            'non_compliant_files': non_compliant_info,  # 返回所有不符合规范的文件
-            'error_files': error_info  # 返回所有错误文件
+            'non_compliant_files': non_compliant_info,
+            'error_files': error_info
         }
 
         script.info(f"=== 高性能检查完成 ===")
-        script.info(f"符合率: {compliance_rate:.1f}%, 速度: {total_checked / total_time:.0f} 文件/秒")
-        script.info(f"不符合规范文件: {len(non_compliant_info)} 个")
-        script.info(f"错误文件: {len(error_info)} 个")
 
         return script.success_result(message, result_data)
 

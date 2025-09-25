@@ -1,14 +1,85 @@
 {
-  "check_Reward": {
-    "dialog_title": "检查奖励配置脚本",
+  "scanner_file": {
+    "dialog_title": "扫描文件脚本-参数配置",
     "parameters": [
       {
         "name": "directory",
         "type": "text",
         "label": "目录路径",
         "required": true,
-        "default": "F:\\\\fish_test",
-        "placeholder": "例如: C:/temp 或 /home/user/documents"
+        "default": "C:\\temp",
+        "placeholder": "例如: C:\\temp 或 /home/user/documents"
+      },
+      {
+        "name": "file_extensions",
+        "type": "checkbox",
+        "label": "文件后缀名",
+        "options": [
+          ".txt",
+          ".log",
+          ".json",
+          ".csv",
+          ".xml",
+          ".py",
+          ".js",
+          ".html",
+          ".css",
+          ".md"
+        ],
+        "required": false,
+        "multiple": true,
+        "default": [
+          ".txt",
+          ".log"
+        ]
+      },
+      {
+        "name": "recursive",
+        "type": "switch",
+        "label": "递归扫描",
+        "required": false,
+        "default": true
+      },
+      {
+        "name": "max_depth",
+        "type": "number",
+        "label": "最大深度",
+        "required": false,
+        "default": 3,
+        "min": 0,
+        "max": 10
+      },
+      {
+        "name": "include_hidden",
+        "type": "switch",
+        "label": "包含隐藏文件",
+        "required": false,
+        "default": false
+      },
+      {
+        "name": "output_format",
+        "type": "select",
+        "label": "输出格式",
+        "options": [
+          "list",
+          "detailed",
+          "tree"
+        ],
+        "required": false,
+        "default": "list"
+      }
+    ]
+  },
+  "check_Reward": {
+    "dialog_title": "检查奖励配置脚本-参数配置",
+    "parameters": [
+      {
+        "name": "directory",
+        "type": "text",
+        "label": "目录路径",
+        "required": true,
+        "default": "C:\\temp",
+        "placeholder": "例如: C:\\temp 或 /home/user/documents"
       },
       {
         "name": "file_name",
@@ -40,15 +111,15 @@
     ]
   },
   "check_ConfigTime": {
-    "dialog_title": "检查配置时间脚本--配置",
+    "dialog_title": "检查配置时间脚本-参数配置",
     "parameters": [
       {
         "name": "directory",
         "type": "text",
         "label": "目录路径",
         "required": true,
-        "default": "F:\\\\fish_test",
-        "placeholder": "例如: C:/temp 或 /home/user/documents"
+        "default": "C:\\temp",
+        "placeholder": "例如: C:\\temp 或 /home/user/documents"
       },
       {
         "name": "file_names",
@@ -57,7 +128,10 @@
         "required": false,
         "multiple": true,
         "default": [
-          "TIMER_MAIN.data.txt"
+          "TIMER_MAIN.data",
+          "TIMER_MAIN.data.txt",
+          "timer_main.data",
+          "timer_main.data.txt"
         ],
         "placeholder": "输入文件名，按回车添加"
       },
@@ -113,6 +187,48 @@
       }
     ]
   },
+
+  "checkConfigExist": {
+    "dialog_title": "检查配置路径的存在性",
+    "parameters": [
+      {
+        "name": "config_file",
+        "type": "text",
+        "label": "配置文件地址",
+        "required": true,
+        "default": "D:\\TimeConfig\\FISH.data11.txt",
+        "placeholder": "配置文件文件地址，例如D:\\TimeConfig\\FISH.data.txt"
+      },
+      {
+        "name": "project_root",
+        "type": "text",
+        "label": "工程文件目录",
+        "required": true,
+        "default": "D:\\fishdev\\client\\MainProject\\Assets\\InBundle\\Character",
+        "description": "输入工程文件的目录，支持输入精确or大致路径"
+      },
+      {
+        "name": "path_fields_param",
+        "type": "text",
+        "label": "配置参数名",
+        "required": true,
+        "default": "assetName",
+        "description": "输入想要查找的配置参数名"
+      },
+      {
+        "name": "custom_extensions_param",
+        "type": "checkbox",
+        "label": "文件后缀名",
+        "options": [
+          ".controller", ".meta", ".prefab", ".txt", ".unity"],
+        "required": false,
+        "multiple": true,
+        "default": [".txt"],
+        "description": "选择要检查的文件后缀类型，可多选。如果不选择任何项，将检查所有文件"
+      }
+    ]
+  },
+
   "checkFileName": {
     "dialog_title": "检查文件名脚本-文件名合法性",
     "parameters": [
@@ -150,6 +266,48 @@
         "multiple": true,
         "default": [".txt"],
         "description": "选择要检查的文件后缀类型，可多选。如果不选择任何项，将检查所有文件"
+      }
+    ]
+  },
+  "checkconfigempty": {
+    "dialog_title": "检查配置不为空",
+    "parameters": [
+      {
+        "name": "file_path",
+        "type": "text",
+        "label": "配置文件地址",
+        "required": true,
+        "default": "D:\\TimeConfig\\FISH.data.txt",
+        "placeholder": "配置文件文件地址，例如D:\\TimeConfig\\FISH.data.txt"
+      },
+      {
+        "name": "parameters_str",
+        "type": "text",
+        "label": "配置参数名",
+        "required": true,
+        "default": "id",
+        "description": "输入想要查找的配置参数名"
+      }
+    ]
+  },
+  "checkconfigunique": {
+    "dialog_title": "检查配置唯一性",
+    "parameters": [
+      {
+        "name": "file_path",
+        "type": "text",
+        "label": "配置文件地址",
+        "required": true,
+        "default": "D:\\TimeConfig\\FISH.data.txt",
+        "placeholder": "配置文件文件地址，例如D:\\TimeConfig\\FISH.data.txt"
+      },
+      {
+        "name": "parameters_str",
+        "type": "text",
+        "label": "配置参数名",
+        "required": true,
+        "default": "id",
+        "description": "输入想要查找的配置参数名"
       }
     ]
   }

@@ -182,23 +182,34 @@
           </el-select>
         </el-form-item>
 
-        <!-- 多选框组 -->
+        <!-- 多选下拉（带勾选） -->
         <el-form-item 
           v-else-if="param.type === 'checkbox'" 
           :label="param.label" 
           :prop="param.name"
           :required="param.required"
         >
-          <el-checkbox-group v-model="formData[param.name]">
-            <el-checkbox
-              v-for="option in param.options"
+          <el-select
+            v-model="formData[param.name]"
+            multiple
+            :collapse-tags="false"
+            clearable
+            filterable
+            style="width: 100%"
+            :placeholder="param.placeholder || `请选择${param.label}`"
+          >
+            <el-option
+              v-for="option in (param.options || [])"
               :key="option"
               :label="option"
               :value="option"
             >
-              {{ option }}
-            </el-checkbox>
-          </el-checkbox-group>
+              <div style="display:flex;align-items:center;gap:8px;">
+                <el-checkbox :model-value="(formData[param.name] || []).includes(option)" />
+                <span>{{ option }}</span>
+              </div>
+            </el-option>
+          </el-select>
         </el-form-item>
 
         <!-- 其他类型的默认处理 -->

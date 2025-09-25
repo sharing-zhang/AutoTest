@@ -54,6 +54,38 @@
             "size": "default"
         },
         "display_order": 1
+    },
+    {
+        "page_route": "/checkConfigExist",
+        "script_name": "checkConfigExist",
+        "button_text": "配置路径存在性检查（含参）",
+        "position": "top-right",
+        "button_style": {
+            "type": "primary",
+            "size": "default"
+        },
+        "display_order": 1
+    },
+    {
+        "page_route": "/checkConfigExist",
+        "script_name": "checkconfigempty",
+        "button_text": "配置不为空检查（含参）",
+        "position": "top-right",
+        "button_style": {
+            "type": "primary",
+            "size": "default"
+        },
+        "display_order": 2
+    },
+    {
+        "page_route": "/checkConfigExist",
+        "script_name": "checkconfigunique",
+        "button_text": "配置唯一性检查（含参）",
+        "position": "top-right",
+        "button_style": {
+            "type": "primary",
+            "size": "default"
+        },
+        "display_order": 3
     }
-
 ]
