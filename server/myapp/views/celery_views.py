@@ -903,6 +903,27 @@ def execute_dynamic_script_task(self, task_execution_id, script_name, script_pat
         task_execution.completed_at = timezone.now()
         task_execution.save()
         
+        # 直接保存脚本执行结果到 ScanDevUpdate_scanResult，确保前端能看到记录
+        try:
+            script_display_name = script_name
+            script_description = f"动态脚本: {script_name}"
+            ScanDevUpdate_scanResult.objects.create(
+                scandevresult_filename=f"{script_display_name}_执行结果_{self.request.id[:8]}.json",
+                scandevresult_time=timezone.now(),
+                director="系统自动",
+                remark=f"脚本执行结果 - {script_description}",
+                scandevresult_content=json.dumps(result, ensure_ascii=False, indent=2),
+                status='0',
+                result_type='script',
+                script_name=script_display_name,
+                task_id=self.request.id,
+                execution_time=execution_time,
+                script_output=(result.get('message', '') if isinstance(result, dict) else ''),
+                error_message=None
+            )
+        except Exception as save_err:
+            logger.error(f"保存动态脚本结果失败: {save_err}")
+
         logger.info(f"动态脚本执行成功: 耗时 {execution_time:.2f}s")
         
         return {
@@ -924,6 +945,30 @@ def execute_dynamic_script_task(self, task_execution_id, script_name, script_pat
             task_execution.error_message = f"{error_message}\n\n{error_traceback}"
             task_execution.completed_at = timezone.now()
             task_execution.save()
+
+        # 失败时也保存记录，便于前端查看历史
+        try:
+            ScanDevUpdate_scanResult.objects.create(
+                scandevresult_filename=f"{script_name}_执行失败_{self.request.id[:8]}.json",
+                scandevresult_time=timezone.now(),
+                director="系统自动",
+                remark=f"脚本执行失败 - {script_name}",
+                scandevresult_content=json.dumps({
+                    'status': 'error',
+                    'error': error_message,
+                    'traceback': error_traceback,
+                    'script_name': script_name
+                }, ensure_ascii=False, indent=2),
+                status='0',
+                result_type='script',
+                script_name=script_name,
+                task_id=self.request.id,
+                execution_time=None,
+                script_output='',
+                error_message=error_message
+            )
+        except Exception as save_err:
+            logger.error(f"保存失败结果记录失败: {save_err}")
         
         # 重试机制
         if self.request.retries < 3:
