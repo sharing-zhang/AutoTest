@@ -227,4 +227,33 @@
       }
     ]
   }
+  ,
+  "check_TextQuality": {
+    "dialog_title": "文本质量检查-参数配置",
+    "parameters": [
+      {
+        "name": "directory",
+        "type": "text",
+        "label": "目录路径",
+        "required": true,
+        "default": "D:\\",
+        "placeholder": "例如: C:\\temp 或 /home/user/docs"
+      },
+      {
+        "name": "file_name",
+        "type": "text",
+        "label": "文件名",
+        "required": true,
+        "default": "readme.txt",
+        "placeholder": "需要检查的单个文件名"
+      },
+      {
+        "name": "field",
+        "type": "text",
+        "label": "字段名(可选)",
+        "required": false,
+        "placeholder": "如从 key=\"value\"; 中抽取某字段值，例如 desc"
+      }
+    ]
+  }
 }

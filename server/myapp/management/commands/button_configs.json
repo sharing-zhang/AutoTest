@@ -46,7 +46,17 @@
         },
         "display_order": 1
     },
-
+     {
+        "page_route": "/CheckText",
+        "script_name": "check_TextQuality",
+        "button_text": "扫描文本质量（含参）",
+        "position": "top-right",
+        "button_style": {
+            "type": "primary",
+            "size": "default"
+        },
+        "display_order": 1
+    },
     {
         "page_route": "/scanDevUpdate",
         "script_name": "checkFileName",

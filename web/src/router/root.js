@@ -29,6 +29,7 @@ const constantRouterMap = [
       { path: 'errorLog', name: 'errorLog', component: () => import('/@/views/error-log.vue') },
       { path: 'sysInfo', name: 'sysInfo', component: () => import('/@/views/sys-info.vue') },
       { path: 'CheckConfigTime', name: 'CheckConfigTime', component: () => import('/@/views/CheckConfigTime.vue') },
+      { path: 'CheckText', name: 'CheckText', component: () => import('/@/views/CheckText.vue') },
     ]
   },
 ];
