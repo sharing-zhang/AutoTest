@@ -5,48 +5,50 @@
     <template v-for="script in availableScripts" :key="script.id">
       
       <!-- 多任务脚本 - 使用下拉菜单显示所有任务选项 -->
-      <el-dropdown v-if="script.tasks && script.tasks.length > 1" :class="buttonWrapperClass">
-        <!-- 主按钮 - 带有下拉箭头 -->
+      <div v-if="script.tasks && script.tasks.length > 1" :class="buttonWrapperClass" class="script-button-group">
+        <el-dropdown>
+          <!-- 主按钮 - 带有下拉箭头 -->
+          <el-button 
+            :type="script.button_style?.type || 'primary'" 
+            :size="script.button_style?.size || 'default'"
+            :loading="script.loading"
+            :style="getButtonStyle(script)"
+          >
+            <!-- 根据加载状态显示不同文本 -->
+            {{ script.loading ? '执行中...' : script.button_text }}
+            <!-- 下拉箭头图标 -->
+            <el-icon><ArrowDown /></el-icon>
+          </el-button>
+          
+          <!-- 下拉菜单内容 -->
+          <template #dropdown>
+            <el-dropdown-menu>
+              <!-- 遍历脚本的所有任务，为每个任务创建一个菜单项 -->
+              <el-dropdown-item 
+                v-for="task in script.tasks" 
+                :key="task.name"
+                @click="$emit('execute-script', script, task)"
+              >
+                {{ task.name }}
+              </el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
+        </el-dropdown>
+      </div>
+      
+      <!-- 单任务脚本 - 直接显示为普通按钮 -->
+      <div v-else-if="script.tasks && script.tasks.length > 0" :class="buttonWrapperClass" class="script-button-group">
         <el-button 
-          :type="script.button_style?.type || 'primary'" 
+          :type="script.button_style?.type || 'primary'"
           :size="script.button_style?.size || 'default'"
-          :loading="script.loading"
           :style="getButtonStyle(script)"
+          @click="$emit('execute-script', script, script.tasks[0])" 
+          :loading="script.loading"
         >
           <!-- 根据加载状态显示不同文本 -->
           {{ script.loading ? '执行中...' : script.button_text }}
-          <!-- 下拉箭头图标 -->
-          <el-icon><ArrowDown /></el-icon>
         </el-button>
-        
-        <!-- 下拉菜单内容 -->
-        <template #dropdown>
-          <el-dropdown-menu>
-            <!-- 遍历脚本的所有任务，为每个任务创建一个菜单项 -->
-            <el-dropdown-item 
-              v-for="task in script.tasks" 
-              :key="task.name"
-              @click="$emit('execute-script', script, task)"
-            >
-              {{ task.name }}
-            </el-dropdown-item>
-          </el-dropdown-menu>
-        </template>
-      </el-dropdown>
-      
-      <!-- 单任务脚本 - 直接显示为普通按钮 -->
-      <el-button 
-        v-else-if="script.tasks && script.tasks.length > 0"
-        :type="script.button_style?.type || 'primary'"
-        :size="script.button_style?.size || 'default'"
-        :class="buttonWrapperClass"
-        :style="getButtonStyle(script)"
-        @click="$emit('execute-script', script, script.tasks[0])" 
-        :loading="script.loading"
-      >
-        <!-- 根据加载状态显示不同文本 -->
-        {{ script.loading ? '执行中...' : script.button_text }}
-      </el-button>
+      </div>
       
       <!-- 无任务脚本 - 显示为禁用状态的按钮 -->
       <el-button 
@@ -326,6 +328,7 @@ const getButtonStyle = (script: Script) => {
     }
   }
 }
+
 
 /* 响应式设计 - 移动端适配 */
 @media (max-width: 768px) {

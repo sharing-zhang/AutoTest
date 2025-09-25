@@ -233,6 +233,22 @@
           <el-icon><VideoPlay /></el-icon>
           {{ executing ? '执行中...' : '执行脚本' }}
         </el-button>
+        
+        <!-- 取消按钮 - 只在任务执行中时显示 -->
+        <el-button 
+          v-if="executing && executionId" 
+          type="danger" 
+          @click="cancelExecution"
+        >
+          取消执行
+        </el-button>
+        
+        <!-- 调试信息 - 临时显示执行状态 -->
+        <!--
+        <div v-if="executing" style="font-size: 10px; color: #999; margin-top: 2px;">
+          调试: executing={{ executing }}, executionId={{ executionId }}
+        </div>
+        -->
         <el-button @click="handleReset">
           <el-icon><Refresh /></el-icon>
           重置
@@ -282,7 +298,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { VideoPlay, Refresh, Setting } from '@element-plus/icons-vue'
 import type { FormInstance, FormRules } from 'element-plus'
 import { BASE_URL } from '/@/store/constants'
-import { executeScriptApi, getScriptTaskResultApi } from '/@/api/scanDevUpdate'
+import { executeScriptApi, getScriptTaskResultApi, cancelTaskApi } from '/@/api/scanDevUpdate'
 
 interface ScriptParameter {
   name: string
@@ -342,6 +358,8 @@ const formConfig = ref<ScriptConfig | null>(null)
 const formData = reactive<Record<string, any>>({})
 const executing = ref(false)
 const executionResult = ref<any>(null)
+const executionId = ref<number | null>(null)
+const taskId = ref<string | null>(null)
 const showAdvancedOptions = ref(false)
 
 // 计算属性
@@ -549,6 +567,12 @@ const handleSubmit = async () => {
     if (data.success) {
       ElMessage.success('脚本启动成功，正在执行...')
       
+      // 保存执行信息
+      executionId.value = data.execution_id
+      taskId.value = data.task_id
+      
+      console.log('DynamicScriptForm 执行信息:', { executionId: executionId.value, taskId: taskId.value })
+      
       // 监控执行状态
       await monitorExecution(data.task_id, data.execution_id)
     } else {
@@ -565,24 +589,28 @@ const handleSubmit = async () => {
       error: '网络请求失败'
     }
     ElMessage.error('网络请求失败')
-  } finally {
     executing.value = false
   }
 }
 
-const monitorExecution = async (taskId: string, executionId: string) => {
+const monitorExecution = async (taskIdParam: string, executionIdParam: string) => {
   const maxAttempts = 30
   let attempts = 0
   
   const poll = async () => {
     try {
       attempts++
-      const response = await getScriptTaskResultApi(taskId, executionId)
+      const response = await getScriptTaskResultApi(taskIdParam, executionIdParam)
       const data = response.data || response
       
       if (data.ready) {
         executionResult.value = data
         emit('script-executed', data)
+        
+        // 清理执行信息（使用外部作用域的ref对象）
+        executionId.value = null
+        taskId.value = null
+        executing.value = false
         
         if (data.success) {
           ElMessage.success('脚本执行成功！')
@@ -591,20 +619,68 @@ const monitorExecution = async (taskId: string, executionId: string) => {
         }
       } else if (attempts >= maxAttempts) {
         ElMessage.warning('脚本执行超时')
+        executing.value = false
       } else {
-        setTimeout(poll, 2000)
+        // 使用更短的轮询间隔，提高响应速度
+        setTimeout(poll, 1000)
       }
     } catch (error) {
       console.error('查询执行状态失败:', error)
       if (attempts >= maxAttempts) {
         ElMessage.error('查询执行状态失败')
+        executing.value = false
       } else {
-        setTimeout(poll, 2000)
+        // 错误时也使用较短的间隔重试
+        setTimeout(poll, 1000)
       }
     }
   }
   
-  setTimeout(poll, 1000)
+  // 立即开始第一次轮询
+  setTimeout(poll, 500)
+}
+
+const cancelExecution = async () => {
+  if (!executionId.value) {
+    ElMessage.warning('没有正在执行的任务')
+    return
+  }
+
+  try {
+    await ElMessageBox.confirm(
+      '确定要取消当前正在执行的脚本吗？',
+      '确认取消',
+      {
+        confirmButtonText: '确定取消',
+        cancelButtonText: '继续执行',
+        type: 'warning'
+      }
+    )
+    
+    console.log('取消任务，执行ID:', executionId.value)
+    
+    const response = await cancelTaskApi(executionId.value)
+    const data = response.data || response
+    
+    if (data && data.message) {
+      ElMessage.success(data.message)
+      
+      // 清理执行信息
+      executionId.value = null
+      taskId.value = null
+      executing.value = false
+    } else {
+      ElMessage.error(data?.error || '取消失败')
+    }
+  } catch (error) {
+    if (error === 'cancel') {
+      // 用户取消操作
+      console.log('用户取消取消操作')
+    } else {
+      console.error('取消任务失败:', error)
+      ElMessage.error('取消任务失败，请检查网络连接')
+    }
+  }
 }
 
 const handleReset = () => {

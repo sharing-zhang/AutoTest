@@ -22,6 +22,14 @@ class Command(BaseCommand):
             default=4,
             help='并发进程数 (default: 4)'
         )
+        parser.add_argument(
+            '--pool',
+            type=str,
+            default='threads',
+            help='Worker池类型 (default: threads)'
+            # default='prefork',
+            # help='Worker池类型 (default: prefork)'
+        )
 
     def handle(self, *args, **options):
         self.stdout.write(
@@ -34,12 +42,9 @@ class Command(BaseCommand):
             '-A', 'celery_app',
             'worker',
             '--loglevel', options['loglevel'],
-            '--concurrency', str(options['concurrency'])
+            '--concurrency', str(options['concurrency']),
+            '--pool', options['pool']
         ]
-        
-        # 在Windows上添加gevent池
-        if os.name == 'nt':
-            cmd.extend(['--pool', 'solo'])
         
         try:
             subprocess.run(cmd, check=True)

@@ -55,10 +55,9 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated  # 认证权限
 
 # Celery异步任务框架 - 分布式任务队列
-from celery import shared_task                          
+from celery import shared_task
 from celery.utils.log import get_task_logger         
-from celery.result import AsyncResult                   
-from celery_app.celery import app as celery_app         
+from celery.result import AsyncResult
 
 # Python标准库 - 系统级功能
 import logging                                     
@@ -96,7 +95,9 @@ logger = get_task_logger(__name__)
 # - 与Django ORM深度集成
 # ============================================================================
 
-@shared_task(bind=True)
+from celery_app.celery import app as celery_app
+
+@celery_app.task(bind=True)
 def execute_script_task(self, task_execution_id, script_info, parameters, user_id, page_context):
     """
     统一脚本执行器 - Celery异步任务的核心执行函数
@@ -478,8 +479,9 @@ def task_status(self, request):
     else:
         return Response({'error': '缺少task_id或execution_id参数'}, status=400)
     
-@action(detail=True, methods=['post'])
-def cancel_task(self, request, pk=None):
+@api_view(['POST'])
+@authentication_classes([AdminTokenAuthtication])
+def cancel_task(request, execution_id):
     """
     取消任务 - 安全的任务终止机制
     
@@ -502,7 +504,7 @@ def cancel_task(self, request, pk=None):
     
     参数:
     -----
-    pk : int
+    execution_id : int
         任务执行记录的主键ID
         
     返回:
@@ -511,20 +513,41 @@ def cancel_task(self, request, pk=None):
         - message: 取消成功消息
         - error: 取消失败原因（如果适用）
     """
-    task_execution = self.get_object()
-    
-    if task_execution.status in ['PENDING', 'STARTED']:
-        # 取消Celery任务
-        celery_task = AsyncResult(task_execution.task_id)
-        celery_task.revoke(terminate=True)
+    try:
+        # 获取任务执行记录
+        task_execution = TaskExecution.objects.get(id=execution_id, user=request.user)
         
-        # 更新状态
-        task_execution.status = 'REVOKED'
-        task_execution.save()
-        
-        return Response({'message': '任务已取消'})
-    else:
-        return Response({'error': '任务无法取消'}, status=400)
+        if task_execution.status in ['PENDING', 'STARTED']:
+            # 取消Celery任务
+            celery_task = AsyncResult(task_execution.task_id)
+            
+            # 检查任务状态
+            if celery_task.state in ['PENDING', 'STARTED']:
+                # 尝试终止任务
+                try:
+                    celery_task.revoke(terminate=True)
+                    logger.info(f'任务 {task_execution.task_id} 已发送终止信号')
+                except Exception as revoke_error:
+                    logger.warning(f'发送终止信号失败: {str(revoke_error)}')
+                    # 即使终止失败，也标记为已取消
+                
+                # 更新状态
+                task_execution.status = 'REVOKED'
+                task_execution.save()
+                
+                return Response({'message': '任务已取消'})
+            else:
+                # 任务已经完成，更新状态
+                task_execution.status = 'REVOKED'
+                task_execution.save()
+                return Response({'message': '任务已标记为取消'})
+        else:
+            return Response({'error': '任务无法取消'}, status=400)
+    except TaskExecution.DoesNotExist:
+        return Response({'error': '任务不存在'}, status=404)
+    except Exception as e:
+        logger.error(f'取消任务失败: {str(e)}')
+        return Response({'error': '取消任务失败'}, status=500)
 
 # execute_script 方法已移至 ScriptExecutionViewSet
 
@@ -581,13 +604,20 @@ class ScriptExecutionViewSet(viewsets.ViewSet):
             - message: str - 执行消息
             - error: str - 错误信息（失败时）
         """
+        print("=== ScriptExecutionViewSet.execute 方法被调用 ===")
         try:
+            logger.info(f"ScriptExecutionViewSet.execute 开始处理请求")
+            print("=== 开始处理请求 ===")
             data = request.data
+            logger.info(f"请求数据: {data}")
+            
             script_id = data.get('script_id')
             script_name = data.get('script_name')
             script_path = data.get('script_path')
             parameters = data.get('parameters', {})
             page_context = data.get('page_context', 'api')
+            
+            logger.info(f"解析参数: script_name={script_name}, script_path={script_path}, page_context={page_context}")
             
             # 确定脚本信息
             script_info = None
@@ -646,26 +676,49 @@ class ScriptExecutionViewSet(viewsets.ViewSet):
             )
             
             # 创建TaskExecution记录
+            logger.info(f"创建TaskExecution记录")
+            import uuid
+            temp_task_id = f"temp_{uuid.uuid4().hex[:8]}"  # 生成临时唯一ID
             task_execution = TaskExecution.objects.create(
                 script=script_obj,
                 user=request.user,
                 parameters=parameters,
                 page_context=page_context,
-                status='PENDING'
+                status='PENDING',
+                task_id=temp_task_id  # 使用临时ID
             )
+            logger.info(f"TaskExecution创建成功: ID={task_execution.id}, temp_task_id={temp_task_id}")
             
             # 启动Celery任务
-            task = execute_script_task.delay(
-                task_execution.id,
-                script_info,
-                parameters,
-                request.user.id,
-                page_context
-            )
+            logger.info(f"准备启动Celery任务")
+            logger.info(f"任务参数: task_execution_id={task_execution.id}, script_info={script_info}")
+            
+            # 检查任务函数是否可用
+            logger.info(f"execute_script_task函数: {execute_script_task}")
+            logger.info(f"execute_script_task类型: {type(execute_script_task)}")
+            
+            try:
+                # 使用Celery异步执行
+                logger.info("启动Celery异步任务...")
+                task = execute_script_task.delay(
+                    task_execution.id,
+                    script_info,
+                    parameters,
+                    request.user.id,
+                    page_context
+                )
+                logger.info(f"Celery任务启动成功: task_id={task.id}")
+                
+            except Exception as task_error:
+                logger.error(f"Celery任务启动失败: {str(task_error)}")
+                import traceback
+                logger.error(f"任务启动错误堆栈: {traceback.format_exc()}")
+                raise task_error
             
             # 更新任务ID
             task_execution.task_id = task.id
             task_execution.save()
+            logger.info(f"TaskExecution更新完成")
             
             return Response({
                 'success': True,
@@ -676,10 +729,20 @@ class ScriptExecutionViewSet(viewsets.ViewSet):
             })
             
         except Exception as e:
+            import traceback
+            error_traceback = traceback.format_exc()
+            print(f"=== 异常发生 ===")
+            print(f"错误: {str(e)}")
+            print(f"类型: {type(e).__name__}")
+            print(f"堆栈: {error_traceback}")
+            print(f"===============")
+            
             logger.error(f'脚本执行失败: {str(e)}')
+            logger.error(f'错误堆栈: {error_traceback}')
             return Response({
                 'success': False,
-                'error': f'脚本执行失败: {str(e)}'
+                'error': f'脚本执行失败: {str(e)}',
+                'traceback': error_traceback
             }, status=500)
     
     @action(detail=False, methods=['get'])

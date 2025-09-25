@@ -7,8 +7,8 @@
         "button_text": "扫描奖励（不含参）",
         "position": "custom",
         "custom_position": {
-            "top": "200px",
-            "right": "200px",
+            "top": "20px",
+            "right": "50px",
             "position": "absolute"
         },
         "button_style": {
@@ -18,13 +18,13 @@
         "display_order": 1
     },
      {
-        "page_route": "/scanDevUpdate",
+        "page_route": "/CheckConfigTime",
         "script_name": "check_ConfigTime",
         "button_text": "扫描活动时间（含参）",
         "position": "custom",
         "custom_position": {
-            "top": "50px",
-            "right": "100px",
+            "top": "20px",
+            "right": "50px",
             "position": "absolute"
         },
         "button_style": {

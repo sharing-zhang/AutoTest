@@ -146,14 +146,14 @@ export function useScriptManager(pageRoute: string) {
       // 兼容 data 嵌套与直出
       const responseDataFinal = responseData.data || responseData
       
+      console.log('脚本执行响应数据:', responseDataFinal)
+      
       if (responseDataFinal && responseDataFinal.success) {
         // 成功启动：提取任务标识
         const taskId = responseDataFinal.task_id
         const executionId = responseDataFinal.execution_id
         const scriptName = responseDataFinal.script_name || script.name
 
-        // 友好提示：打印简短 taskId
-        // message.success(`${scriptName} 已启动，任务ID: ${taskId.substring(0, 8)}...`)
         message.success(`${scriptName} 已启动`)
         
         // 启动轮询监控
@@ -472,6 +472,7 @@ export function useScriptManager(pageRoute: string) {
       }
     })
   }
+
 
   // 暴露给外部使用的状态与方法
   return {

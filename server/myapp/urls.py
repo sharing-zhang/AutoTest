@@ -72,5 +72,7 @@ urlpatterns = [
     path('api/script-configs/', views.celery_views.get_script_configs),
     path('api/reload-script-configs/', views.celery_views.reload_script_configs),
     
+    # 取消任务独立接口
+    path('api/cancel-task/<int:execution_id>/', views.celery_views.cancel_task, name='cancel-task'),
 
 ]

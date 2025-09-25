@@ -19,8 +19,8 @@ enum URL {
     // ScriptExecutionViewSet - 独立的脚本执行ViewSet
     executeScript = '/myapp/api/script-executions/execute/',
     scriptStatus = '/myapp/api/script-executions/status/',
-    // TaskExecutionViewSet - 任务记录管理
-    cancelTask = '/myapp/api/task-executions/',
+    // 取消任务独立接口
+    cancelTask = '/myapp/api/cancel-task/',
 }
 
 const listApi = async (params: any) => get<any>({ url: URL.list, params: params, data: {}, headers: {'Content-Type': 'application/x-www-form-urlencoded'} });
@@ -54,8 +54,8 @@ const getScriptTaskResultApi = async (taskId?: string, executionId?: string) => 
   return get<any>({ url: URL.scriptStatus, params: params, headers: {} });
 };
 
-// TaskExecutionViewSet API - 任务记录管理
-const cancelTaskApi = async (executionId: number) => post<any>({ url: `${URL.cancelTask}${executionId}/cancel_task/`, params: {}, data: {}, headers: {} });
+// 取消任务独立API
+const cancelTaskApi = async (executionId: number) => post<any>({ url: `${URL.cancelTask}${executionId}/`, params: {}, data: {}, headers: { 'Content-Type': 'application/json' } });
 
 export { 
     listApi, createApi, updateApi, deleteApi, detailApi, sendmessageApi,

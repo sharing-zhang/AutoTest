@@ -50,10 +50,11 @@ app.conf.update(
     task_max_retries=3,              # 最大重试次数
     
     # Worker配置
-    worker_prefetch_multiplier=1,     # 预取任务数量
+    worker_prefetch_multiplier=4,     # 预取任务数量（支持并发）
     worker_max_tasks_per_child=50,    # 防止内存泄漏
     worker_disable_rate_limits=False, # 启用速率限制
     worker_hijack_root_logger=False,  # 不劫持根日志器
+    worker_concurrency=4,             # Worker并发数（支持4个并发任务）
     
     # 结果配置
     result_expires=3600,             # 结果过期时间(1小时)
@@ -90,6 +91,9 @@ app.conf.update(
 app.autodiscover_tasks([
     'myapp.views.celery_views',      # 方案1统一任务执行器
 ])
+
+# 注意：不在这里明确导入任务，避免循环导入问题
+# 任务会通过autodiscover_tasks自动发现和注册
 
 # Worker信号处理
 @worker_ready.connect

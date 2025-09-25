@@ -486,7 +486,7 @@ import {{ createApi, listApi, updateApi, deleteApi }} from '/@/api/scanDevUpdate
 import ScriptManagerLayout from '/@/components/ScriptManagerLayout.vue';
 import {{ SuccessFilled, CircleCloseFilled }} from '@element-plus/icons-vue';
 import dayjs from 'dayjs';
-import {{ ref, reactive, onMounted }} from 'vue'
+import {{ ref, reactive, onMounted, h}} from 'vue'
 
 // 进来页面后默认定位到扫描结果页面
 const activeName = ref('scanResult')
@@ -507,7 +507,7 @@ const scanResultcolumns = reactive([
     dataIndex: 'scandevresult_filename',
     align: "center",
     key: 'scandevresult_filename',
-    width: 600
+    width: 300
   }},
   {{
     title: '执行时间',
@@ -522,6 +522,28 @@ const scanResultcolumns = reactive([
     align: "center",
     key: 'director',
     width: 110
+  }},
+  {{
+    title: '执行状态',
+    dataIndex: 'execution_status',
+    align: "center",
+    key: 'execution_status',
+    width: 120,
+  }},
+  {{
+    title: '结果摘要',
+    dataIndex: 'result_summary',
+    align: "center",
+    key: 'result_summary',
+    width: 120,
+    ellipsis: true,
+    customRender: ({{ record }}) => {{
+      const summary = record.result_summary || '-';
+      if (summary.length > 20) {{
+        return summary.substring(0, 20) + '...';
+      }}
+      return summary;
+    }}
   }},
   {{
     title: '操作',

@@ -313,25 +313,49 @@ class TaskExecutionManager:
         logger.info(f"TaskExecution {self.task_execution_id} marked as success")
         
         # 保存到扫描结果表
-        self._save_to_scan_result(result, execution_time, memory_usage)
+        logger.info(f"TaskExecution {self.task_execution_id} 开始保存到扫描结果表")
+        try:
+            self._save_to_scan_result(result, execution_time, memory_usage)
+            logger.info(f"TaskExecution {self.task_execution_id} 扫描结果保存完成")
+        except Exception as e:
+            logger.error(f"TaskExecution {self.task_execution_id} 保存扫描结果时出错: {e}")
+            import traceback
+            logger.error(f"保存扫描结果异常堆栈: {traceback.format_exc()}")
     
-    def mark_failure(self, error_message: str):
+    def mark_failure(self, error_message: str, execution_time: float = 0, memory_usage: float = 0):
         """
         标记任务执行失败
         
         将任务状态更新为'FAILURE'，并记录错误信息和完成时间。
+        同时保存失败结果到扫描结果表。
         
         参数：
         -----
         error_message : str
             错误信息描述
+        execution_time : float
+            执行时间（秒），默认为0
+        memory_usage : float
+            内存使用量（MB），默认为0
         """
         self.update_status(
             'FAILURE',
             error_message=error_message,
+            execution_time=execution_time,
+            memory_usage=memory_usage,
             completed_at=timezone.now()
         )
         logger.error(f"TaskExecution {self.task_execution_id} marked as failure: {error_message}")
+        
+        # 保存失败结果到扫描结果表
+        logger.info(f"TaskExecution {self.task_execution_id} 开始保存失败结果到扫描结果表")
+        try:
+            self._save_failure_to_scan_result(error_message, execution_time, memory_usage)
+            logger.info(f"TaskExecution {self.task_execution_id} 失败结果保存完成")
+        except Exception as e:
+            logger.error(f"TaskExecution {self.task_execution_id} 保存失败结果时出错: {e}")
+            import traceback
+            logger.error(f"保存失败结果异常堆栈: {traceback.format_exc()}")
     
     def update_task_id(self, task_id: str):
         """
@@ -365,6 +389,11 @@ class TaskExecutionManager:
             内存使用量（MB）
         """
         try:
+            logger.info(f"[_save_to_scan_result] 开始保存扫描结果")
+            logger.info(f"[_save_to_scan_result] result: {result}")
+            logger.info(f"[_save_to_scan_result] execution_time: {execution_time}")
+            logger.info(f"[_save_to_scan_result] memory_usage: {memory_usage}")
+            
             from myapp.models import ScanDevUpdate_scanResult
             from django.utils import timezone
             from myapp.management.commands.script_config_manager import ScriptConfigManager
@@ -401,12 +430,33 @@ class TaskExecutionManager:
                     display_content = str(result['content'])
                 else:
                     # 如果没有message字段，显示简化的结果信息
-                    display_content = f"脚本执行完成"
+                    display_content = "脚本执行完成"
             else:
                 display_content = str(result)
             
+            # 确定执行状态
+            execution_status = 'SUCCESS'
+            result_summary = ''
+            
+            if isinstance(result, dict):
+                if result.get('success', True):  # 默认成功
+                    execution_status = 'SUCCESS'
+                    result_summary = result.get('message', '执行成功')
+                else:
+                    execution_status = 'FAILURE'
+                    result_summary = result.get('message', '执行失败')
+            else:
+                result_summary = str(result)[:200]  # 限制长度
+            
             # 创建扫描结果记录
-            scan_result = ScanDevUpdate_scanResult.objects.create(
+            logger.info(f"[_save_to_scan_result] 准备创建扫描结果记录")
+            logger.info(f"[_save_to_scan_result] filename: {filename}")
+            logger.info(f"[_save_to_scan_result] script_name: {script_name}")
+            logger.info(f"[_save_to_scan_result] execution_status: {execution_status}")
+            logger.info(f"[_save_to_scan_result] result_summary: {result_summary}")
+            
+            # 创建扫描结果记录，明确提供所有字段的值
+            scan_result = ScanDevUpdate_scanResult(
                 scandevresult_filename=filename,
                 scandevresult_time=timezone.now(),
                 director=self.task_execution.user.username if self.task_execution.user else 'system',
@@ -418,13 +468,123 @@ class TaskExecutionManager:
                 task_id=self.task_execution.task_id,
                 execution_time=execution_time,
                 script_output=display_content,  # 只显示message字段
-                error_message=None
+                error_message=None,
+                execution_status=execution_status,
+                result_summary=result_summary
             )
+            scan_result.save()
             
             logger.info(f"扫描结果已保存到数据库: {scan_result.id}")
             
         except Exception as e:
             logger.error(f"保存扫描结果失败: {str(e)}")
+            import traceback
+            logger.error(f"保存扫描结果失败堆栈: {traceback.format_exc()}")
+            # 不抛出异常，避免影响主流程
+
+    def _save_failure_to_scan_result(self, error_message: str, execution_time: float, memory_usage: float):
+        """
+        保存失败结果到扫描结果表
+        
+        将脚本执行失败的结果保存到ScanDevUpdate_scanResult表中，用于历史记录和数据分析。
+        支持超时和普通失败两种情况的记录。
+        
+        参数：
+        -----
+        error_message : str
+            错误信息描述
+        execution_time : float
+            执行时间（秒）
+        memory_usage : float
+            内存使用量（MB）
+        """
+        try:
+            logger.info(f"[_save_failure_to_scan_result] 开始保存失败结果")
+            logger.info(f"[_save_failure_to_scan_result] error_message: {error_message}")
+            logger.info(f"[_save_failure_to_scan_result] execution_time: {execution_time}")
+            logger.info(f"[_save_failure_to_scan_result] memory_usage: {memory_usage}")
+            
+            from myapp.models import ScanDevUpdate_scanResult
+            from django.utils import timezone
+            from myapp.management.commands.script_config_manager import ScriptConfigManager
+            import json
+            
+            # 生成文件名 - 使用 dialog_title 
+            script_name = self.task_execution.script.name if self.task_execution.script else 'unknown'
+            
+            # 获取脚本的 dialog_title
+            config_manager = ScriptConfigManager()
+            display_info = config_manager.get_script_display_info(script_name)
+            dialog_title = display_info.get('dialog_title', script_name)
+            
+            timestamp = timezone.now().strftime('%Y%m%d_%H%M%S')
+            filename = f"{dialog_title}"
+            
+            # 判断是否为超时异常
+            is_timeout = 'timeout' in error_message.lower() or 'timeoutexpired' in error_message.lower()
+            
+            # 准备失败结果内容
+            failure_result = {
+                'status': 'timeout' if is_timeout else 'error',
+                'error': error_message,
+                'execution_time': execution_time,
+                'memory_usage': memory_usage,
+                'script_name': script_name,
+                'timestamp': timezone.now().isoformat(),
+                'is_timeout': is_timeout
+            }
+            
+            # 准备完整结果内容（用于scandevresult_content）
+            full_result_content = json.dumps(failure_result, ensure_ascii=False, indent=2)
+            
+            # 准备显示内容（用于script_output）- 显示错误信息
+            if is_timeout:
+                display_content = f"脚本执行超时: {error_message}"
+                remark_prefix = "脚本执行超时"
+                result_summary_prefix = "脚本执行超时"
+                execution_status = 'TIMEOUT'
+            else:
+                display_content = f"脚本执行失败: {error_message}"
+                remark_prefix = "脚本执行失败"
+                result_summary_prefix = "脚本执行失败"
+                execution_status = 'FAILURE'
+            
+            # 确定结果摘要
+            result_summary = f"{result_summary_prefix}: {error_message[:200]}"  # 限制长度
+            
+            # 创建扫描结果记录
+            logger.info(f"[_save_failure_to_scan_result] 准备创建失败扫描结果记录")
+            logger.info(f"[_save_failure_to_scan_result] filename: {filename}")
+            logger.info(f"[_save_failure_to_scan_result] script_name: {script_name}")
+            logger.info(f"[_save_failure_to_scan_result] execution_status: {execution_status}")
+            logger.info(f"[_save_failure_to_scan_result] result_summary: {result_summary}")
+            logger.info(f"[_save_failure_to_scan_result] is_timeout: {is_timeout}")
+            
+            # 创建扫描结果记录，明确提供所有字段的值
+            scan_result = ScanDevUpdate_scanResult(
+                scandevresult_filename=filename,
+                scandevresult_time=timezone.now(),
+                director=self.task_execution.user.username if self.task_execution.user else 'system',
+                remark=f'{remark_prefix} - {dialog_title}',
+                status='0',  # 可用
+                scandevresult_content=full_result_content,  # 完整JSON结果
+                result_type='script',  # 脚本执行
+                script_name=script_name,
+                task_id=self.task_execution.task_id,
+                execution_time=execution_time,
+                script_output=display_content,  # 显示错误信息
+                error_message=error_message,
+                execution_status=execution_status,
+                result_summary=result_summary
+            )
+            scan_result.save()
+            
+            logger.info(f"失败扫描结果已保存到数据库: {scan_result.id}")
+            
+        except Exception as e:
+            logger.error(f"保存失败扫描结果失败: {str(e)}")
+            import traceback
+            logger.error(f"保存失败扫描结果失败堆栈: {traceback.format_exc()}")
             # 不抛出异常，避免影响主流程
 
 
@@ -620,17 +780,25 @@ class ScriptExecutorBase:
             logger.error(f"Script execution failed: {error_message}")
             logger.error(f"Error traceback: {error_traceback}")
             
-            # 标记任务失败
-            self.task_execution_manager.mark_failure(f"{error_message}\n\n{error_traceback}")
+            # 判断是否为超时异常
+            is_timeout = 'timeout' in error_message.lower() or 'timeoutexpired' in error_message.lower()
+            status = 'timeout' if is_timeout else 'error'
+            
+            # 标记任务失败，传递执行时间和内存使用量
+            self.task_execution_manager.mark_failure(
+                f"{error_message}\n\n{error_traceback}",
+                execution_time=execution_time,
+                memory_usage=memory_usage
+            )
             
             # 返回错误结果
             return ScriptExecutionResult(
-                status='error',
+                status=status,
                 error=error_message,
                 execution_time=execution_time,
                 memory_usage=memory_usage,
                 script_name=self.script_info.get('name') if self.script_info else None,
-                metadata={'traceback': error_traceback}
+                metadata={'traceback': error_traceback, 'is_timeout': is_timeout}
             )
 
 
@@ -848,7 +1016,7 @@ class UnifiedScriptExecutor(ScriptExecutorBase):
                 capture_output=True,            # 捕获标准输出和错误输出
                 text=True,                      # 以文本模式处理输出
                 env=env,                        # 传递环境变量
-                timeout=540,                    # 9分钟超时 (与Celery软限制对应)
+                timeout=120,                    # 2分钟超时 (减少超时时间，快速失败)
                 cwd=os.path.dirname(script_path) # 设置工作目录为脚本所在目录
             )
             
@@ -883,7 +1051,7 @@ class UnifiedScriptExecutor(ScriptExecutorBase):
             return output_data
             
         except subprocess.TimeoutExpired:
-            error_msg = f"脚本执行超时 (超过540秒): {script_path}"
+            error_msg = f"脚本执行超时 (超过120秒): {script_path}"
             logger.error(error_msg)
             raise RuntimeError(error_msg)
         except Exception as e:

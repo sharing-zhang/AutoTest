@@ -89,6 +89,15 @@ class ScanDevUpdate_scanResult(models.Model):
         ('task', '任务执行'),
     )
     
+    EXECUTION_STATUS_CHOICES = (
+        ('SUCCESS', '成功'),
+        ('FAILURE', '失败'),
+        ('RUNNING', '运行中'),
+        ('PENDING', '等待中'),
+        ('TIMEOUT', '超时'),
+        ('CANCELLED', '已取消'),
+    )
+    
     id = models.BigAutoField(primary_key=True)
     scandevresult_filename = models.CharField(max_length=120, blank=True, null=True)
     # auto_now_add=True会导致时间变为只可读，导致无法修改
@@ -105,6 +114,20 @@ class ScanDevUpdate_scanResult(models.Model):
     execution_time = models.FloatField(null=True, blank=True, verbose_name="执行时间(秒)")
     script_output = models.TextField(blank=True, null=True, verbose_name="脚本输出")
     error_message = models.TextField(blank=True, null=True, verbose_name="错误信息")
+    
+    # 执行状态和结果摘要
+    execution_status = models.CharField(
+        max_length=20, 
+        choices=EXECUTION_STATUS_CHOICES, 
+        default='PENDING', 
+        verbose_name="执行状态"
+    )
+    result_summary = models.TextField(
+        max_length=1000, 
+        blank=True, 
+        null=True, 
+        verbose_name="结果摘要"
+    )
 
     class Meta:
         # 关联的数据库
