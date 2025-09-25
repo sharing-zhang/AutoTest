@@ -10,7 +10,7 @@ from myapp.models import ScanDevUpdate_scanResult
 from myapp.permission.permission import isDemoAdminUser
 from myapp.serializers import ScanDevUpdate_scanResult_Serializer, UpdateScanDevUpdate_scanResult_SerializerSerializer
 from dingtalkchatbot.chatbot import DingtalkChatbot, ActionCard, FeedLink, CardItem
-
+import pandas as pd
 
 @api_view(['GET'])
 def list_api(request):
@@ -137,7 +137,9 @@ def sendmessage(request):
         # 同时支持设置消息链接跳转方式，默认pc_slide=False为跳转到浏览器，pc_slide为在PC端侧边栏打开
         # 同时支持设置消息发送失败时提醒，默认fail_notice为false不提醒，开发者可以根据返回的消息发送结果自行判断和处理
         robotxiaoding = DingtalkChatbot(webhook, secret, pc_slide=True, fail_notice=False)
-        scanResult_text = "执行脚本： " + serializer.data.get('scandevresult_filename') + "\n执行时间： " + serializer.data.get('scandevresult_time') + "\n执行结果： " + serializer.data.get('script_output')
+        scanResult_text = ("执行脚本： " + serializer.data.get('scandevresult_filename') + "\n执行时间： "
+                           + pd.to_datetime(serializer.data.get('scandevresult_time')).strftime("%Y-%m-%d %H.%M.%S")
+                           + "\n执行结果： " + serializer.data.get('script_output'))
         # text 控制钉钉自定义机器人中发送消息
         robotxiaoding.send_text(msg=scanResult_text, is_at_all=False)
         return APIResponse(code=0, msg='钉钉机器人信息已成功发送，请进对应群中检查；如果未收到消息，请检查webhook与密钥是否正确', data=serializer.data)
