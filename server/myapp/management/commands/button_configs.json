@@ -1,34 +1,16 @@
 
 [
-    {
-        "page_route": "/scanDevUpdate",
-        "script_name": "scanner_file",
-        "button_text": "测试按钮（含参）",
-        "position": "top-right",
-        "button_style": {
-            "type": "default",
-            "size": "default"
-        },
-        "display_order": 2
-    },
-    
-    {
-        "page_route": "/scanDevUpdate",
-        "script_name": "test",
-        "button_text": "测试脚本（不含参）",
-        "position": "top-right",
-        "button_style": {
-            "type": "primary",
-            "size": "default"
-        },
-        "display_order": 1
-    },
 
     {
         "page_route": "/CheckReward",
         "script_name": "check_Reward",
         "button_text": "扫描奖励（不含参）",
-        "position": "top-right",
+        "position": "custom",
+        "custom_position": {
+            "top": "200px",
+            "right": "200px",
+            "position": "absolute"
+        },
         "button_style": {
             "type": "primary",
             "size": "default"
@@ -36,10 +18,15 @@
         "display_order": 1
     },
      {
-        "page_route": "/CheckConfigTime",
+        "page_route": "/scanDevUpdate",
         "script_name": "check_ConfigTime",
         "button_text": "扫描活动时间（含参）",
-        "position": "top-right",
+        "position": "custom",
+        "custom_position": {
+            "top": "50px",
+            "right": "100px",
+            "position": "absolute"
+        },
         "button_style": {
             "type": "primary",
             "size": "default"

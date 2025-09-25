@@ -27,6 +27,7 @@ urlpatterns = [
     path('admin/scanDevUpdate/scanResultupdate', views.admin.scanDevUpdate.update),
     path('admin/scanDevUpdate/scanResultdelete', views.admin.scanDevUpdate.delete),
     path('admin/scanDevUpdate/scanResultdetail', views.admin.scanDevUpdate.detail),
+    path('admin/scanDevUpdate/scanResultsendmessage', views.admin.scanDevUpdate.sendmessage),
 
     path('admin/thing/list', views.admin.thing.list_api),
     path('admin/thing/detail', views.admin.thing.detail),

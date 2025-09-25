@@ -1,85 +1,14 @@
 {
-  "scanner_file": {
-    "dialog_title": "扫描文件脚本-参数配置",
-    "parameters": [
-      {
-        "name": "directory",
-        "type": "text",
-        "label": "目录路径",
-        "required": true,
-        "default": "C:\\temp",
-        "placeholder": "例如: C:\\temp 或 /home/user/documents"
-      },
-      {
-        "name": "file_extensions",
-        "type": "checkbox",
-        "label": "文件后缀名",
-        "options": [
-          ".txt",
-          ".log",
-          ".json",
-          ".csv",
-          ".xml",
-          ".py",
-          ".js",
-          ".html",
-          ".css",
-          ".md"
-        ],
-        "required": false,
-        "multiple": true,
-        "default": [
-          ".txt",
-          ".log"
-        ]
-      },
-      {
-        "name": "recursive",
-        "type": "switch",
-        "label": "递归扫描",
-        "required": false,
-        "default": true
-      },
-      {
-        "name": "max_depth",
-        "type": "number",
-        "label": "最大深度",
-        "required": false,
-        "default": 3,
-        "min": 0,
-        "max": 10
-      },
-      {
-        "name": "include_hidden",
-        "type": "switch",
-        "label": "包含隐藏文件",
-        "required": false,
-        "default": false
-      },
-      {
-        "name": "output_format",
-        "type": "select",
-        "label": "输出格式",
-        "options": [
-          "list",
-          "detailed",
-          "tree"
-        ],
-        "required": false,
-        "default": "list"
-      }
-    ]
-  },
   "check_Reward": {
-    "dialog_title": "检查奖励配置脚本-参数配置",
+    "dialog_title": "检查奖励配置脚本",
     "parameters": [
       {
         "name": "directory",
         "type": "text",
         "label": "目录路径",
         "required": true,
-        "default": "C:\\temp",
-        "placeholder": "例如: C:\\temp 或 /home/user/documents"
+        "default": "F:\\\\fish_test",
+        "placeholder": "例如: C:/temp 或 /home/user/documents"
       },
       {
         "name": "file_name",
@@ -111,15 +40,15 @@
     ]
   },
   "check_ConfigTime": {
-    "dialog_title": "检查配置时间脚本-参数配置",
+    "dialog_title": "检查配置时间脚本--配置",
     "parameters": [
       {
         "name": "directory",
         "type": "text",
         "label": "目录路径",
         "required": true,
-        "default": "C:\\temp",
-        "placeholder": "例如: C:\\temp 或 /home/user/documents"
+        "default": "F:\\\\fish_test",
+        "placeholder": "例如: C:/temp 或 /home/user/documents"
       },
       {
         "name": "file_names",
@@ -128,10 +57,7 @@
         "required": false,
         "multiple": true,
         "default": [
-          "TIMER_MAIN.data",
-          "TIMER_MAIN.data.txt",
-          "timer_main.data",
-          "timer_main.data.txt"
+          "TIMER_MAIN.data.txt"
         ],
         "placeholder": "输入文件名，按回车添加"
       },
