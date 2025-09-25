@@ -49,7 +49,8 @@ app.conf.update(
     task_default_retry_delay=60,     # 重试延迟(1分钟)
     task_max_retries=3,              # 最大重试次数
     
-    # Worker配置
+    # Worker配置 - Windows优化
+    worker_pool='threads',            # Windows下使用threads池（避免prefork问题）
     worker_prefetch_multiplier=4,     # 预取任务数量（支持并发）
     worker_max_tasks_per_child=50,    # 防止内存泄漏
     worker_disable_rate_limits=False, # 启用速率限制

@@ -523,13 +523,23 @@ def cancel_task(request, execution_id):
             
             # 检查任务状态
             if celery_task.state in ['PENDING', 'STARTED']:
-                # 尝试终止任务
+                # 尝试取消任务（Windows threads池下使用温和取消）
                 try:
-                    celery_task.revoke(terminate=True)
-                    logger.info(f'任务 {task_execution.task_id} 已发送终止信号')
+                    # 先尝试温和取消
+                    celery_task.revoke(terminate=False)
+                    logger.info(f'任务 {task_execution.task_id} 已发送取消信号（温和模式）')
+                    
+                    # 如果是PENDING状态，尝试强制终止
+                    if celery_task.state == 'PENDING':
+                        try:
+                            celery_task.revoke(terminate=True)
+                            logger.info(f'任务 {task_execution.task_id} 已发送强制终止信号')
+                        except Exception as terminate_error:
+                            logger.warning(f'强制终止失败（threads池不支持）: {str(terminate_error)}')
+                            
                 except Exception as revoke_error:
-                    logger.warning(f'发送终止信号失败: {str(revoke_error)}')
-                    # 即使终止失败，也标记为已取消
+                    logger.warning(f'取消任务失败: {str(revoke_error)}')
+                    # 即使取消失败，也标记为已取消
                 
                 # 更新状态
                 task_execution.status = 'REVOKED'
