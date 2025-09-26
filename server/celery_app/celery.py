@@ -44,8 +44,8 @@ app.conf.update(
     task_ignore_result=False,         # 不忽略任务结果
     
     # 时间限制配置
-    task_time_limit=600,              # 硬时间限制(10分钟)
-    task_soft_time_limit=540,        # 软时间限制(9分钟)
+    task_time_limit=1200,             # 硬时间限制(20分钟)
+    task_soft_time_limit=1080,       # 软时间限制(18分钟)
     task_default_retry_delay=60,     # 重试延迟(1分钟)
     task_max_retries=3,              # 最大重试次数
     

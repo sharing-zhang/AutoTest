@@ -470,4 +470,9 @@ python manage.py runserver 0.0.0.0:8000
   python manage.py setup_page_scripts --config-file myapp\management\commands\button_configs.json
   redis-cli flushall 
 
+10. Django超级用户
+  python manage.py createsuperuser
+  http://127.0.0.1:8000/admin/
+
+  
 > 🌟 如果这个项目对你有帮助，请给我们一个星星！

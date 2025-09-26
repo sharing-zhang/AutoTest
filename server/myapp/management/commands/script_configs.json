@@ -47,7 +47,7 @@
         "type": "text",
         "label": "目录路径",
         "required": true,
-        "default": "D:\\desk\\work\\test",
+        "default": "F:\\fish_test",
         "placeholder": "例如: C:\\temp 或 /home/user/documents"
       },
       {
@@ -123,7 +123,7 @@
         "type": "text",
         "label": "配置文件地址",
         "required": true,
-        "default": "D:\\TimeConfig\\FISH.data11.txt",
+        "default": "F:\\fish_test\\FISH.data11.txt",
         "placeholder": "配置文件文件地址，例如D:\\TimeConfig\\FISH.data.txt"
       },
       {
@@ -131,7 +131,7 @@
         "type": "text",
         "label": "工程文件目录",
         "required": true,
-        "default": "D:\\fishdev\\client\\MainProject\\Assets\\InBundle",
+        "default": "E:\\Dev_2024_3_30\\client\\MainProject\\Assets\\InBundle",
         "description": "输入工程文件的目录，支持输入精确or大致路径"
       },
       {
@@ -268,6 +268,55 @@
         "label": "字段名(可选)",
         "required": false,
         "placeholder": "如从 key=\"value\"; 中抽取某字段值，例如 desc"
+      }
+    ]
+  },
+  "find_resource_name": {
+    "dialog_title": "文件内容搜索",
+    "parameters": [
+      {
+        "name": "search_string",
+        "type": "text",
+        "label": "搜索字符串",
+        "required": true,
+        "placeholder": "输入要在文件内容中搜索的字符串"
+      },
+      {
+        "name": "target_files",
+        "type": "tags",
+        "label": "目标文件/目录",
+        "required": true,
+        "multiple": true,
+        "default":"F:\\fish_test",
+        "placeholder": "输入要搜索的文件或目录路径，按回车添加",
+        "description": "可以指定具体的文件路径或目录路径，支持多个路径"
+      },
+      {
+        "name": "file_formats",
+        "type": "checkbox",
+        "label": "文件格式",
+        "options": [
+          ".txt", ".cs", ".py", ".js", ".ts", ".json", ".xml", ".cfg", ".ini", ".conf"
+        ],
+        "required": false,
+        "multiple": true,
+        "default": [".txt", ".json"],
+        "description": "选择要搜索的文件格式，可多选"
+      },
+      {
+        "name": "match_rules",
+        "type": "checkbox",
+        "label": "匹配规则",
+        "options": [
+          "全匹配",
+          "前缀匹配",
+          "后缀匹配",
+          "包含匹配"
+        ],
+        "required": false,
+        "multiple": true,
+        "default": ["包含匹配"],
+        "description": "选择匹配规则：全匹配、前缀匹配、后缀匹配、包含匹配"
       }
     ]
   }

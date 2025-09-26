@@ -1016,7 +1016,7 @@ class UnifiedScriptExecutor(ScriptExecutorBase):
                 capture_output=True,            # 捕获标准输出和错误输出
                 text=True,                      # 以文本模式处理输出
                 env=env,                        # 传递环境变量
-                timeout=120,                    # 2分钟超时 (减少超时时间，快速失败)
+                timeout=1200,                   # 20分钟超时 (支持分批处理)
                 cwd=os.path.dirname(script_path) # 设置工作目录为脚本所在目录
             )
             
