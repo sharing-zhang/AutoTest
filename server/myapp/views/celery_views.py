@@ -673,7 +673,6 @@ class ScriptExecutionViewSet(viewsets.ViewSet):
                 }
             elif script_name:
                 # 根据脚本名称构建路径
-                import os
                 from django.conf import settings
                 script_path = os.path.join(settings.BASE_DIR, 'celery_app', f'{script_name}.py')
                 script_info = {
