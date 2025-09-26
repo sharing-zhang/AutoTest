@@ -9,8 +9,8 @@ enum URL {
     create = '/myapp/admin/user/create',
     update = '/myapp/admin/user/update',
     delete = '/myapp/admin/user/delete',
-    userLogin = '/api/user/userLogin',
-    userRegister = '/api/user/userRegister',
+    userLogin = '/myapp/api/user/userLogin',
+    userRegister = '/myapp/api/user/userRegister',
     updateUserPwd = '/api/user/updatePwd',
     updateUserInfo = '/api/user/updateUserInfo'
 }

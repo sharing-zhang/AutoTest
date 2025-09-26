@@ -11,11 +11,16 @@ enum URL {
     detail = '/myapp/admin/scanDevUpdate/scanResultdetail',
     // 钉钉机器人发送消息接口
     sendmessage = '/myapp/admin/scanDevUpdate/scanResultsendmessage',
-    // 方案1 Celery任务接口
-    executeScript = '/myapp/admin/celery/execute-script',
-    scriptTaskResult = '/myapp/admin/celery/script-task-result',
-    listScripts = '/myapp/admin/celery/scripts',
-    scriptDetail = '/myapp/admin/celery/scripts',
+    // ViewSet API 路由
+    listScripts = '/myapp/api/scripts/',
+    scriptDetail = '/myapp/api/scripts/',
+    pageConfigs = '/myapp/api/page-configs/',
+    taskExecutions = '/myapp/api/task-executions/',
+    // ScriptExecutionViewSet - 独立的脚本执行ViewSet
+    executeScript = '/myapp/api/script-executions/execute/',
+    scriptStatus = '/myapp/api/script-executions/status/',
+    // 取消任务独立接口
+    cancelTask = '/myapp/api/cancel-task/',
 }
 
 const listApi = async (params: any) => get<any>({ url: URL.list, params: params, data: {}, headers: {'Content-Type': 'application/x-www-form-urlencoded'} });
@@ -30,21 +35,30 @@ const detailApi = async (params: any) => get<any>({ url: URL.detail, params: par
 const sendmessageApi = async (params:any, data: any) =>
     post<any>({ url: URL.sendmessage, params: params, data: data, headers: { 'Content-Type': 'multipart/form-data;charset=utf-8' } });
 
-// 方案1任务相关API
-const getScriptTaskResultApi = async (taskId: string, executionId?: string) => {
-  const params: any = { task_id: taskId };
-  if (executionId) {
-    params.execution_id = executionId;
-  }
-  return get<any>({ url: URL.scriptTaskResult, params: params, headers: {} });
+// ViewSet API 函数
+const listScriptsApi = async (params: any = {}) => get<any>({ url: URL.listScripts, params: params, headers: {} });
+const getScriptDetailApi = async (scriptId: number) => get<any>({ url: `${URL.scriptDetail}/${scriptId}`, params: {}, headers: {} });
+
+// 页面配置API
+const getPageConfigsApi = async (pageRoute?: string) => {
+  const params = pageRoute ? { page_route: pageRoute } : {};
+  return get<any>({ url: URL.pageConfigs, params: params, headers: {} });
 };
 
-// 脚本管理API
-const listScriptsApi = async (params: any = {}) => get<any>({ url: URL.listScripts, params: params, headers: {} });
+// ScriptExecutionViewSet API - 脚本执行相关
 const executeScriptApi = async (data: any) => post<any>({ url: URL.executeScript, params: {}, data: data, headers: { 'Content-Type': 'application/json' } });
-const getScriptDetailApi = async (scriptId: number) => get<any>({ url: `${URL.scriptDetail}/${scriptId}`, params: {}, headers: {} });
+const getScriptTaskResultApi = async (taskId?: string, executionId?: string) => {
+  const params: any = {};
+  if (taskId) params.task_id = taskId;
+  if (executionId) params.execution_id = executionId;
+  return get<any>({ url: URL.scriptStatus, params: params, headers: {} });
+};
+
+// 取消任务独立API
+const cancelTaskApi = async (executionId: number) => post<any>({ url: `${URL.cancelTask}${executionId}/`, params: {}, data: {}, headers: { 'Content-Type': 'application/json' } });
 
 export { 
     listApi, createApi, updateApi, deleteApi, detailApi, sendmessageApi,
-    getScriptTaskResultApi, listScriptsApi, executeScriptApi, getScriptDetailApi 
+    listScriptsApi, getScriptDetailApi, getPageConfigsApi,
+    executeScriptApi, getScriptTaskResultApi, cancelTaskApi
 };

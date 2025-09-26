@@ -24,7 +24,7 @@ class Command(BaseCommand):
         # 构建命令
         cmd = [
             sys.executable, '-m', 'celery',
-            '-A', 'server',
+            '-A', 'celery_app',
             'beat',
             '--loglevel', options['loglevel'],
             '--scheduler', 'django_celery_beat.schedulers:DatabaseScheduler'

@@ -68,13 +68,14 @@
 </template>
 
 <script setup lang="ts">
-import {useUserStore} from '/@/store';
-import logoImage from '/@/assets/images/logo2.png';
+import { ref, reactive } from 'vue'
+import { useRouter } from 'vue-router'
+import { useUserStore } from '/@/store'
+import { message } from 'ant-design-vue'
+import logoImage from '/@/assets/images/logo2.png'
 
-const router = useRouter();
-const userStore = useUserStore();
-
-import {message} from "ant-design-vue";
+const router = useRouter()
+const userStore = useUserStore()
 
 const myform = ref()
 
@@ -107,6 +108,7 @@ const handleSubmit = () => {
 
 // 登录校验
 const handleLogin = () => {
+  loginBtn.value = true
   userStore.adminLogin({
     username: data.loginForm.username,
     password: data.loginForm.password
@@ -114,6 +116,8 @@ const handleLogin = () => {
     loginSuccess()
   }).catch(err=> {
       message.warn(err.msg || '登录失败，用户名或密码错误')
+  }).finally(() => {
+    loginBtn.value = false
   })
 }
 

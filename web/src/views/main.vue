@@ -6,7 +6,8 @@
         <img class="header-logo" :src="logo">
         <span class="header-title">自动化测试运行系统</span>
         <div class="empty"></div>
-        <span>管理员[{{ userStore.admin_user_name }}]</span>
+        <span v-if="userStore.admin_user_name">管理员[{{ userStore.admin_user_name }}]</span>
+        <span v-else-if="userStore.user_name">用户[{{ userStore.user_name }}]</span>
         <a class="header-quit" @click="handleLogout">退出</a>
       </div>
     </a-layout-header>
@@ -14,14 +15,16 @@
       <a-layout-sider v-model="collapsed" collapsible >
         <a-menu style="overflow:auto; overflow-x: hidden;" v-model:selectedKeys="selectedKeys" theme="dark" mode="inline" @click="handleClick">
 
+          <!-- 所有用户都可以看到的功能 -->
           <a-menu-item key="scanUpdate">
             <read-outlined/>
             <span>资源扫描</span>
           </a-menu-item>
-          <a-menu-item key="thing">
+          
+          <!-- <a-menu-item key="thing">
             <database-outlined/>
             <span>自动化钓鱼</span>
-          </a-menu-item>
+          </a-menu-item> -->
           <a-menu-item key="plugin">
             <tag-outlined/>
             <span>插件管理</span>
@@ -41,6 +44,10 @@
           <!--<a-menu-item key="user">
             <user-outlined/>
             <span>用户管理</span>-->
+          <a-menu-item key="user">
+            <user-outlined/>
+            <span>用户管理</span>
+          </a-menu-item>
           <a-sub-menu>
             <template #icon>
               <folder-outlined/>
@@ -128,9 +135,18 @@ onMounted(() => {
 
 
 const handleLogout = () => {
-  userStore.adminLogout().then(res => {
-    router.push({name: 'adminLogin'})
-  })
+  // 如果是管理员，执行管理员退出
+  if (userStore.admin_user_name) {
+    userStore.adminLogout().then(res => {
+      router.push({name: 'adminLogin'})
+    })
+  }
+  // 如果是普通用户，执行用户退出
+  else if (userStore.user_name) {
+    userStore.userLogout().then(() => {
+      router.push({name: 'userLogin'})
+    })
+  }
 }
 
 </script>

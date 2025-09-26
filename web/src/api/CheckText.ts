@@ -1,4 +1,4 @@
-// AI文本检查 API接口
+// CheckText API接口
 import { get, post } from '/@/utils/http/axios';
 
 enum URL {

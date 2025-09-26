@@ -536,6 +536,11 @@ Optional[List[int]], Optional[str], Optional[str], Optional[str]]:
         ])
         recursive = script.get_parameter('recursive', False)
         expected_days_param = script.get_parameter('expected_days', [3, 7, 14])
+        
+        # 规范化路径：处理多重转义的反斜杠
+        if directory:
+            # 处理多重转义：\\\\\\\\ -> \\ -> /
+            directory = directory.replace('\\\\\\\\', '\\').replace('\\\\', '\\').replace('\\', os.sep)
 
         # 获取时间字段名参数
         start_time_field = script.get_parameter('start_time_field', 'openTime')

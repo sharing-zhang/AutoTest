@@ -60,37 +60,6 @@
       <!--弹窗区域-->
       <div>
         <a-modal
-          :visible="resultSendDingDingRobot.resultSendDingDingRobot_visile"
-          :forceRender="true"
-          :title="resultSendDingDingRobot.title"
-          ok-text="确认发送"
-          cancel-text="取消"
-          @ok="resultSendDingDingRobot_sendResult"
-          @cancel="resultSendDingDingRobot_handleCancel"
-        >
-          <div>
-            <a-form
-              ref="myform"
-              :label-col="{ style: { width: '180px' } }"
-              :model="resultSendDingDingRobot.form"
-              :rules="resultSendDingDingRobot.rules"
-            >
-              <a-row :gutter="24">
-                <a-col span="24">
-                  <a-form-item label="群机器人Webhook" name="resultSendDingDingRobot_webhook">
-                    <a-input placeholder="请输入群机器人的Webhook" v-model:value="resultSendDingDingRobot.form.resultSendDingDingRobot_webhook" allowClear />
-                  </a-form-item>
-                </a-col>
-                <a-col span="24">
-                  <a-form-item label="群机器人加签密钥" name="resultSendDingDingRobot_secret">
-                    <a-input placeholder="请输入群机器人加签密钥" v-model:value="resultSendDingDingRobot.form.resultSendDingDingRobot_secret" allowClear />
-                  </a-form-item>
-                </a-col>
-              </a-row>
-            </a-form>
-          </div>
-        </a-modal>
-        <a-modal
           :visible="modal.scanResult_visile"
           :forceRender="true"
           :title="modal.title"
@@ -233,83 +202,118 @@
 
 <script setup lang="ts">
   import { FormInstance, message } from 'ant-design-vue';
-  import { createApi, listApi, updateApi, deleteApi, sendmessageApi } from '/@/api/scanDevUpdate';
+  import { createApi, listApi, updateApi, deleteApi } from '/@/api/scanDevUpdate';
   import ScriptManagerLayout from '/@/components/ScriptManagerLayout.vue';
   import { SuccessFilled, CircleCloseFilled } from '@element-plus/icons-vue';
   import dayjs from 'dayjs';
-  import { ref, reactive, onMounted } from 'vue';
+  import { ref, reactive, onMounted, h } from 'vue';
 
   // 进来页面后默认定位到扫描结果页面
   const activeName = ref('scanResult');
 
-  // 扫描结果表格列配置
-  const scanResultcolumns = reactive([
-    {
-      title: '序号',
-      dataIndex: 'index',
-      key: 'index',
-      align: 'center',
-      width: 100,
-    },
-    {
-      title: '资源扫描结果文件名',
-      dataIndex: 'scandevresult_filename',
-      align: 'center',
-      key: 'scandevresult_filename',
-      width: 400,
-    },
-    {
-      title: '时间',
-      dataIndex: 'scandevresult_time',
-      align: 'center',
-      key: 'scandevresult_time',
-      width: 200,
-    },
-    {
-      title: '负责人',
-      dataIndex: 'director',
-      align: 'center',
-      key: 'director',
-      width: 110,
-    },
-    {
-      title: '备注',
-      dataIndex: 'remark',
-      align: 'center',
-      key: 'remark',
-      width: 450,
-    },
-    {
-      title: '结果类型',
-      dataIndex: 'result_type',
-      align: 'center',
-      key: 'result_type',
-      width: 100,
-      customRender: ({ text }) => {
-        const typeMap = {
-          manual: '手动扫描',
-          script: '脚本执行',
-          task: '任务执行',
-        };
-        return typeMap[text] || text || '手动扫描';
-      },
-    },
-    {
-      title: '脚本名称',
-      dataIndex: 'script_name',
-      align: 'center',
-      key: 'script_name',
-      width: 120,
-    },
-    {
-      title: '操作',
-      dataIndex: 'action',
-      key: 'operation',
-      align: 'center',
-      fixed: 'right',
-      width: 140,
-    },
-  ]);
+// 扫描结果表格列配置
+const scanResultcolumns = reactive([
+
+  {
+    title: '序号',
+    dataIndex: 'index',
+    key: 'index',
+    align: "center",
+    width: 100
+  },
+  {
+    title: '脚本名称',
+    dataIndex: 'scandevresult_filename',
+    align: "center",
+    key: 'scandevresult_filename',
+    width: 300
+  },
+  {
+    title: '执行时间',
+    dataIndex: 'scandevresult_time',
+    align: "center",
+    key: 'scandevresult_time',
+    width: 200
+  },
+  {
+    title: '执行人',
+    dataIndex: 'director',
+    align: "center",
+    key: 'director',
+    width: 110
+  },
+  {
+    title: '执行状态',
+    dataIndex: 'execution_status',
+    align: "center",
+    key: 'execution_status',
+    width: 120,
+    customRender: ({ record }) => {
+      const statusMap = {
+        'SUCCESS': { text: '成功', type: 'success' },
+        'FAILURE': { text: '失败', type: 'error' },
+        'RUNNING': { text: '运行中', type: 'processing' },
+        'PENDING': { text: '等待中', type: 'default' },
+        'TIMEOUT': { text: '超时', type: 'warning' },
+        'CANCELLED': { text: '已取消', type: 'default' }
+      };
+      const status = statusMap[record.execution_status] || { text: '未知', type: 'default' };
+      return h('a-tag', { color: status.type }, status.text);
+    }
+  },
+  {
+    title: '结果摘要',
+    dataIndex: 'result_summary',
+    align: "center",
+    key: 'result_summary',
+    width: 120,
+    ellipsis: true,
+    customRender: ({ record }) => {
+      const summary = record.result_summary || '-';
+      if (summary.length > 10) {
+        return summary.substring(0, 20) + '...';
+      }
+      return summary;
+    }
+  },
+  // {
+  //   title: '备注',
+  //   dataIndex: 'remark',
+  //   align: "center",
+  //   key: 'remark',
+  //   width: 250
+  // },
+  // {
+  //   title: '结果类型',
+  //   dataIndex: 'result_type',
+  //   align: "center",
+  //   key: 'result_type',
+  //   width: 100,
+  //   customRender: ({ text }) => {
+  //     const typeMap = {
+  //       'manual': '手动扫描',
+  //       'script': '脚本执行',
+  //       'task': '任务执行'
+  //     };
+  //     return typeMap[text] || text || '手动扫描';
+  //   }
+  // },
+  // {
+  //   title: '脚本名称',
+  //   dataIndex: 'script_name',
+  //   align: "center",
+  //   key: 'script_name',
+  //   width: 120
+  // },
+  {
+    title: '操作',
+    dataIndex: 'action',
+    key: 'operation',
+    align: 'center',
+    fixed: 'right',
+    width: 140,
+  },
+]);
 
   // 数据备份表格列配置
   const dataBackupcolumns = reactive([
@@ -373,22 +377,6 @@
     page: 1,
   });
 
-  // 钉钉机器人弹窗数据
-  const resultSendDingDingRobot = reactive({
-    resultSendDingDingRobot_visile: false,
-    resultSendDingDingRobot_editFlag: false,
-    title: '',
-    form: {
-      id: undefined,
-      resultSendDingDingRobot_webhook: undefined,
-      resultSendDingDingRobot_secret: undefined,
-    },
-    rules: {
-      resultSendDingDingRobot_webhook: [{ required: true, message: '请输入群机器人的Webhook', trigger: 'change' }],
-      resultSendDingDingRobot_secret: [{ required: true, message: '请输入群机器人加签密钥', trigger: 'change' }],
-    },
-  });
-
   // 编辑弹窗数据
   const modal = reactive({
     scanResult_visile: false,
@@ -429,17 +417,22 @@
   // 组件引用
   const scriptManager = ref();
 
-  onMounted(() => {
-    getDataList();
-
-    // 注册脚本执行完成后的数据刷新回调
+onMounted(() => {
+  getDataList();
+  
+  // 延迟注册脚本执行完成后的数据刷新回调，确保组件已完全挂载
+  setTimeout(() => {
     if (scriptManager.value) {
       scriptManager.value.onDataRefresh(() => {
-        console.log('脚本执行完成，刷新扫描结果数据...');
+        console.log('脚本执行完成，刷新扫描结果数据...')
         getDataList();
       });
+      console.log('scanDevUpdate页面刷新回调已注册');
+    } else {
+      console.error('scriptManager组件引用未找到');
     }
-  });
+  }, 100);
+});
 
   const getDataList = () => {
     data.loading = true;
@@ -473,17 +466,9 @@
   };
 
   const handleSend = (record: any) => {
-    resetModal();
-    resultSendDingDingRobot.resultSendDingDingRobot_visile = true;
-    resultSendDingDingRobot.resultSendDingDingRobot_editFlag = true;
-    resultSendDingDingRobot.title = '扫描结果同步钉钉机器人';
-    for (const key in resultSendDingDingRobot.form) {
-      resultSendDingDingRobot.form[key] = undefined;
-    }
-    for (const key in record) {
-      if (record[key]) {
-        resultSendDingDingRobot.form[key] = record[key];
-      }
+    // 调用 ScriptManagerLayout 的钉钉机器人弹窗方法
+    if (scriptManager.value) {
+      scriptManager.value.openDingtalkDialog(record);
     }
   };
 
@@ -550,49 +535,6 @@
       .catch((err) => {
         console.log('不能为空');
       });
-  };
-
-  // 点击【确认发送】按钮后，触发发送钉钉群机器人消息逻辑
-  const resultSendDingDingRobot_sendResult = () => {
-    myform.value
-      ?.validate()
-      .then(() => {
-        const formData = new FormData();
-        formData.append('id', resultSendDingDingRobot.form.id);
-        formData.append('resultSendDingDingRobot_webhook', resultSendDingDingRobot.form.resultSendDingDingRobot_webhook);
-        formData.append('resultSendDingDingRobot_secret', resultSendDingDingRobot.form.resultSendDingDingRobot_secret);
-        if (resultSendDingDingRobot.resultSendDingDingRobot_editFlag) {
-          submitting.value = true;
-          sendmessageApi(
-            {
-              id: resultSendDingDingRobot.form.id,
-            },
-            formData,
-          )
-            .then((res) => {
-              submitting.value = false;
-              resultSendDingDingRobot_handleCancel();
-              getDataList();
-              message.success('钉钉群机器人消息发送成功');
-            })
-            .catch((err) => {
-              submitting.value = false;
-              console.log(err);
-              message.error(err.msg || '钉钉群机器人消息发送失败');
-            });
-        } else {
-          submitting.value = false;
-          message.error('不允许发送机器人消息，发送操作失败');
-        }
-      })
-      .catch((err) => {
-        console.log('不能为空');
-      });
-  };
-
-  // 关闭消息同步弹窗
-  const resultSendDingDingRobot_handleCancel = () => {
-    resultSendDingDingRobot.resultSendDingDingRobot_visile = false;
   };
 
   // 关闭编辑弹窗

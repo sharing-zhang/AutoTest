@@ -1,4 +1,4 @@
-// 游戏活动时间扫描 API接口
+// CheckConfigTime API接口
 import { get, post } from '/@/utils/http/axios';
 
 enum URL {

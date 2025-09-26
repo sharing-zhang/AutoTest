@@ -12,7 +12,7 @@ import root from './root';
 import { ADMIN_USER_TOKEN, USER_TOKEN } from '/@/store/constants'
 
 // 路由权限白名单
-const allowList = ['adminLogin', 'login', 'register', 'portal', 'search', 'detail', '403', '404']
+const allowList = ['adminLogin', 'userLogin', 'userHome', 'loginSelect', 'login', 'register', 'portal', 'search', 'detail', '403', '404']
 // 前台登录地址
 const loginRoutePath = '/index/login'
 // 后台登录地址
@@ -36,8 +36,16 @@ router.beforeEach(async (to, from, next) => {
 
   //控制台输出日志
   console.log(to,from)
-  /** 路由 **/
-  //判断跳转的目的路由路径是否是以/admin为开头的
+  
+  /** 路由权限控制 **/
+  
+  // 1. 登录页面白名单 - 优先处理
+  if (allowList.includes(to.name)) {
+    next()
+    return
+  }
+  
+  // 2. 管理员路由权限控制
   if (to.path.startsWith('/admin')) {
     //localStorage.getItem获取存储的ADMIN_USER_TOKEN的值，如果存在token值
     if (localStorage.getItem(ADMIN_USER_TOKEN)) {
@@ -50,28 +58,43 @@ router.beforeEach(async (to, from, next) => {
         next()
       }
     }
-    //如果不存在token值
+    // 如果存在普通用户token，也允许访问管理员页面
+    else if (localStorage.getItem(USER_TOKEN)) {
+      next()
+    }
+    //如果不存在任何token值
     else {
-      //判断要跳转的路由name是否在白名单中，是的话可以免token判断，直接进入
-      if (allowList.includes(to.name)) {
+      //没有token，跳转到登录页面路由下，并且附带上query中的参数
+      next(
+            {
+              path: adminLoginRoutePath,
+              query:
+                  {
+                    redirect: to.fullPath
+                  }
+            }
+          )
+    }
+  }
+  // 3. 普通用户路由权限控制
+  else if (to.path.startsWith('/user')) {
+    if (localStorage.getItem(USER_TOKEN)) {
+      // 已登录，允许访问
+      next()
+    } else {
+      // 未登录，跳转到用户登录页
+      if (to.name === 'userLogin') {
         next()
-      }
-      //没有token，又不在白名单中,跳转到登录页面路由下，并且附带上query中的参数
-      else {
-        next(
-              {
-                path: adminLoginRoutePath,
-                query:
-                    {
-                      redirect: to.fullPath
-                    }
-              }
-            )
+      } else {
+        next({ path: '/userLogin' })
       }
     }
-
   }
-
+  // 4. 其他路由（登录选择页等）
+  else {
+    // 默认跳转到登录选择页
+    next({ path: '/login-select' })
+  }
 
 });
 

@@ -1,12 +1,12 @@
-// checkConfigExist API接口
+// CheckReward API接口
 import { get, post } from '/@/utils/http/axios';
 
 enum URL {
-    # list = '/myapp/admin/checkConfigExist/list',
-    # create = '/myapp/admin/checkConfigExist/create',
-    # update = '/myapp/admin/checkConfigExist/update',
-    # delete = '/myapp/admin/checkConfigExist/delete',
-    # detail = '/myapp/admin/checkConfigExist/detail',
+    # list = '/myapp/admin/CheckReward/list',
+    # create = '/myapp/admin/CheckReward/create',
+    # update = '/myapp/admin/CheckReward/update',
+    # delete = '/myapp/admin/CheckReward/delete',
+    # detail = '/myapp/admin/CheckReward/detail',
     list = '/myapp/admin/scanDevUpdate/scanResultlist',
     create = '/myapp/admin/scanDevUpdate/scanResultcreate',
     update = '/myapp/admin/scanDevUpdate/scanResultupdate',

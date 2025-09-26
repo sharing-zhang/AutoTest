@@ -34,7 +34,12 @@ service.interceptors.request.use(
 service.interceptors.response.use(
   (response: AxiosResponse) => {
     if(response.status == 200) {
-      if(response.data.code == 0 || response.data.code == 200) {
+      // 检查多种成功响应格式
+      if(response.data.code == 0 || 
+         response.data.code == 200 || 
+         response.data.success === true ||
+         Array.isArray(response.data) ||
+         (typeof response.data === 'object' && response.data !== null && !response.data.error)) {  // 支持直接返回对象的API
         return response
       }else {
         return Promise.reject(response.data)

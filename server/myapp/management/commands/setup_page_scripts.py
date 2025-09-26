@@ -359,19 +359,17 @@ class Command(BaseCommand):
                 
                 # 添加可选字段
                 if config.button_style:
-                    # 分离 custom_position
-                    button_style = config.button_style.copy()
-                    if 'custom_position' in button_style:
-                        json_config['custom_position'] = json.dumps(
-                            button_style.pop('custom_position'), 
-                            ensure_ascii=False
-                        )
-                    
-                    if button_style:  # 如果还有其他样式
-                        json_config['button_style'] = json.dumps(
-                            button_style, 
-                            ensure_ascii=False
-                        )
+                    json_config['button_style'] = json.dumps(
+                        config.button_style, 
+                        ensure_ascii=False
+                    )
+                
+                # 添加自定义位置字段
+                if config.custom_position:
+                    json_config['custom_position'] = json.dumps(
+                        config.custom_position, 
+                        ensure_ascii=False
+                    )
                 
                 json_configs.append(json_config)
             
@@ -456,10 +454,8 @@ class Command(BaseCommand):
             if button_style:
                 existing_config.button_style = button_style
             if custom_position:
-                # 可以将自定义位置保存到button_style的custom_position字段
-                if not existing_config.button_style:
-                    existing_config.button_style = {}
-                existing_config.button_style['custom_position'] = custom_position
+                # 保存自定义位置到专门的custom_position字段
+                existing_config.custom_position = custom_position
             existing_config.save()
             
             self.stdout.write(
@@ -475,10 +471,9 @@ class Command(BaseCommand):
                 models.Max('display_order')
             )['display_order__max'] or 0
             
-            # 准备按钮样式
+            # 准备按钮样式和自定义位置
             final_button_style = button_style or {}
-            if custom_position:
-                final_button_style['custom_position'] = custom_position
+            final_custom_position = custom_position or {}
             
             PageScriptConfig.objects.create(
                 page_name=page_route.split('/')[-1] or 'root',
@@ -487,6 +482,7 @@ class Command(BaseCommand):
                 button_text=button_text,
                 button_style=final_button_style,
                 position=position,
+                custom_position=final_custom_position,
                 is_enabled=True,
                 display_order=max_order + 1
             )

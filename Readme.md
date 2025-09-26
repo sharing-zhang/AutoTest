@@ -45,7 +45,7 @@ AutoTest/
 │   │   ├── views/             # 视图控制器
 │   │   ├── serializers.py     # 序列化器
 │   │   ├── urls.py            # 路由配置
-│   │   ├── tasks.py           # Celery 任务
+│   │   ├── celery_view.py     # Celery 任务
 │   │   ├── management/        # Django 管理命令
 │   │   └── migrations/        # 数据库迁移
 │   ├── celery_app/            # Celery 配置和脚本
@@ -84,7 +84,7 @@ AutoTest/
   - `TaskExecution` - 任务执行记录模型
   - `Address` - 地址模型
 
-- **`tasks.py`** - Celery 异步任务
+- **`celery_view.py`** - Celery 异步任务
   - `execute_python_script()` - 执行 Python 脚本任务
   - `run_script()` - 脚本运行核心逻辑
   - `run_python_file()` - Python 文件执行器
@@ -168,11 +168,6 @@ AutoTest/
   - 设备扫描结果展示
   - 扫描数据管理
   - 脚本执行功能
-
-- **`scanOvsUpdate.vue`** - 海外资源扫描页面
-  - 海外资源扫描结果
-  - 数据备份功能
-  - 脚本管理集成
 
 - **`thing.vue`** - 自动化钓鱼页面
   - 钓鱼任务管理
@@ -469,5 +464,9 @@ python manage.py runserver 0.0.0.0:8000
    npm install
    npm install element-plus --save
   ·运行：npm run dev -- --port 8001
+
+9.
+  python manage.py register_scripts
+  python manage.py setup_page_scripts --config-file myapp\management\commands\button_configs.json
 
 > 🌟 如果这个项目对你有帮助，请给我们一个星星！
