@@ -196,9 +196,11 @@ def check_missing_parameters(script, lines: List[str], parameters: List[str]) ->
                         'block_index': current_block['block_index'],
                         'start_line': current_block['start_line'],
                         'end_line': current_block['end_line'],
-                        'missing_params': list(missing_params)
+                        'missing_params': list(missing_params),
+                        'found_params': list(current_block_params)
                     })
-                    script.debug(f"第{current_block['block_index']}个配置块 {current_block['id']} 缺失参数: {missing_params}")
+                    script.debug(
+                        f"第{current_block['block_index']}个配置块 {current_block['id']} 缺失参数: {missing_params}")
                 else:
                     found_blocks += 1
                     script.debug(f"第{current_block['block_index']}个配置块 {current_block['id']} 包含所有参数")
@@ -218,7 +220,8 @@ def check_missing_parameters(script, lines: List[str], parameters: List[str]) ->
                 'block_index': current_block['block_index'],
                 'start_line': current_block['start_line'],
                 'end_line': current_block['end_line'],
-                'missing_params': list(missing_params)
+                'missing_params': list(missing_params),
+                'found_params': list(current_block_params)
             })
         else:
             found_blocks += 1
@@ -231,24 +234,95 @@ def check_missing_parameters(script, lines: List[str], parameters: List[str]) ->
     }
 
 
-def generate_chinese_message(results: Dict, parameters: List[str]) -> str:
+def format_file_size(file_path: str) -> str:
+    """格式化文件大小"""
+    try:
+        size = os.path.getsize(file_path)
+        for unit in ['B', 'KB', 'MB', 'GB']:
+            if size < 1024.0:
+                return f"{size:.1f} {unit}"
+            size /= 1024.0
+        return f"{size:.1f} TB"
+    except:
+        return "未知大小"
+
+
+def generate_chinese_message(results: Dict, parameters: List[str], file_path: str, used_encoding: str) -> str:
     """生成中文消息"""
     missing_blocks = results['missing_blocks']
     total_blocks = results['total_blocks']
     found_blocks = results['found_blocks']
     missing_count = results['missing_count']
 
+    # 获取文件基本信息
+    file_name = os.path.basename(file_path)
+    file_size = format_file_size(file_path)
+
+    # 构建消息头
+    separator = "=" * 60
+    message_parts = [
+        separator,
+        "配置文件参数检查报告",
+        separator,
+        f"文件信息:",
+        f"  文件名: {file_name}",
+        f"  文件大小: {file_size}",
+        f"  文件编码: {used_encoding}",
+        "",
+        f"检查参数: {', '.join(parameters)}",
+        f"参数数量: {len(parameters)} 个",
+        "",
+        f"检查结果:",
+        f"  配置块总数: {total_blocks} 个",
+        f"  合格配置块: {found_blocks} 个",
+        f"  缺失参数的配置块: {missing_count} 个",
+        ""
+    ]
+
+    # 计算合格率
+    if total_blocks > 0:
+        success_rate = (found_blocks / total_blocks) * 100
+        message_parts.append(f"  合格率: {success_rate:.1f}%")
+        message_parts.append("")
+
+    # 检查结果状态
     if missing_count == 0:
-        return f"检查完成: 所有 {total_blocks} 个配置块都包含所需参数 {', '.join(parameters)}"
+        message_parts.extend([
+            "检查状态: 通过",
+            "所有配置块都包含所需的参数",
+            separator
+        ])
+    else:
+        message_parts.extend([
+            "检查状态: 未通过",
+            f"发现 {missing_count} 个配置块存在参数缺失问题",
+            ""
+        ])
 
-    # 生成缺失信息
-    missing_info = []
-    for block in missing_blocks:
-        missing_params_str = ', '.join(block['missing_params'])
-        missing_info.append(f"第{block['block_index']}个配置块(第{block['start_line']}行): 缺失 {missing_params_str}")
+        # 显示前10个缺失参数的配置块详情
+        display_count = min(missing_count, 10)
+        message_parts.append(f"缺失参数详情 (显示前 {display_count} 个):")
 
-    message = f"检查完成: {found_blocks}/{total_blocks} 个配置块包含所有参数。有 {missing_count} 个配置为空或缺失参数: {'; '.join(missing_info)}"
-    return message
+        for i, block in enumerate(missing_blocks[:display_count], 1):
+            missing_params_str = ', '.join(sorted(block['missing_params']))
+            found_params_str = ', '.join(sorted(block['found_params'])) if block['found_params'] else "无"
+
+            message_parts.extend([
+                f"  [{i}] 第 {block['block_index']} 个配置块 ({block['start_line']}-{block['end_line']} 行)",
+                f"      配置块ID: {block['block_id']}",
+                f"      缺失参数: {missing_params_str}",
+                f"      已有参数: {found_params_str}",
+                ""
+            ])
+
+        # 如果有更多缺失的配置块，显示省略信息
+        if missing_count > 10:
+            message_parts.append(f"  ... 还有 {missing_count - 10} 个配置块存在参数缺失")
+            message_parts.append("")
+
+        message_parts.append(separator)
+
+    return "\n".join(message_parts)
 
 
 # ==================== 主逻辑函数 ====================
@@ -299,8 +373,8 @@ def main_logic(script):
         # 检查缺失参数
         results = check_missing_parameters(script, lines, parameters)
 
-        # 生成中文消息
-        message = generate_chinese_message(results, parameters)
+        # 生成格式化的中文消息
+        message = generate_chinese_message(results, parameters, file_path, used_encoding)
 
         script.info("参数检查完成")
 
@@ -308,12 +382,26 @@ def main_logic(script):
         return script.success_result(
             message=message,
             data={
-                'total_blocks': results['total_blocks'],
-                'found_blocks': results['found_blocks'],
-                'missing_count': results['missing_count'],
-                'missing_blocks': results['missing_blocks'][:10] if len(results['missing_blocks']) > 10 else results['missing_blocks'],  # 限制返回数量避免数据过大
-                'file_encoding': used_encoding,
-                'checked_parameters': parameters
+                'file_info': {
+                    'file_name': os.path.basename(file_path),
+                    'file_path': file_path,
+                    'file_size': format_file_size(file_path),
+                    'file_encoding': used_encoding,
+                    'total_lines': len(lines)
+                },
+                'check_summary': {
+                    'checked_parameters': parameters,
+                    'parameter_count': len(parameters),
+                    'total_blocks': results['total_blocks'],
+                    'found_blocks': results['found_blocks'],
+                    'missing_count': results['missing_count'],
+                    'success_rate': round((results['found_blocks'] / results['total_blocks']) * 100, 1) if results[
+                                                                                                               'total_blocks'] > 0 else 0,
+                    'check_status': 'PASS' if results['missing_count'] == 0 else 'FAIL'
+                },
+                'missing_blocks': results['missing_blocks'][:10] if len(results['missing_blocks']) > 10 else results[
+                    'missing_blocks'],  # 限制返回数量避免数据过大
+                'has_more_missing': len(results['missing_blocks']) > 10
             }
         )
 
@@ -326,4 +414,5 @@ def main_logic(script):
 
 if __name__ == '__main__':
     from script_base import create_simple_script
+
     create_simple_script('config_parameter_checker', main_logic)

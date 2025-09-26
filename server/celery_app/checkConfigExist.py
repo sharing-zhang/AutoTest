@@ -3,7 +3,7 @@
 """
 配置文件指定路径字段验证脚本（简化版）
 根据用户指定的配置文件和字段名，检查对应的路径是否在工程目录中存在
-只输出未找到的路径信息
+展示所有缺失的配置和部分找到的文件路径
 """
 
 from script_base import create_simple_script
@@ -180,7 +180,7 @@ def scan_all_field_occurrences(script, content: str, target_fields: List[str]) -
 
 
 def safe_find_matching_items(script, root_path: Path, item_name: str, is_file: bool = False, max_depth: int = 6) -> \
-List[Path]:
+        List[Path]:
     """安全地在指定根目录下递归查找匹配的文件或文件夹"""
     try:
         if not root_path or not item_name:
@@ -301,16 +301,17 @@ def find_all_matching_items_with_extensions(script, root_path: Path, item_name: 
         return []
 
 
-def validate_path_exists(script, path_value: str, project_root: Path, custom_extensions: List[str]) -> bool:
-    """验证路径是否存在（简化版，只返回是否存在）"""
+def validate_path_exists_with_details(script, path_value: str, project_root: Path, custom_extensions: List[str]) -> \
+Tuple[bool, Optional[str]]:
+    """验证路径是否存在，并返回找到的实际路径"""
     try:
         if not isinstance(path_value, str) or not path_value:
-            return False
+            return False, None
 
         # 清理路径值
         cleaned_path = clean_value(path_value)
         if not cleaned_path:
-            return False
+            return False, None
 
         # 处理环境变量
         try:
@@ -321,11 +322,11 @@ def validate_path_exists(script, path_value: str, project_root: Path, custom_ext
         # 检查路径长度，防止过长路径导致问题
         if len(expanded_path) > 260:  # Windows路径长度限制
             script.debug(f"路径过长，跳过: {expanded_path[:100]}...")
-            return False
+            return False, None
 
         path_obj = safe_path_operation(Path, expanded_path)
         if not path_obj:
-            return False
+            return False, None
 
         has_extension = len(path_obj.suffix) > 0
 
@@ -352,7 +353,7 @@ def validate_path_exists(script, path_value: str, project_root: Path, custom_ext
         for path in possible_paths:
             try:
                 if safe_path_operation(path.exists):
-                    return True
+                    return True, str(path)
             except Exception:
                 continue
 
@@ -361,7 +362,7 @@ def validate_path_exists(script, path_value: str, project_root: Path, custom_ext
             path_components = [comp for comp in expanded_path.replace('\\', '/').split('/') if comp and comp != '.']
 
             if not path_components or len(path_components) > 10:  # 限制路径深度
-                return False
+                return False, None
 
             # 只搜索最后一个组件
             last_component = path_components[-1]
@@ -370,21 +371,21 @@ def validate_path_exists(script, path_value: str, project_root: Path, custom_ext
             file_matches = find_all_matching_items_with_extensions(script, project_root, last_component,
                                                                    custom_extensions)
             if file_matches:
-                return True
+                return True, str(file_matches[0])
 
             # 搜索目录
             dir_matches = safe_find_matching_items(script, project_root, last_component, is_file=False)
             if dir_matches:
-                return True
+                return True, str(dir_matches[0])
 
         except Exception as e:
             script.debug(f"递归搜索出错: {e}")
 
-        return False
+        return False, None
 
     except Exception as e:
         script.debug(f"验证路径存在性时出错: {e}")
-        return False
+        return False, None
 
 
 def parse_config_file_for_scanning(script, config_path: str, encoding: str = 'utf-8') -> str:
@@ -412,10 +413,10 @@ def get_and_validate_parameters(script) -> Tuple[
 
         config_file = script.get_parameter('config_file', "D:\\TimeConfig\\FISH.data11.txt")
         project_root = script.get_parameter('project_root',
-                                            "D:\\fishdev\\client\\MainProject\\Assets\\InBundle\\Character")
-        path_fields_param = script.get_parameter('path_fields_param', "assetName")
+                                            "D:\\fishdev\\client\\MainProject\\Assets\\InBundle")
+        path_fields_param = script.get_parameter('path_fields_param', "displayicon")
         encoding = script.get_parameter('encoding', 'utf-8')
-        custom_extensions_param = script.get_parameter('custom_extensions_param', ['.controller', '.prefab'])
+        custom_extensions_param = script.get_parameter('custom_extensions_param', ['.png'])
 
         script.debug(f"原始参数 - config_file: {config_file}")
         script.debug(f"原始参数 - project_root: {project_root}")
@@ -489,12 +490,14 @@ def get_and_validate_parameters(script) -> Tuple[
         return None, None, None, None, None, error_msg
 
 
-def validate_field_items(script, field_items: List[Dict[str, Any]], project_root: Path, custom_extensions: List[str]) -> \
-Tuple[int, List[Dict[str, str]]]:
-    """验证字段项的路径是否存在"""
+def validate_field_items_with_details(script, field_items: List[Dict[str, Any]], project_root: Path,
+                                      custom_extensions: List[str]) -> \
+        Tuple[int, List[Dict[str, str]], List[Dict[str, str]]]:
+    """验证字段项的路径是否存在，并返回详细信息"""
     try:
         script.info("开始验证路径...")
         missing_paths = []
+        found_paths = []
         valid_count = 0
         total_items = len(field_items)
 
@@ -503,10 +506,17 @@ Tuple[int, List[Dict[str, str]]]:
                 if i % 10 == 0:  # 每10个项目报告一次进度
                     script.debug(f"验证进度: {i + 1}/{total_items}")
 
-                exists = validate_path_exists(script, field_item['cleaned_value'], project_root, custom_extensions)
+                exists, found_path = validate_path_exists_with_details(script, field_item['cleaned_value'],
+                                                                       project_root, custom_extensions)
 
-                if exists:
+                if exists and found_path:
                     valid_count += 1
+                    found_paths.append({
+                        'field': field_item['source_key'],
+                        'value': field_item['cleaned_value'],
+                        'original': field_item['original_value'],
+                        'found_path': found_path
+                    })
                 else:
                     missing_paths.append({
                         'field': field_item['source_key'],
@@ -523,7 +533,7 @@ Tuple[int, List[Dict[str, str]]]:
                 })
 
         script.info(f"路径验证完成，有效: {valid_count}, 无效: {len(missing_paths)}")
-        return valid_count, missing_paths
+        return valid_count, missing_paths, found_paths
 
     except Exception as e:
         script.error(f"验证路径时发生错误: {e}")
@@ -587,37 +597,115 @@ def main_logic(script):
         return script.error_result(error_msg, "ScanError")
 
     if total_items == 0:
-        message = "未找到任何目标字段的配置项"
+        message = "配置文件路径字段验证结果: 未找到任何目标字段的配置项"
         return script.success_result(message, {
             'total_paths': 0,
             'valid_paths': 0,
             'invalid_paths': 0,
             'success_rate': 0,
-            'missing_paths': []
+            'missing_paths': [],
+            'found_paths': []
         })
 
     # 5. 验证每个配置项的路径
     try:
-        valid_count, missing_paths = validate_field_items(script, all_field_items, project_root, custom_extensions)
+        valid_count, missing_paths, found_paths = validate_field_items_with_details(script, all_field_items,
+                                                                                    project_root, custom_extensions)
     except Exception as e:
         error_msg = f"验证路径时发生错误: {e}"
         script.error(error_msg)
         return script.error_result(error_msg, "ValidationError")
 
-    # 6. 生成结果消息
+    # 6. 生成详细的结果消息
     try:
         invalid_count = len(missing_paths)
+        success_rate = (valid_count / total_items) * 100 if total_items > 0 else 0
 
+        # 获取配置文件名和工程目录名用于显示
+        config_filename = os.path.basename(config_file)
+        project_dirname = os.path.basename(project_root_str)
+
+        # 统计各个字段的情况
+        field_stats = {}
+        for item in all_field_items:
+            field_name = item['field_name']
+            if field_name not in field_stats:
+                field_stats[field_name] = {'total': 0, 'valid': 0}
+            field_stats[field_name]['total'] += 1
+
+        # 统计有效字段
+        for found in found_paths:
+            field_name = found['field'].split('[')[0]  # 提取字段名
+            if field_name in field_stats:
+                field_stats[field_name]['valid'] += 1
+
+        # 构建详细消息
+        message_parts = []
+        message_parts.append("配置文件路径字段验证完成")
+        message_parts.append(f"配置文件: {config_filename}")
+        message_parts.append(f"工程目录: {project_dirname}")
+        message_parts.append(f"验证字段: {', '.join(path_fields)}")
+        message_parts.append(f"支持扩展名: {', '.join(custom_extensions)}")
+        message_parts.append("")
+
+        # 总体统计
+        message_parts.append("=== 验证结果统计 ===")
+        message_parts.append(f"总计配置项: {total_items}")
+        message_parts.append(f"路径存在: {valid_count}")
+        message_parts.append(f"路径缺失: {invalid_count}")
+        message_parts.append(f"成功率: {success_rate:.1f}%")
+        message_parts.append("")
+
+        # 各字段统计
+        if field_stats:
+            message_parts.append("=== 各字段验证情况 ===")
+            for field_name, stats in field_stats.items():
+                field_success_rate = (stats['valid'] / stats['total']) * 100 if stats['total'] > 0 else 0
+                message_parts.append(f"{field_name}: {stats['valid']}/{stats['total']} ({field_success_rate:.1f}%)")
+            message_parts.append("")
+
+        # 展示找到的文件路径（部分）
+        if found_paths:
+            message_parts.append("=== 找到的文件路径示例 ===")
+            display_found_count = min(len(found_paths), 10)  # 最多显示10个
+            for i, found in enumerate(found_paths[:display_found_count]):
+                message_parts.append(
+                    f"{i + 1}. 字段: {found['field']} | 配置值: {found['value']} | 实际路径: {found['found_path']}")
+
+            if len(found_paths) > display_found_count:
+                message_parts.append(f"... 还有 {len(found_paths) - display_found_count} 个找到的文件未显示")
+            message_parts.append("")
+
+        # 所有缺失路径详情
+        if invalid_count > 0:
+            message_parts.append("=== 所有缺失路径详情 ===")
+            for i, missing in enumerate(missing_paths):
+                message_parts.append(
+                    f"{i + 1}. 字段: {missing['field']} | 配置值: {missing['value']} | 原始值: {missing['original']}")
+            message_parts.append("")
+
+        # 结论
         if invalid_count == 0:
-            message = f"✓ 验证完成: 所有 {total_items} 个配置项的路径都存在"
+            message_parts.append("结论: 所有配置路径验证通过！")
+        elif success_rate >= 90:
+            message_parts.append("结论: 路径验证良好，少量路径需要检查")
+        elif success_rate >= 70:
+            message_parts.append("结论: 路径验证一般，建议检查缺失路径")
         else:
-            message = f"验证完成: {valid_count}/{total_items} 个路径存在，{invalid_count} 个路径不存在"
+            message_parts.append("结论: 路径验证较差，需要重点检查配置")
 
+        message = "\n".join(message_parts)
         script.info("结果消息生成完成")
 
     except Exception as e:
         script.error(f"生成结果消息时出错: {e}")
-        message = f"验证完成: {valid_count}/{total_items} 个路径存在"
+        # 降级到简单消息
+        invalid_count = len(missing_paths)
+        success_rate = (valid_count / total_items) * 100 if total_items > 0 else 0
+        if invalid_count == 0:
+            message = f"验证完成: 所有 {total_items} 个配置项的路径都存在 (成功率: 100%)"
+        else:
+            message = f"验证完成: {valid_count}/{total_items} 个路径存在，{invalid_count} 个路径不存在 (成功率: {success_rate:.1f}%)"
 
     # 7. 返回结果
     try:
@@ -628,7 +716,13 @@ def main_logic(script):
             'valid_paths': valid_count,
             'invalid_paths': invalid_count,
             'success_rate': success_rate,
-            'missing_paths': missing_paths[:50]  # 限制返回的缺失路径数量
+            'missing_paths': missing_paths,  # 返回所有缺失路径
+            'found_paths': found_paths[:50],  # 限制返回的找到路径数量，防止数据过大
+            'field_statistics': field_stats if 'field_stats' in locals() else {},
+            'config_file': config_filename if 'config_filename' in locals() else os.path.basename(config_file),
+            'project_root': project_dirname if 'project_dirname' in locals() else os.path.basename(project_root_str),
+            'verified_fields': path_fields,
+            'supported_extensions': custom_extensions
         }
 
         script.info("脚本执行完成")
@@ -641,4 +735,4 @@ def main_logic(script):
 
 
 if __name__ == '__main__':
-    create_simple_script('config_field_path_validator_simple', main_logic)
+    create_simple_script('config_field_path_validator_detailed', main_logic)

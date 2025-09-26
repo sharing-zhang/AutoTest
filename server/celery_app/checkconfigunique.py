@@ -151,6 +151,19 @@ def extract_parameter_value(param_name: str, line: str) -> Optional[str]:
         return None
 
 
+def format_file_size(file_path: str) -> str:
+    """格式化文件大小"""
+    try:
+        size = os.path.getsize(file_path)
+        for unit in ['B', 'KB', 'MB', 'GB']:
+            if size < 1024.0:
+                return f"{size:.1f} {unit}"
+            size /= 1024.0
+        return f"{size:.1f} TB"
+    except:
+        return "未知大小"
+
+
 def load_config_file(script, file_path: str) -> Tuple[List[str], str]:
     """加载配置文件"""
     script.info(f"开始加载配置文件: {file_path}")
@@ -223,13 +236,17 @@ def check_parameter_uniqueness(script, lines: List[str], parameters: List[str]) 
         return {
             'duplicates': {param: {} for param in parameters},
             'total_blocks': 0,
-            'param_values': {param: defaultdict(list) for param in parameters}
+            'param_values': {param: defaultdict(list) for param in parameters},
+            'total_param_instances': {param: 0 for param in parameters},
+            'unique_values': {param: 0 for param in parameters}
         }
 
     # 存储每个参数的值和位置信息
     param_values = {}
+    total_param_instances = {}
     for param in parameters:
         param_values[param] = defaultdict(list)
+        total_param_instances[param] = 0
 
     total_blocks = 0
     current_block = None
@@ -271,6 +288,7 @@ def check_parameter_uniqueness(script, lines: List[str], parameters: List[str]) 
                             try:
                                 value = extract_parameter_value(param, line_stripped)
                                 if value is not None:
+                                    total_param_instances[param] += 1
                                     param_values[param][value].append({
                                         'block_id': current_block['id'],
                                         'block_type': current_block['type'],
@@ -295,6 +313,7 @@ def check_parameter_uniqueness(script, lines: List[str], parameters: List[str]) 
                         try:
                             value = extract_parameter_value(param, line_stripped)
                             if value is not None:
+                                total_param_instances[param] += 1
                                 param_values[param][value].append({
                                     'block_id': current_block['id'],
                                     'block_type': current_block['type'],
@@ -329,51 +348,152 @@ def check_parameter_uniqueness(script, lines: List[str], parameters: List[str]) 
 
     # 找出重复的参数值
     duplicates = {}
+    unique_values = {}
     for param in parameters:
         duplicates[param] = {}
+        unique_values[param] = 0
         for value, block_list in param_values[param].items():
             if len(block_list) > 1:
                 duplicates[param][value] = block_list
+            else:
+                unique_values[param] += 1
 
     script.info(f"解析完成: 共发现 {total_blocks} 个配置块")
 
     return {
         'duplicates': duplicates,
         'total_blocks': total_blocks,
-        'param_values': param_values
+        'param_values': param_values,
+        'total_param_instances': total_param_instances,
+        'unique_values': unique_values
     }
 
 
-def generate_chinese_uniqueness_message(results: Dict, parameters: List[str]) -> str:
+def generate_chinese_uniqueness_message(results: Dict, parameters: List[str], file_path: str,
+                                        used_encoding: str) -> str:
     """生成中文的唯一性检查消息"""
     try:
         duplicates = results['duplicates']
         total_blocks = results['total_blocks']
+        total_param_instances = results['total_param_instances']
+        unique_values = results['unique_values']
 
-        # 检查是否有重复
-        has_duplicates = False
-        duplicate_count = 0
+        # 获取文件基本信息
+        file_name = os.path.basename(file_path)
+        file_size = format_file_size(file_path)
+
+        # 构建消息头
+        separator = "=" * 60
+        message_parts = [
+            separator,
+            "配置文件参数唯一性检查报告",
+            separator,
+            f"文件信息:",
+            f"  文件名: {file_name}",
+            f"  文件大小: {file_size}",
+            f"  文件编码: {used_encoding}",
+            "",
+            f"检查参数: {', '.join(parameters)}",
+            f"参数数量: {len(parameters)} 个",
+            "",
+            f"统计信息:",
+            f"  配置块总数: {total_blocks} 个",
+            ""
+        ]
+
+        # 统计各参数的情况
+        total_duplicates = 0
+        total_duplicate_instances = 0
+        total_unique_instances = 0
 
         for param in parameters:
-            if duplicates.get(param):
-                has_duplicates = True
-                duplicate_count += len(duplicates[param])
+            param_total = total_param_instances.get(param, 0)
+            param_unique = unique_values.get(param, 0)
+            param_duplicates = len(duplicates.get(param, {}))
+            param_duplicate_instances = sum(len(block_list) for block_list in duplicates.get(param, {}).values())
 
-        if not has_duplicates:
-            return f"唯一性检查完成: 所有 {total_blocks} 个配置块的参数 {', '.join(parameters)} 都是唯一的"
+            total_duplicates += param_duplicates
+            total_duplicate_instances += param_duplicate_instances
+            total_unique_instances += param_unique
 
-        # 生成重复信息
-        duplicate_info = []
-        for param in parameters:
-            if duplicates.get(param):
-                for value, block_list in duplicates[param].items():
-                    locations = []
-                    for block_info in block_list:
-                        locations.append(f"第{block_info['param_line']}行(第{block_info['block_index']}个配置块)")
-                    duplicate_info.append(f"{param}='{value}' 重复出现在: {', '.join(locations)}")
+            message_parts.extend([
+                f"  参数 '{param}':",
+                f"    参数实例总数: {param_total} 个",
+                f"    唯一值数量: {param_unique} 个",
+                f"    重复值数量: {param_duplicates} 个",
+                f"    重复实例数量: {param_duplicate_instances} 个",
+                ""
+            ])
 
-        message = f"检查完成: 在 {total_blocks} 个配置块中发现 {duplicate_count} 个重复的参数值。重复详情: {'; '.join(duplicate_info)}"
-        return message
+        # 总体统计
+        message_parts.extend([
+            f"总体统计:",
+            f"  参数实例总数: {sum(total_param_instances.values())} 个",
+            f"  唯一值总数: {total_unique_instances} 个",
+            f"  重复值总数: {total_duplicates} 个",
+            f"  重复实例总数: {total_duplicate_instances} 个",
+            ""
+        ])
+
+        # 检查结果状态
+        if total_duplicates == 0:
+            message_parts.extend([
+                "检查状态: 通过",
+                "所有参数值都是唯一的，未发现重复",
+                separator
+            ])
+        else:
+            # 计算重复率
+            total_instances = sum(total_param_instances.values())
+            duplicate_rate = (total_duplicate_instances / total_instances * 100) if total_instances > 0 else 0
+
+            message_parts.extend([
+                "检查状态: 未通过",
+                f"发现 {total_duplicates} 个重复值，涉及 {total_duplicate_instances} 个参数实例",
+                f"重复率: {duplicate_rate:.1f}%",
+                ""
+            ])
+
+            # 显示重复详情
+            display_count = 0
+            max_display = 10
+
+            message_parts.append("重复参数详情:")
+
+            for param in parameters:
+                if duplicates.get(param):
+                    for value, block_list in list(duplicates[param].items()):
+                        if display_count >= max_display:
+                            break
+
+                        display_count += 1
+                        message_parts.extend([
+                            f"  [{display_count}] 参数 '{param}' 值 '{value}' (重复 {len(block_list)} 次):",
+                        ])
+
+                        for i, block_info in enumerate(block_list[:5], 1):  # 最多显示5个位置
+                            message_parts.append(
+                                f"      位置{i}: 第{block_info['param_line']}行 "
+                                f"(第{block_info['block_index']}个配置块 {block_info['block_id']})"
+                            )
+
+                        if len(block_list) > 5:
+                            message_parts.append(f"      ... 还有 {len(block_list) - 5} 个重复位置")
+
+                        message_parts.append("")
+
+                    if display_count >= max_display:
+                        break
+
+            # 如果有更多重复，显示省略信息
+            remaining_duplicates = total_duplicates - display_count
+            if remaining_duplicates > 0:
+                message_parts.append(f"  ... 还有 {remaining_duplicates} 个重复值未显示")
+                message_parts.append("")
+
+            message_parts.append(separator)
+
+        return "\n".join(message_parts)
 
     except Exception as e:
         return f"生成报告时出错: {e}"
@@ -432,13 +552,16 @@ def main_logic(script):
             results = check_parameter_uniqueness(script, lines, parameters)
             script.info("参数唯一性检查完成")
 
-            # 生成中文消息
-            message = generate_chinese_uniqueness_message(results, parameters)
+            # 生成格式化的中文消息
+            message = generate_chinese_uniqueness_message(results, parameters, file_path, used_encoding)
 
             # 统计重复数量
             duplicate_count = 0
+            duplicate_instances = 0
             for param in parameters:
-                duplicate_count += len(results['duplicates'].get(param, {}))
+                param_duplicates = results['duplicates'].get(param, {})
+                duplicate_count += len(param_duplicates)
+                duplicate_instances += sum(len(block_list) for block_list in param_duplicates.values())
 
             script.info("唯一性检查任务完成")
 
@@ -446,11 +569,39 @@ def main_logic(script):
             return script.success_result(
                 message=message,
                 data={
-                    'total_blocks': results['total_blocks'],
-                    'duplicate_count': duplicate_count,
-                    'duplicates': results['duplicates'],
-                    'file_encoding': used_encoding,
-                    'checked_parameters': parameters
+                    'file_info': {
+                        'file_name': os.path.basename(file_path),
+                        'file_path': file_path,
+                        'file_size': format_file_size(file_path),
+                        'file_encoding': used_encoding,
+                        'total_lines': len(lines)
+                    },
+                    'check_summary': {
+                        'checked_parameters': parameters,
+                        'parameter_count': len(parameters),
+                        'total_blocks': results['total_blocks'],
+                        'total_param_instances': sum(results['total_param_instances'].values()),
+                        'unique_values_count': sum(results['unique_values'].values()),
+                        'duplicate_values_count': duplicate_count,
+                        'duplicate_instances_count': duplicate_instances,
+                        'duplicate_rate': round(
+                            (duplicate_instances / sum(results['total_param_instances'].values()) * 100), 1) if sum(
+                            results['total_param_instances'].values()) > 0 else 0,
+                        'check_status': 'PASS' if duplicate_count == 0 else 'FAIL'
+                    },
+                    'parameter_statistics': {
+                        param: {
+                            'total_instances': results['total_param_instances'].get(param, 0),
+                            'unique_values': results['unique_values'].get(param, 0),
+                            'duplicate_values': len(results['duplicates'].get(param, {})),
+                            'duplicate_instances': sum(
+                                len(block_list) for block_list in results['duplicates'].get(param, {}).values())
+                        }
+                        for param in parameters
+                    },
+                    'duplicates': {param: dict(list(duplicates.items())[:5]) for param, duplicates in
+                                   results['duplicates'].items()},  # 限制返回数量
+                    'has_more_duplicates': duplicate_count > 50
                 }
             )
 

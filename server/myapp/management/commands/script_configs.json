@@ -57,7 +57,7 @@
         "required": false,
         "multiple": true,
         "default": [
-        
+
           "TIMER_MAIN.data.txt"
         ],
         "placeholder": "输入文件名，按回车添加"
@@ -123,7 +123,7 @@
         "type": "text",
         "label": "配置文件地址",
         "required": true,
-        "default": "D:\\desk\\work\\test\\FISH.data11.txt",
+        "default": "D:\\TimeConfig\\FISH.data11.txt",
         "placeholder": "配置文件文件地址，例如D:\\TimeConfig\\FISH.data.txt"
       },
       {
@@ -131,7 +131,7 @@
         "type": "text",
         "label": "工程文件目录",
         "required": true,
-        "default": "D:\\",
+        "default": "D:\\fishdev\\client\\MainProject\\Assets\\InBundle",
         "description": "输入工程文件的目录，支持输入精确or大致路径"
       },
       {
@@ -147,7 +147,11 @@
         "type": "checkbox",
         "label": "文件后缀名",
         "options": [
-          ".controller", ".meta", ".prefab", ".txt", ".unity"],
+        ".anim", ".asset", ".bytes", ".controller", ".dae", ".dds",
+        ".fbx", ".font", ".hlsl", ".jpg", ".json", ".mat", ".mp3",
+        ".obj", ".png", ".prefab",".scene", ".shader", ".tga", ".ttf",
+        ".txt", ".unity", ".wav", ".xml"
+        ],
         "required": false,
         "multiple": true,
         "default": [".txt"],
