@@ -39,7 +39,7 @@ app.conf.update(
     
     # 任务配置
     task_track_started=True,           # 跟踪任务开始状态
-    task_acks_late=True,              # 任务完成后才确认
+    task_acks_late=False,             # 任务开始后立即确认（避免重复执行）
     task_reject_on_worker_lost=True,  # Worker丢失时拒绝任务
     task_ignore_result=False,         # 不忽略任务结果
     

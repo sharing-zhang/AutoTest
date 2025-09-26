@@ -152,8 +152,27 @@ def execute_script_task(self, task_execution_id, script_info, parameters, user_i
     - 系统监控和维护
     """
     from .script_executor_base import UnifiedScriptExecutor
+    from myapp.models import TaskExecution
     
     logger.info(f"开始执行脚本: task_id={self.request.id}, script={script_info.get('name', 'unknown')}")
+    
+    # 检查任务是否已经执行过（防止重复执行）
+    try:
+        task_execution = TaskExecution.objects.get(id=task_execution_id)
+        if task_execution.status in ['SUCCESS', 'FAILURE']:
+            logger.warning(f"任务 {task_execution_id} 已经执行过，状态: {task_execution.status}，跳过重复执行")
+            return {
+                'status': 'skipped',
+                'message': f'任务已执行过，状态: {task_execution.status}',
+                'script_name': script_info.get('name', 'unknown')
+            }
+    except TaskExecution.DoesNotExist:
+        logger.error(f"任务执行记录 {task_execution_id} 不存在")
+        return {
+            'status': 'error',
+            'error': f'任务执行记录 {task_execution_id} 不存在',
+            'script_name': script_info.get('name', 'unknown')
+        }
     
     try:
         # 使用统一执行器
