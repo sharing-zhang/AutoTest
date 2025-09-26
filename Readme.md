@@ -468,5 +468,6 @@ python manage.py runserver 0.0.0.0:8000
 9.
   python manage.py register_scripts
   python manage.py setup_page_scripts --config-file myapp\management\commands\button_configs.json
+  redis-cli flushall 
 
 > 🌟 如果这个项目对你有帮助，请给我们一个星星！
