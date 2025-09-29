@@ -13,12 +13,12 @@ from myapp.permission.permission import isDemoAdminUser
 from myapp.serializers import PluginSerializer
 
 
-@api_view(['GET'])
-def list_api(request):
-    if request.method == 'GET':
-        plugins = Plugin.objects.all().order_by('-create_time')
-        serializer = PluginSerializer(plugins, many=True)
-        return APIResponse(code=0, msg='查询成功', data=serializer.data)
+# @api_view(['GET'])
+# def list_api(request):
+#     if request.method == 'GET':
+#         plugins = Plugin.objects.all().order_by('-create_time')
+#         serializer = PluginSerializer(plugins, many=True)
+#         return APIResponse(code=0, msg='查询成功', data=serializer.data)
 
 
 @api_view(['POST'])
@@ -35,26 +35,26 @@ def create(request):
     return APIResponse(code=1, msg='创建失败')
 
 
-@api_view(['POST'])
-@authentication_classes([AdminTokenAuthtication])
-def update(request):
-    if isDemoAdminUser(request):
-        return APIResponse(code=1, msg='演示帐号无法操作')
-
-    try:
-        pk = request.GET.get('id', -1)
-        plugin = Plugin.objects.get(pk=pk)
-    except Plugin.DoesNotExist:
-        return APIResponse(code=1, msg='对象不存在')
-
-    serializer = PluginSerializer(plugin, data=request.data)
-    if serializer.is_valid():
-        serializer.save()
-        return APIResponse(code=0, msg='更新成功', data=serializer.data)
-    else:
-        print(serializer.errors)
-
-    return APIResponse(code=1, msg='更新失败')
+# @api_view(['POST'])
+# @authentication_classes([AdminTokenAuthtication])
+# def update(request):
+#     if isDemoAdminUser(request):
+#         return APIResponse(code=1, msg='演示帐号无法操作')
+#
+#     try:
+#         pk = request.GET.get('id', -1)
+#         plugin = Plugin.objects.get(pk=pk)
+#     except Plugin.DoesNotExist:
+#         return APIResponse(code=1, msg='对象不存在')
+#
+#     serializer = PluginSerializer(plugin, data=request.data)
+#     if serializer.is_valid():
+#         serializer.save()
+#         return APIResponse(code=0, msg='更新成功', data=serializer.data)
+#     else:
+#         print(serializer.errors)
+#
+#     return APIResponse(code=1, msg='更新失败')
 
 
 @api_view(['POST'])
@@ -203,3 +203,161 @@ def download_exe(request):  # 注：现在支持所有文件类型，不仅限�
 
     except Exception as e:
         return JsonResponse({'error': '文件下载失败'}, status=500)
+
+
+@api_view(['POST'])
+@authentication_classes([AdminTokenAuthtication])
+def update_exe(request):
+    """更新插件文件和元数据信息"""
+    if isDemoAdminUser(request):
+        return APIResponse(code=1, msg='演示帐号无法操作')
+
+    try:
+        # 获取请求参数
+        original_name = request.POST.get('original_name')  # 原文件名
+        display_name = request.POST.get('display_name', '').strip()
+        description = request.POST.get('description', '').strip()
+        new_file = request.FILES.get('file')  # 新文件（可选）
+
+        if not original_name:
+            return APIResponse(code=1, msg='缺少原文件名参数')
+
+        if not display_name:
+            return APIResponse(code=1, msg='插件名称不能为空')
+
+        # 安全检查
+        if '..' in original_name or '/' in original_name or '\\' in original_name:
+            return APIResponse(code=1, msg='非法文件名')
+
+        _ensure_plugin_dir()
+
+        # 检查原插件文件是否存在
+        original_file_path = os.path.join(PLUGIN_DIR, original_name)
+        if not os.path.exists(original_file_path):
+            return APIResponse(code=1, msg='原插件文件不存在')
+
+        # 准备元数据
+        meta_data = {
+            'display_name': display_name,
+            'description': description
+        }
+
+        final_file_name = original_name  # 默认使用原文件名
+
+        # 如果有新文件，则处理文件替换
+        if new_file:
+            try:
+                # 生成新的文件名（保持时间戳+原名格式）
+                new_original_name = new_file.name
+                safe_name = f"{int(time.time())}_{new_original_name}"
+                new_file_path = os.path.join(PLUGIN_DIR, safe_name)
+
+                # 保存新文件
+                with open(new_file_path, 'wb') as f:
+                    for chunk in new_file.chunks():
+                        f.write(chunk)
+
+                # 删除旧文件和旧元数据文件
+                try:
+                    if os.path.exists(original_file_path):
+                        os.remove(original_file_path)
+
+                    old_meta_path = os.path.join(PLUGIN_DIR, original_name + '.meta.json')
+                    if os.path.exists(old_meta_path):
+                        os.remove(old_meta_path)
+                except Exception as e:
+                    print(f"删除旧文件时出错: {e}")
+
+                final_file_name = safe_name
+
+                print(f"文件替换成功: {original_name} -> {safe_name}")
+
+            except Exception as e:
+                print(f"文件替换失败: {e}")
+                return APIResponse(code=1, msg=f'文件替换失败: {str(e)}')
+
+        # 更新元数据文件
+        meta_path = os.path.join(PLUGIN_DIR, final_file_name + '.meta.json')
+
+        # 如果元数据文件已存在，先读取现有数据，然后更新
+        if os.path.exists(meta_path):
+            try:
+                import json as _json
+                with open(meta_path, 'r', encoding='utf-8') as mf:
+                    existing_meta = _json.load(mf)
+                    # 保留其他可能的元数据字段
+                    existing_meta.update(meta_data)
+                    meta_data = existing_meta
+            except Exception as e:
+                print(f"读取现有元数据失败，将创建新的元数据文件: {e}")
+
+        # 写入更新后的元数据
+        try:
+            import json as _json
+            with open(meta_path, 'w', encoding='utf-8') as mf:
+                _json.dump(meta_data, mf, ensure_ascii=False, indent=2)
+        except Exception as e:
+            print(f"写入元数据失败: {e}")
+            return APIResponse(code=1, msg='更新插件信息失败')
+
+        # 返回更新后的数据
+        return APIResponse(code=0, msg='插件更新成功', data={
+            'name': final_file_name,
+            'display_name': display_name,
+            'description': description,
+            'url': settings.MEDIA_URL + 'plugins/' + escape_uri_path(final_file_name),
+            'file_updated': bool(new_file)  # 标识是否更新了文件
+        })
+
+    except Exception as e:
+        print(f"更新插件时发生错误: {e}")
+        return APIResponse(code=1, msg=f'更新失败: {str(e)}')
+@api_view(['GET'])
+def get_exe_info(request):
+    """获取单个插件的详细信息"""
+    try:
+        file_name = request.GET.get('name')
+        if not file_name:
+            return APIResponse(code=1, msg='缺少文件名参数')
+
+        # 安全检查
+        if '..' in file_name or '/' in file_name or '\\' in file_name:
+            return APIResponse(code=1, msg='非法文件名')
+
+        _ensure_plugin_dir()
+
+        # 检查文件是否存在
+        file_path = os.path.join(PLUGIN_DIR, file_name)
+        if not os.path.exists(file_path):
+            return APIResponse(code=1, msg='插件文件不存在')
+
+        # 读取元数据
+        desc = ''
+        disp = file_name
+
+        meta_path = os.path.join(PLUGIN_DIR, file_name + '.meta.json')
+        if os.path.exists(meta_path):
+            try:
+                import json as _json
+                with open(meta_path, 'r', encoding='utf-8') as mf:
+                    meta = _json.load(mf)
+                    desc = meta.get('description', '')
+                    disp = meta.get('display_name', file_name)
+            except Exception as e:
+                print(f"读取元数据失败 {meta_path}: {e}")
+
+        # 获取文件信息
+        file_stats = os.stat(file_path)
+
+        return APIResponse(code=0, msg='查询成功', data={
+            'name': file_name,
+            'display_name': disp,
+            'description': desc,
+            'url': settings.MEDIA_URL + 'plugins/' + escape_uri_path(file_name),
+            'size': file_stats.st_size,
+            'create_time': file_stats.st_ctime,
+            'modify_time': file_stats.st_mtime
+        })
+
+    except Exception as e:
+        return APIResponse(code=1, msg=f'获取插件信息失败: {str(e)}')

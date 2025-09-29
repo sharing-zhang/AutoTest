@@ -36,11 +36,10 @@ urlpatterns = [
     path('admin/thing/update', views.admin.thing.update),
     path('admin/thing/delete', views.admin.thing.delete),
 
-    path('admin/plugin/list', views.admin.plugin.list_api),
-    path('admin/plugin/create', views.admin.plugin.create),
-    path('admin/plugin/update', views.admin.plugin.update),
+
     path('admin/plugin/delete', views.admin.plugin.delete),
     path('admin/plugin/upload', views.admin.plugin.upload_exe),
+    path('admin/plugin/updateExe', views.admin.plugin.update_exe),
     path('admin/plugin/listExe', views.admin.plugin.list_exe),
     path('admin/plugin/download', views.admin.plugin.download_exe),
     
