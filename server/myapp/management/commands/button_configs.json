@@ -1,103 +1,22 @@
-
 [
-
     {
         "page_route": "/CheckReward",
-        "script_name": "check_Reward",
-        "button_text": "扫描奖励（不含参）",
-        "position": "custom",
-        "custom_position": {
-            "top": "20px",
-            "right": "50px",
-            "position": "absolute"
-        },
-        "button_style": {
-            "type": "primary",
-            "size": "default"
-        },
-        "display_order": 1
+        "scripts": ["check_Reward"]
     },
-     {
-        "page_route": "/CheckConfigTime",
-        "script_name": "check_ConfigTime",
-        "button_text": "扫描活动时间（含参）",
-        "position": "custom",
-        "custom_position": {
-            "top": "20px",
-            "right": "50px",
-            "position": "absolute"
-        },
-        "button_style": {
-            "type": "primary",
-            "size": "default"
-        },
-        "display_order": 1
+    {
+        "page_route": "/CheckConfigTime", 
+        "scripts": ["check_ConfigTime"]
     },
-     {
+    {
         "page_route": "/CheckText",
-        "script_name": "check_TextQuality",
-        "button_text": "扫描文本质量（含参）",
-        "position": "top-right",
-        "button_style": {
-            "type": "primary",
-            "size": "default"
-        },
-        "display_order": 1
+        "scripts": ["check_TextQuality"]
     },
     {
         "page_route": "/scanDevUpdate",
-        "script_name": "checkFileName",
-        "button_text": "file（含参）",
-        "position": "top-right",
-        "button_style": {
-            "type": "primary",
-            "size": "default"
-        },
-        "display_order": 1
+        "scripts": ["checkFileName", "find_resource_name"]
     },
     {
         "page_route": "/checkConfigExist",
-        "script_name": "checkConfigExist",
-        "button_text": "配置路径存在性检查（含参）",
-        "position": "top-right",
-        "button_style": {
-            "type": "primary",
-            "size": "default"
-        },
-        "display_order": 1
-    },
-    {
-        "page_route": "/checkConfigExist",
-        "script_name": "checkconfigempty",
-        "button_text": "配置不为空检查（含参）",
-        "position": "top-right",
-        "button_style": {
-            "type": "primary",
-            "size": "default"
-        },
-        "display_order": 2
-    },
-    {
-        "page_route": "/checkConfigExist",
-        "script_name": "checkconfigunique",
-        "button_text": "配置唯一性检查（含参）",
-        "position": "top-right",
-        "button_style": {
-            "type": "primary",
-            "size": "default"
-        },
-        "display_order": 3
-    },
-
-    {
-        "page_route": "/scanDevUpdate",
-        "script_name": "find_resource_name",
-        "button_text": "匹配搜索",
-        "position": "top-right",
-        "button_style": {
-            "type": "primary",
-            "size": "default"
-        },
-        "display_order": 2
+        "scripts": ["checkConfigExist", "checkconfigempty", "checkconfigunique"]
     }
 ]

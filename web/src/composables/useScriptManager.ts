@@ -13,7 +13,6 @@ export function useScriptManager(pageRoute: string) {
   const availableScripts = ref<any[]>([])
 
   // 页面配置（决定按钮如何在页面展示）
-  const pageConfigs = ref<any[]>([])
 
   // 完整配置后的脚本按钮（用于直接渲染）
   const allConfiguredScripts = ref<any[]>([])
@@ -52,10 +51,11 @@ export function useScriptManager(pageRoute: string) {
         throw scriptsError
       }
       
+      // 获取页面配置 - 使用专门的API
       try {
         console.log('正在获取页面配置...')
         const configsResponse = await getPageConfigsApi(pageRoute)
-        configsData = configsResponse.data || configsResponse
+        configsData = configsResponse.results || configsResponse || []
         console.log('页面配置响应:', configsData)
       } catch (configsError) {
         console.error('获取页面配置失败:', configsError)
@@ -70,26 +70,26 @@ export function useScriptManager(pageRoute: string) {
           id: script.id || index,                      // 无 id 时回退 index，避免渲染 key 报错
           name: script.name || `脚本${index}`,         // 保底名称
           description: script.description || '',       // 保底描述
+          dialog_title: script.dialog_title || '',     // 对话框标题
+          is_active: script.is_active !== false,       // 默认为启用状态，除非明确为false
           loading: false,                              // 初始非加载状态
           tasks: Array.isArray(script.tasks) ? script.tasks : [] // 非数组则回退为空数组
         }))
         
-        // 页面层面的按钮/布局配置
-        pageConfigs.value = Array.isArray(configsData) ? configsData : []
+        // 页面配置现在直接从数据库模型获取，不再需要单独的API
 
-        // 合并为“可直接渲染”的按钮集合
+        // 合并为"可直接渲染"的按钮集合
         allConfiguredScripts.value = mergeScriptsWithConfigs(
           availableScripts.value, 
-          pageConfigs.value
+          configsData
         )
         
-        // console.log(`页面 ${pageRoute} 脚本加载完成:`, {
-        //   scripts: availableScripts.value.length,
-        //   configs: pageConfigs.value.length,
-        //   configured: allConfiguredScripts.value.length
-        // })
+        console.log(`页面 ${pageRoute} 脚本加载完成:`, {
+          scripts: availableScripts.value.length,
+          configs: configsData.length,
+          configured: allConfiguredScripts.value.length
+        })
 
-      console.log(`页面 ${pageRoute} 脚本加载完成:`)
 
       } else {
         // 返回结构不符合预期
@@ -368,54 +368,43 @@ export function useScriptManager(pageRoute: string) {
   }
 
   /**
-   * 合并脚本与页面配置，生成“可渲染按钮集”
-   * 规则：
-   * - 一个脚本可对应多个页面配置 config，最终产出多个按钮（文案/样式/位置可不同）
-   * - 没有页面配置的脚本不产出按钮（即“配置驱动渲染”）
+   * 合并脚本与页面配置，生成"可渲染脚本集"
+   * 新版本：支持一个页面配置多个脚本
    *
    * @param scripts 原始脚本列表 availableScripts
    * @param configs 页面配置列表 pageConfigs
-   * @returns result 最终用于渲染的按钮数组
+   * @returns result 最终用于渲染的脚本数组
    */
   const mergeScriptsWithConfigs = (scripts: any[], configs: any[]) => {
-    const configMap = new Map<number, any[]>()
-    
-    // 按 script.id 将页面配置分组（一个脚本可能有多个 config）
-    configs.forEach(config => {
-      const scriptId = config.script?.id || config.script_id
-      if (scriptId) {
-        if (!configMap.has(scriptId)) {
-          configMap.set(scriptId, [])
-        }
-        configMap.get(scriptId)?.push(config)
-      }
-    })
+    console.log('合并脚本和配置:', { scripts: scripts.length, configs: configs.length })
     
     const result: any[] = []
     
-    // 遍历每个脚本，按分组到的配置生成按钮
-    scripts.forEach(script => {
-      const scriptConfigs = configMap.get(script.id) || []
+    // 遍历每个配置，每个配置包含一个页面的多个脚本
+    configs.forEach(config => {
+      console.log('处理配置:', config)
       
-      if (scriptConfigs.length > 0) {
-        // 有配置时，为每条配置生成一个“按钮实例”
-        scriptConfigs.forEach(config => {
+      // 获取配置中的脚本名称列表
+      const scriptNames = config.scripts || []
+      console.log('配置中的脚本名称:', scriptNames)
+      
+      // 根据脚本名称找到对应的脚本对象
+      scriptNames.forEach(scriptName => {
+        const matchingScript = scripts.find(s => s.name === scriptName)
+        if (matchingScript) {
+          console.log(`找到匹配的脚本: ${scriptName}`)
           result.push({
-            ...script,                                // 继承脚本基础信息（任务、loading等）
-            button_text: config.button_text || script.name,
-            button_style: config.button_style || {},
-            position: config.position || 'top-right', // 按钮位置，默认为 top-right
-            customPosition: config.custom_position || config.customPosition || {}, // 自定义位置配置
-            display_order: config.display_order || 0, // 用于排序
-            dialog_title: config.dialog_title,        // 参数弹窗标题（若用于参数收集）
-            display_name: config.display_name,
-            config_id: config.id                      // 记录该按钮来自哪条配置
+            ...matchingScript,  // 继承脚本基础信息
+            display_name: matchingScript.name,
+            config_id: config.id
           })
-        })
-      }
-      // 无配置则不生成按钮（即不显示）
+        } else {
+          console.warn(`未找到脚本: ${scriptName}`)
+        }
+      })
     })
     
+    console.log('合并结果:', result.length, '个脚本')
     return result
   }
 
@@ -425,7 +414,6 @@ export function useScriptManager(pageRoute: string) {
    */
   const resetScripts = () => {
     availableScripts.value = []
-    pageConfigs.value = []
     allConfiguredScripts.value = []
   }
 
@@ -478,7 +466,6 @@ export function useScriptManager(pageRoute: string) {
   return {
     // 状态
     availableScripts,
-    pageConfigs,
     allConfiguredScripts,
     loading,
     

@@ -127,8 +127,6 @@ class TaskExecutionSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 class PageScriptConfigSerializer(serializers.ModelSerializer):
-    script = ScriptSerializer(read_only=True)
-    
     class Meta:
         model = PageScriptConfig
         fields = '__all__'

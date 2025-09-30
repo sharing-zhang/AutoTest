@@ -146,3 +146,90 @@ def sendmessage(request):
     except Exception as e:
         print(e)
         return APIResponse(code=1, msg='消息发送失败，请检查webhook与密钥是否正确',data=request.data)
+
+
+@api_view(['POST'])
+@authentication_classes([AdminTokenAuthtication])
+def rerun_script(request):
+    """
+    一键重跑脚本功能
+    使用历史任务参数重新执行脚本，结果作为新记录返回
+    """
+    # 判断是否是演示账号，用于账号隔离
+    if isDemoAdminUser(request):
+        return APIResponse(code=1, msg='演示帐号无法操作')
+
+    try:
+        # 获取扫描结果记录ID
+        scan_result_id = request.GET.get('id', -1)
+        scan_result = ScanDevUpdate_scanResult.objects.get(pk=scan_result_id)
+        
+        # 检查是否为脚本执行结果
+        if scan_result.result_type not in ['script', 'task']:
+            return APIResponse(code=1, msg='只有脚本执行结果才能重跑')
+        
+        # 检查是否有task_id
+        if not scan_result.task_id:
+            return APIResponse(code=1, msg='该记录没有关联的任务ID，无法重跑')
+        
+        # 查找对应的TaskExecution记录
+        from myapp.models import TaskExecution
+        try:
+            task_execution = TaskExecution.objects.get(task_id=scan_result.task_id)
+        except TaskExecution.DoesNotExist:
+            return APIResponse(code=1, msg='找不到对应的任务执行记录')
+        
+        # 检查脚本是否仍然存在且启用
+        script = task_execution.script
+        if not script.is_active:
+            return APIResponse(code=1, msg='脚本已禁用，无法重跑')
+        
+        # 获取历史参数
+        historical_parameters = task_execution.parameters
+        
+        # 创建新的任务执行记录
+        new_task_execution = TaskExecution.objects.create(
+            script=script,
+            user=request.user,
+            page_context=task_execution.page_context,
+            parameters=historical_parameters,
+            status='PENDING'
+        )
+        
+        # 启动Celery任务
+        from myapp.views.celery_views import execute_script_task
+        
+        script_info = {
+            'name': script.name,
+            'path': script.script_path,
+            'id': script.id
+        }
+        
+        celery_task = execute_script_task.delay(
+            new_task_execution.id,
+            script_info,
+            historical_parameters,
+            request.user.id,
+            task_execution.page_context
+        )
+        
+        # 更新任务ID
+        new_task_execution.task_id = celery_task.id
+        new_task_execution.save()
+        
+        return APIResponse(
+            code=0, 
+            msg='重跑任务已启动', 
+            data={
+                'task_id': celery_task.id,
+                'execution_id': new_task_execution.id,
+                'script_name': script.name,
+                'message': f'正在使用历史参数重新执行脚本: {script.name}'
+            }
+        )
+        
+    except ScanDevUpdate_scanResult.DoesNotExist:
+        return APIResponse(code=1, msg='扫描结果记录不存在')
+    except Exception as e:
+        print(f"重跑脚本失败: {e}")
+        return APIResponse(code=1, msg=f'重跑失败: {str(e)}')

@@ -2,36 +2,23 @@
   <div>
     <!-- 使用脚本管理布局组件 -->
     <ScriptManagerLayout page-route="/scanDevUpdate" ref="scriptManager">
+      
       <el-tabs v-model="activeName" class="el-tabs__content">
         <el-tab-pane label="扫描结果" name="scanResult">
-          <a-table
-            size="middle"
-            rowKey="scanResult_id"
+          <ScanResultTable
             :loading="data.loading"
-            :columns="scanResultcolumns"
             :data-source="data.scanResult_dataList"
-            :scroll="{ x: 'max-content' }"
-            :pagination="{
-              size: 'small',
-              current: data.page,
-              pageSize: data.pageSize,
-              onChange: (current) => (data.page = current),
-              showSizeChanger: false,
-              showTotal: (total) => `共${total}条数据`,
-            }"
-          >
-            <template #bodyCell="{ text, record, index, column }">
-              <template v-if="column.key === 'operation'">
-                <span>
-                  <a @click="handleSend(record)">消息同步</a>
-                  <a-divider type="vertical" />
-                  <a @click="handleEdit(record)">编辑</a>
-                  <a-divider type="vertical" />
-                  <a @click="handleClick(record)">查看详情</a>
-                </span>
-              </template>
-            </template>
-          </a-table>
+            :columns="scanResultcolumns"
+            :current="data.page"
+            :page-size="data.pageSize"
+            :show-rerun="true"
+            :show-edit="false"
+            :use-builtin-rerun="true"
+            @send="handleSend"
+            @view-detail="handleClick"
+            @refresh-data="handleRefreshData"
+            @page-change="(current) => data.page = current"
+          />
         </el-tab-pane>
         <el-tab-pane label="数据备份" name="dataBackup">
           <a-table
@@ -95,107 +82,14 @@
             </a-form>
           </div>
         </a-modal>
-        <a-modal
-          width="1600px"
-          :destroyOnClose="true"
-          :body-style="bodystyle"
-          :visible="scanResultContentDetail.scanResultContentDetail_visile"
-          :forceRender="true"
-          :title="scanResultContentDetail.title"
+        <!-- 使用通用扫描结果弹窗组件 -->
+        <ScanResultModal
+          v-model:visible="scanResultContentDetail.scanResultContentDetail_visile"
+          :resultData="scanResultContentDetail.form"
           @cancel="dataBackup_handleCancel"
-          cancelText="取消"
-        >
-          <!-- 根据结果类型显示不同的内容 -->
-          <div v-if="scanResultContentDetail.form['result_type'] === 'script' || scanResultContentDetail.form['result_type'] === 'task'">
-            <!-- 脚本执行结果显示 -->
-            <el-descriptions title="脚本执行信息" :column="2" border>
-              <el-descriptions-item label="脚本名称">
-                {{ scanResultContentDetail.form['script_name'] || '未知' }}
-              </el-descriptions-item>
-              <el-descriptions-item label="任务ID">
-                {{ scanResultContentDetail.form['task_id'] || '无' }}
-              </el-descriptions-item>
-              <el-descriptions-item label="执行时间">
-                {{ scanResultContentDetail.form['scandevresult_time'] }}
-              </el-descriptions-item>
-              <el-descriptions-item label="执行耗时">
-                {{ scanResultContentDetail.form['execution_time'] ? `${scanResultContentDetail.form['execution_time']}秒` : '未知' }}
-              </el-descriptions-item>
-              <el-descriptions-item label="执行者">
-                {{ scanResultContentDetail.form['director'] }}
-              </el-descriptions-item>
-              <el-descriptions-item label="结果类型">
-                {{ scanResultContentDetail.form['result_type'] === 'script' ? '脚本执行' : '任务执行' }}
-              </el-descriptions-item>
-            </el-descriptions>
-
-            <!-- 脚本输出结果 -->
-            <el-divider content-position="left">脚本输出结果</el-divider>
-            <el-card v-if="scanResultContentDetail.form['script_output']" shadow="never" style="margin-bottom: 16px">
-              <template #header>
-                <span style="color: #67c23a">
-                  <el-icon><SuccessFilled /></el-icon>
-                  执行结果
-                </span>
-              </template>
-              <div
-                style="white-space: pre-wrap; font-family: 'Courier New', monospace; background: #f5f5f5; padding: 12px; border-radius: 4px"
-              >
-                {{ scanResultContentDetail.form['script_output'] }}
-              </div>
-            </el-card>
-
-            <!-- 错误信息 -->
-            <el-card v-if="scanResultContentDetail.form['error_message']" shadow="never" style="margin-bottom: 16px">
-              <template #header>
-                <span style="color: #f56c6c">
-                  <el-icon><CircleCloseFilled /></el-icon>
-                  错误信息
-                </span>
-              </template>
-              <div
-                style="
-                  white-space: pre-wrap;
-                  font-family: 'Courier New', monospace;
-                  background: #fef0f0;
-                  padding: 12px;
-                  border-radius: 4px;
-                  color: #f56c6c;
-                "
-              >
-                {{ scanResultContentDetail.form['error_message'] }}
-              </div>
-            </el-card>
-
-            <!-- 完整JSON结果（折叠显示） -->
-            <el-collapse style="margin-top: 16px">
-              <el-collapse-item title="查看完整JSON结果" name="json">
-                <div
-                  style="
-                    white-space: pre-wrap;
-                    font-family: 'Courier New', monospace;
-                    background: #f8f8f8;
-                    padding: 12px;
-                    border-radius: 4px;
-                    max-height: 400px;
-                    overflow-y: auto;
-                  "
-                >
-                  {{ formatJsonContent(scanResultContentDetail.form['scandevresult_content']) }}
-                </div>
-              </el-collapse-item>
-            </el-collapse>
-          </div>
-
-          <!-- 传统扫描结果显示 -->
-          <div v-else style="white-space: pre-wrap">
-            {{ scanResultContentDetail.form['scandevresult_content'] }}
-          </div>
-          <template #footer="footer">
-            <a-button @click="dataBackup_handleCancel">关闭</a-button>
-          </template>
-        </a-modal>
+        />
       </div>
+      
     </ScriptManagerLayout>
   </div>
 </template>
@@ -204,6 +98,8 @@
   import { FormInstance, message } from 'ant-design-vue';
   import { createApi, listApi, updateApi, deleteApi } from '/@/api/scanDevUpdate';
   import ScriptManagerLayout from '/@/components/ScriptManagerLayout.vue';
+  import ScanResultModal from '/@/components/ScanResultModal.vue';
+  import ScanResultTable from '/@/components/ScanResultTable.vue';
   import { SuccessFilled, CircleCloseFilled } from '@element-plus/icons-vue';
   import dayjs from 'dayjs';
   import { ref, reactive, onMounted, h } from 'vue';
@@ -219,14 +115,14 @@ const scanResultcolumns = reactive([
     dataIndex: 'index',
     key: 'index',
     align: "center",
-    width: 100
+    width: 50
   },
   {
     title: '脚本名称',
     dataIndex: 'scandevresult_filename',
     align: "center",
     key: 'scandevresult_filename',
-    width: 300
+    width: 200
   },
   {
     title: '执行时间',
@@ -399,17 +295,19 @@ const scanResultcolumns = reactive([
     },
   });
 
+
   // 查看详情弹窗数据
   const scanResultContentDetail = reactive({
     scanResultContentDetail_visile: false,
     scanResultContentDetail_editFlag: false,
-    title: '资源扫描结果',
     form: {
       id: undefined,
       scandevresult_content: undefined,
     },
     rules: {},
   });
+
+
 
   // 表单实例引用
   const myform = ref<FormInstance>();
@@ -570,16 +468,16 @@ onMounted(() => {
     console.log(scanResultContentDetail.form['scandevresult_content']);
   };
 
-  // 格式化JSON内容
-  const formatJsonContent = (jsonStr: string) => {
-    if (!jsonStr) return '';
-    try {
-      const parsed = JSON.parse(jsonStr);
-      return JSON.stringify(parsed, null, 2);
-    } catch (e) {
-      return jsonStr;
-    }
+
+
+  // 重跑脚本功能
+  // 刷新数据函数 - 供ScanResultTable组件调用
+  const handleRefreshData = () => {
+    console.log('收到刷新数据请求，开始刷新扫描结果...');
+    getDataList();
   };
+
+
 
   const bodystyle = {
     height: '680px',
@@ -587,6 +485,10 @@ onMounted(() => {
     overflowX: 'auto',
     width: '1600px',
   };
+
+  // 页面加载时获取脚本列表
+  onMounted(() => {
+  });
 </script>
 
 <style scoped lang="less">
@@ -634,6 +536,7 @@ onMounted(() => {
   ::v-deep .el-tabs__active-bar {
     width: 90px !important;
   }
+
 
   ::v-deep .ant-table {
     color: rgb(34 33 33 / 85%);
