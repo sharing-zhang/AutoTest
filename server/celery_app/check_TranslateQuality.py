@@ -1,0 +1,454 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+翻译质量检查脚本
+
+功能:
+- 接收参数: directory(目录), file_name1(中文语言配置表), file_name2(英文语言配置表), field(配置文本的字段)
+- 读取两个语言配置文件，提取指定字段的中英文文本
+- 调用 DeepSeek Chat Completions API，对中英文翻译进行正确性分析
+- 返回包含每条目的翻译问题与建议
+
+环境变量:
+- DEEPSEEK_API_KEY (必填)
+- DEEPSEEK_API_BASE (可选，默认 https://api.deepseek.com)
+- DEEPSEEK_MODEL    (可选，默认 deepseek-chat)
+"""
+
+import os
+import re
+import json
+import time
+import chardet
+import requests
+from typing import Any, Dict, List, Optional, Tuple
+
+from script_base import ScriptBase, create_simple_script
+
+
+# ==================== 辅助函数区域 ====================
+
+def detect_encoding(file_path: str) -> str:
+    """检测文件编码"""
+    with open(file_path, 'rb') as f:
+        raw = f.read()
+    res = chardet.detect(raw)
+    return res['encoding'] or 'utf-8'
+
+
+def read_file_text(script: ScriptBase, path: str) -> Optional[str]:
+    """读取文件内容，自动检测编码"""
+    try:
+        enc = detect_encoding(path)
+        with open(path, 'r', encoding=enc, errors='ignore') as f:
+            return f.read()
+    except Exception as e:
+        script.error(f"读取文件失败: {e}")
+        return None
+
+
+def extract_field_entries(script: ScriptBase, content: str, field: str) -> Dict[int, str]:
+    """从文件内容中提取指定字段的文本条目，返回行号和内容的字典"""
+    entries: Dict[int, str] = {}
+    lines = content.splitlines()
+
+    # 方法1: 直接匹配字段的键值对，记录行号
+    for line_num, line in enumerate(lines, 1):
+        # 匹配 key = field { ... } 格式
+        pattern = rf'\w+\s*=\s*{re.escape(field)}\s*\{{\s*([^}}]+)\s*\}}'
+        match = re.search(pattern, line)
+        if match:
+            block_content = match.group(1)
+            # 从块内容中提取文本值
+            text_pattern = r'text\s*=\s*"([^"]+)"'
+            text_match = re.search(text_pattern, block_content)
+            if text_match:
+                entries[line_num] = text_match.group(1).strip()
+
+        # 方法2: 匹配 field = { key = "value" } 格式
+        if not entries:
+            block_pattern = rf'{re.escape(field)}\s*=\s*\{{\s*([^}}]+)\s*\}}'
+            block_match = re.search(block_pattern, line)
+            if block_match:
+                block = block_match.group(1)
+                pairs = re.findall(r'\w+\s*=\s*"([^"]+)"', block)
+                for text in pairs:
+                    if text.strip():
+                        entries[line_num] = text.strip()
+                        break
+
+        # 方法3: 简单的键值对匹配
+        if line_num not in entries:
+            simple_pattern = rf'{re.escape(field)}\s*=\s*"([^"]+)"'
+            simple_match = re.search(simple_pattern, line)
+            if simple_match:
+                entries[line_num] = simple_match.group(1).strip()
+
+    # 如果上述方法都没有结果，尝试多行匹配
+    if not entries:
+        full_content = '\n'.join(lines)
+        pattern = rf'(\w+)\s*=\s*{re.escape(field)}\s*\{{\s*([^}}]+)\s*\}}'
+        matches = re.findall(pattern, full_content, re.DOTALL)
+
+        for key, block_content in matches:
+            # 找到这个匹配在哪一行
+            for line_num, line in enumerate(lines, 1):
+                if key in line and field in line:
+                    text_pattern = r'text\s*=\s*"([^"]+)"'
+                    text_match = re.search(text_pattern, block_content)
+                    if text_match:
+                        entries[line_num] = text_match.group(1).strip()
+                    break
+
+    script.info(f"从 {field} 字段提取到 {len(entries)} 个文本条目")
+    return entries
+
+
+def align_translations(script: ScriptBase, chinese_entries: Dict[int, str],
+                       english_entries: Dict[int, str]) -> List[Dict[str, Any]]:
+    """对齐中英文翻译条目，按行号匹配"""
+    aligned_pairs: List[Dict[str, Any]] = []
+
+    # 按行号匹配
+    common_lines = set(chinese_entries.keys()) & set(english_entries.keys())
+    for line_num in sorted(common_lines):
+        aligned_pairs.append({
+            'line_number': line_num,
+            'chinese': chinese_entries[line_num],
+            'english': english_entries[line_num]
+        })
+
+    # 处理不匹配的条目
+    chinese_only = set(chinese_entries.keys()) - set(english_entries.keys())
+    english_only = set(english_entries.keys()) - set(chinese_entries.keys())
+
+    if chinese_only:
+        script.warning(f"仅在中文配置中存在的行号: {sorted(chinese_only)}")
+    if english_only:
+        script.warning(f"仅在英文配置中存在的行号: {sorted(english_only)}")
+
+    script.info(f"成功对齐 {len(aligned_pairs)} 组翻译条目")
+    return aligned_pairs
+
+
+def deepseek_translation_check(script: ScriptBase, pairs: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """调用 DeepSeek API 进行翻译质量检查"""
+    api_key = "sk-8f18bde8ff294c1580ee050a2baf26b8"
+    if not api_key:
+        return {'error': 'DEEPSEEK_API_KEY 未设置', 'result': []}
+
+    api_base = (os.getenv('DEEPSEEK_API_BASE') or 'https://api.deepseek.com').rstrip('/')
+    url = f"{api_base}/v1/chat/completions"
+
+    # 兼容常见模型名；优先使用外部指定
+    preferred_model = os.getenv('DEEPSEEK_MODEL')
+    model_candidates: List[str] = []
+    if preferred_model:
+        model_candidates.append(preferred_model)
+    # 官方公开可用模型（按优先顺序）
+    model_candidates.extend(['deepseek-chat', 'deepseek-reasoner'])
+
+    # 限制条目数量
+    preview = pairs[:20]
+
+    prompt = (
+        "你是专业的中英文翻译质量检查助手。请检查以下中英文翻译对的质量，重点关注："
+        "1. 翻译准确性（意思是否正确传达）"
+        "2. 语法正确性（英文语法是否正确）"
+        "3. 用词适当性（是否使用合适的词汇）"
+        "4. 语言自然度（是否符合英语表达习惯）"
+        "5. 专业术语使用（是否准确使用行业术语）"
+        "请用中文回复所有问题和建议。"
+        "输出JSON数组，格式：[{\"line_number\": 行号, \"chinese\": \"中文原文\", \"english\": \"英文翻译\", "
+        "\"issues\": [\"具体的翻译问题描述（中文）\"], \"suggestions\": [\"具体的修改建议（中文）\"]}]"
+        "如果翻译质量良好无问题，issues和suggestions可以为空数组。"
+    )
+
+    base_payload = {
+        'messages': [
+            {'role': 'system', 'content': prompt},
+            {'role': 'user', 'content': json.dumps({'translation_pairs': preview}, ensure_ascii=False)}
+        ],
+        'temperature': 0.2,
+        'max_tokens': 8192,
+        'response_format': {'type': 'json_object'}
+    }
+
+    headers = {
+        'Authorization': f'Bearer {api_key}',
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+    }
+
+    last_error_text: Optional[str] = None
+    last_status: Optional[int] = None
+    used_model: Optional[str] = None
+
+    for candidate in model_candidates:
+        used_model = candidate
+        payload = dict(base_payload, model=candidate)
+        try:
+            resp = requests.post(url, headers=headers, json=payload, timeout=90)
+            if resp.status_code == 400:
+                # 记录错误并尝试下一个候选模型
+                last_error_text = resp.text
+                last_status = resp.status_code
+                script.warning(f"DeepSeek 400 错误，尝试备用模型: {candidate} -> {last_error_text[:200]}")
+                continue
+            resp.raise_for_status()
+            data = resp.json()
+            content = data.get('choices', [{}])[0].get('message', {}).get('content', '')
+
+            # 解析返回的JSON
+            try:
+                result = json.loads(content)
+                if not isinstance(result, list):
+                    # 容错：如果不是数组，尝试从文本中抓取首个JSON数组
+                    array_match = re.search(r"$$\s*\{[\s\S]*\}\s*$$", content)
+                    result = json.loads(array_match.group(0)) if array_match else []
+            except Exception:
+                result = []
+
+            return {
+                'checked_count': len(preview),
+                'total_pairs': len(pairs),
+                'result': result,
+                'model': used_model or ''
+            }
+        except requests.HTTPError as e:
+            if hasattr(e, 'response') and e.response is not None:
+                if e.response.status_code == 402:
+                    return {'error': '余额不足', 'result': []}
+                last_status = e.response.status_code
+                try:
+                    last_error_text = e.response.text
+                except Exception:
+                    last_error_text = str(e)
+            else:
+                last_error_text = str(e)
+        except Exception as e:
+            last_error_text = str(e)
+
+    # 所有候选模型均失败
+    detail = f"HTTP {last_status}: {last_error_text[:300]}" if last_status else (last_error_text or '未知错误')
+    return {'error': f'API请求失败: {detail}', 'result': []}
+
+
+def format_translation_report(script: ScriptBase, ds_result: Dict[str, Any]) -> str:
+    """格式化翻译检查报告"""
+    if ds_result.get('error'):
+        return f"翻译检查失败: {ds_result['error']}"
+
+    result_list = ds_result.get('result', [])
+    if not result_list:
+        return "翻译检查完成，但未获得有效结果"
+
+    lines = []
+    lines.append("翻译质量检查结果：")
+    lines.append("")
+
+    # 统计信息
+    total_issues = 0
+    total_suggestions = 0
+    items_with_issues = 0
+
+    for idx, item in enumerate(result_list, 1):
+        if not isinstance(item, dict):
+            continue
+
+        line_number = item.get('line_number', f'第{idx}行')
+        chinese = item.get('chinese', '')
+        english = item.get('english', '')
+        issues = item.get('issues', [])
+        suggestions = item.get('suggestions', [])
+
+        # 过滤有效内容
+        valid_issues = [str(x).strip() for x in issues if str(x).strip()] if isinstance(issues, list) else []
+        valid_suggestions = [str(x).strip() for x in suggestions if str(x).strip()] if isinstance(suggestions,
+                                                                                                  list) else []
+
+        if valid_issues:
+            items_with_issues += 1
+            total_issues += len(valid_issues)
+        total_suggestions += len(valid_suggestions)
+
+        lines.append(f"【第{idx}条】行号: {line_number}")
+        lines.append(f"中文: {chinese}")
+        lines.append(f"英文: {english}")
+
+        if valid_issues:
+            lines.append("问题:")
+            for issue in valid_issues:
+                lines.append(f"  • {issue}")
+
+        if valid_suggestions:
+            lines.append("建议:")
+            for suggestion in valid_suggestions:
+                lines.append(f"  • {suggestion}")
+
+        if not valid_issues and not valid_suggestions:
+            lines.append("状态: 翻译质量良好，无明显问题")
+
+        lines.append("")
+
+    # 总体统计
+    lines.append(f"共检查 {len(result_list)} 组翻译，发现 {items_with_issues} 组存在问题，")
+    lines.append(f"共计 {total_issues} 个问题，给出 {total_suggestions} 条建议")
+
+    return "\n".join(lines)
+
+
+def validate_translation_parameters(script: ScriptBase, directory: str, file_name1: str,
+                                    file_name2: str, field: str) -> bool:
+    """验证翻译检查参数"""
+    if not all([directory, file_name1, file_name2, field]):
+        script.error("缺少必要参数")
+        return False
+
+    path1 = os.path.join(directory, file_name1)
+    path2 = os.path.join(directory, file_name2)
+
+    if not os.path.exists(path1):
+        script.error(f"中文配置文件不存在: {path1}")
+        return False
+
+    if not os.path.exists(path2):
+        script.error(f"英文配置文件不存在: {path2}")
+        return False
+
+    return True
+
+
+def calculate_translation_statistics(script: ScriptBase, result_list: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """计算翻译检查统计信息"""
+    if not result_list:
+        return {'count': 0, 'items_with_issues': 0, 'total_issues': 0, 'total_suggestions': 0}
+
+    items_with_issues = 0
+    total_issues = 0
+    total_suggestions = 0
+
+    for item in result_list:
+        if isinstance(item, dict):
+            issues = item.get('issues', [])
+            suggestions = item.get('suggestions', [])
+
+            valid_issues = [str(x).strip() for x in issues if str(x).strip()] if isinstance(issues, list) else []
+            valid_suggestions = [str(x).strip() for x in suggestions if str(x).strip()] if isinstance(suggestions,
+                                                                                                      list) else []
+
+            if valid_issues:
+                items_with_issues += 1
+                total_issues += len(valid_issues)
+            total_suggestions += len(valid_suggestions)
+
+    return {
+        'count': len(result_list),
+        'items_with_issues': items_with_issues,
+        'total_issues': total_issues,
+        'total_suggestions': total_suggestions
+    }
+
+
+# ==================== 主逻辑函数 ====================
+
+def main_logic(script: ScriptBase) -> Dict[str, Any]:
+    """
+    翻译质量检查主要业务逻辑函数
+
+    Args:
+        script: ScriptBase实例
+    """
+
+    # 1. 获取参数
+    directory = script.get_parameter('directory', r"D:\\")
+    file_name1 = script.get_parameter('file_name1', "chinese_config.txt")
+    file_name2 = script.get_parameter('file_name2', "english_config.txt")
+    field = script.get_parameter('field', 'description')
+
+    script.info("开始翻译质量检查")
+
+    # 2. 参数验证
+    if not validate_translation_parameters(script, directory, file_name1, file_name2, field):
+        return script.error_result('参数验证失败', 'InvalidParameters')
+
+    chinese_path = os.path.join(directory, file_name1)
+    english_path = os.path.join(directory, file_name2)
+
+    script.info(f"中文配置文件: {chinese_path}")
+    script.info(f"英文配置文件: {english_path}")
+    script.info(f"检查字段: {field}")
+
+    try:
+        # 3. 读取文件内容
+        chinese_content = read_file_text(script, chinese_path)
+        english_content = read_file_text(script, english_path)
+
+        if chinese_content is None or english_content is None:
+            return script.error_result('读取配置文件失败', 'ReadError')
+
+        # 4. 提取字段条目（按行号）
+        chinese_entries = extract_field_entries(script, chinese_content, field)
+        english_entries = extract_field_entries(script, english_content, field)
+
+        if not chinese_entries and not english_entries:
+            return script.success_result('未找到可检查的翻译条目', {
+                'chinese_path': chinese_path,
+                'english_path': english_path,
+                'field': field,
+                'pairs_count': 0
+            })
+
+        # 5. 对齐翻译条目（按行号）
+        aligned_pairs = align_translations(script, chinese_entries, english_entries)
+
+        if not aligned_pairs:
+            return script.success_result('未找到匹配的翻译对', {
+                'chinese_entries': len(chinese_entries),
+                'english_entries': len(english_entries),
+                'pairs_count': 0
+            })
+
+        # 6. 执行翻译质量检查
+        script.info("调用 DeepSeek API 进行翻译检查...")
+        start_time = time.time()
+        ds_result = deepseek_translation_check(script, aligned_pairs)
+        duration = time.time() - start_time
+
+        # 7. 生成详细报告
+        detailed_report = format_translation_report(script, ds_result)
+
+        # 8. 统计信息
+        statistics = calculate_translation_statistics(script, ds_result.get('result', []))
+
+        script.info("翻译检查完成")
+
+        # 9. 返回结果
+        return script.success_result(
+            message=detailed_report,
+            data={
+                'chinese_path': chinese_path,
+                'english_path': english_path,
+                'field': field,
+                'chinese_entries_count': len(chinese_entries),
+                'english_entries_count': len(english_entries),
+                'aligned_pairs_count': len(aligned_pairs),
+                'time_cost_sec': round(duration, 2),
+                'deepseek_result': ds_result,
+                'summary': {
+                    'checked_count': ds_result.get('checked_count', 0),
+                    'items_with_issues': statistics['items_with_issues'],
+                    'total_issues': statistics['total_issues'],
+                    'total_suggestions': statistics['total_suggestions']
+                }
+            }
+        )
+
+    except Exception as e:
+        # 10. 错误处理
+        script.error(f"执行失败: {e}")
+        raise
+
+
+if __name__ == '__main__':
+    create_simple_script('check_Translation', main_logic)

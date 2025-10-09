@@ -81,7 +81,8 @@ def extract_entries(script: ScriptBase, content: str, field: Optional[str]) -> L
 
 def deepseek_check(script: ScriptBase, items: List[str]) -> Dict[str, Any]:
     """调用 DeepSeek API 进行文本质量检查"""
-    api_key = os.getenv('DEEPSEEK_API_KEY')
+    #api_key = os.getenv('DEEPSEEK_API_KEY')
+    api_key = "sk-8f18bde8ff294c1580ee050a2baf26b8"
     if not api_key:
         return {'error': 'DEEPSEEK_API_KEY 未设置', 'result': []}
 
@@ -98,7 +99,7 @@ def deepseek_check(script: ScriptBase, items: List[str]) -> Dict[str, Any]:
 
     # 限制条目数量和长度
     preview = items[:30]
-    preview = [t[:300] if len(t) > 300 else t for t in preview]
+    preview = [t[:1000] if len(t) > 300 else t for t in preview]
 
     prompt = (
         "你是中文文本校对助手。检查以下文本的：拼写错误、语法问题、标点问题。"
@@ -113,7 +114,7 @@ def deepseek_check(script: ScriptBase, items: List[str]) -> Dict[str, Any]:
             ]}, ensure_ascii=False)}
         ],
         'temperature': 0.2,
-        'max_tokens': 1024,
+        'max_tokens': 8192,
         'response_format': {'type': 'json_object'}
     }
 
@@ -265,9 +266,9 @@ def main_logic(script: ScriptBase) -> Dict[str, Any]:
     """
 
     # 1. 获取参数
-    directory = script.get_parameter('directory', r"D:\dev")
-    file_name = script.get_parameter('file_name', '')
-    field = script.get_parameter('field', '')
+    directory = script.get_parameter('directory', r"D:\\")
+    file_name = script.get_parameter('file_name',  "4.txt")
+    field = script.get_parameter('field',  't_description')
 
     script.info("开始文本质量检查")
 
