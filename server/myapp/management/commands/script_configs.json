@@ -241,8 +241,43 @@
         "description": "输入想要查找的配置参数名"
       }
     ]
-  }
-  ,
+  },
+  "check_TranslateQuality": {
+    "dialog_title": "文本翻译质量检查",
+    "parameters": [
+      {
+        "name": "directory",
+        "type": "text",
+        "label": "目录路径",
+        "required": true,
+        "default": "D:\\",
+        "placeholder": "例如: C:\\temp 或 /home/user/docs"
+      },
+      {
+        "name": "file_name1",
+        "type": "text",
+        "label": "文件名",
+        "required": true,
+        "default": "CH.txt",
+        "placeholder": "需要检查的中文策划表"
+      },
+       {
+        "name": "file_name2",
+        "type": "text",
+        "label": "文件名",
+        "required": true,
+        "default": "Eng.txt",
+        "placeholder": "需要检查的英文策划表"
+      },
+      {
+        "name": "field",
+        "type": "text",
+        "label": "字段名(可选)",
+        "required": false,
+        "placeholder": "如从 key=\"value\"; 中抽取某字段值，例如 desc"
+      }
+    ]
+  },
   "check_TextQuality": {
     "dialog_title": "文本质量检查",
     "parameters": [
@@ -271,6 +306,7 @@
       }
     ]
   },
+
   "find_resource_name": {
     "dialog_title": "文件内容搜索",
     "parameters": [
