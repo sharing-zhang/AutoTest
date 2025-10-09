@@ -3,7 +3,7 @@
     <!-- 当前脚本信息 -->
     <div class="script-info" v-if="formConfig">
       <div class="script-title">
-        <h3>{{ props.scriptDisplayName || formConfig.script_name.replace('.py', '').replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()) }}</h3>
+        <h3>{{ props.scriptInfo?.dialog_title || props.scriptDisplayName || formConfig.script_name.replace('.py', '').replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()) }}</h3>
         <!-- <el-tag type="info" size="small">{{ formConfig.script_name }}</el-tag> -->
       </div>
       <p v-if="formConfig.parameters" class="script-desc">
@@ -25,10 +25,10 @@
           <el-option
             v-for="script in availableScripts"
             :key="script.script_name"
-            :label="script.display_name"
+            :label="script.dialog_title || script.display_name"
             :value="script.script_name"
           >
-            <span>{{ script.display_name }}</span>
+            <span>{{ script.dialog_title || script.display_name }}</span>
             <span style="float: right; color: #8492a6; font-size: 13px">
               {{ script.parameter_count }} 个参数
             </span>
@@ -311,6 +311,8 @@ interface ScriptParameter {
   multiple?: boolean
   min?: number
   max?: number
+  addonAfter?: string
+  item_fields?: ScriptParameter[]  // 用于 group-list 类型
 }
 
 interface ScriptConfig {
@@ -324,6 +326,7 @@ interface ScriptConfig {
 interface ScriptInfo {
   script_name: string
   display_name: string
+  dialog_title?: string
   parameter_count: number
   has_required_params: boolean
 }
@@ -331,6 +334,7 @@ interface ScriptInfo {
 interface Props {
   scriptName?: string
   scriptDisplayName?: string
+  scriptInfo?: any  // 完整的脚本信息
   showScriptSelector?: boolean
   showAdvanced?: boolean
   autoExecute?: boolean
@@ -344,11 +348,7 @@ const props = withDefaults(defineProps<Props>(), {
   autoExecute: false
 })
 
-const emit = defineEmits<{
-  'script-executed': [result: any]
-  'script-changed': [scriptName: string]
-  'form-updated': [formData: any]
-}>()
+const emit = defineEmits(['script-executed', 'script-changed', 'form-updated'])
 
 // 响应式数据
 const dynamicFormRef = ref<FormInstance>()
@@ -412,6 +412,14 @@ watch(() => props.scriptName, (newScriptName) => {
   }
 }, { immediate: true })
 
+// 监听脚本信息变化
+watch(() => props.scriptInfo, (newScriptInfo) => {
+  if (newScriptInfo && newScriptInfo.parameters_schema) {
+    console.log('脚本信息变化，重新加载配置:', newScriptInfo)
+    loadScriptConfig(props.scriptName || '')
+  }
+}, { immediate: true, deep: true })
+
 // 监听表单数据变化
 watch(formData, (newFormData) => {
   emit('form-updated', { ...newFormData })
@@ -437,6 +445,14 @@ watch(formData, (newFormData) => {
 
 const loadScriptConfig = async (scriptName: string) => {
   if (!scriptName) return
+  
+  // 优先使用传入的 scriptInfo 中的参数配置
+  if (props.scriptInfo && props.scriptInfo.parameters_schema) {
+    console.log('使用传入的脚本配置:', props.scriptInfo.parameters_schema)
+    formConfig.value = props.scriptInfo.parameters_schema
+    initializeFormData()
+    return
+  }
   
   try {
     const response = await fetch(`${BASE_URL}/myapp/api/script-configs/?script_name=${encodeURIComponent(scriptName)}`)

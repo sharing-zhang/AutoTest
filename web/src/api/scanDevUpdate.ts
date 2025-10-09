@@ -11,6 +11,8 @@ enum URL {
     detail = '/myapp/admin/scanDevUpdate/scanResultdetail',
     // 钉钉机器人发送消息接口
     sendmessage = '/myapp/admin/scanDevUpdate/scanResultsendmessage',
+    // 重跑脚本接口
+    rerunScript = '/myapp/admin/scanDevUpdate/scanResultrerun',
     // ViewSet API 路由
     listScripts = '/myapp/api/scripts/',
     scriptDetail = '/myapp/api/scripts/',
@@ -35,15 +37,15 @@ const detailApi = async (params: any) => get<any>({ url: URL.detail, params: par
 const sendmessageApi = async (params:any, data: any) =>
     post<any>({ url: URL.sendmessage, params: params, data: data, headers: { 'Content-Type': 'multipart/form-data;charset=utf-8' } });
 
+//重跑脚本接口
+const rerunScriptApi = async (params: any) =>
+    post<any>({ url: URL.rerunScript, params: params, data: {}, headers: { 'Content-Type': 'application/json' } });
+
 // ViewSet API 函数
 const listScriptsApi = async (params: any = {}) => get<any>({ url: URL.listScripts, params: params, headers: {} });
 const getScriptDetailApi = async (scriptId: number) => get<any>({ url: `${URL.scriptDetail}/${scriptId}`, params: {}, headers: {} });
 
 // 页面配置API
-const getPageConfigsApi = async (pageRoute?: string) => {
-  const params = pageRoute ? { page_route: pageRoute } : {};
-  return get<any>({ url: URL.pageConfigs, params: params, headers: {} });
-};
 
 // ScriptExecutionViewSet API - 脚本执行相关
 const executeScriptApi = async (data: any) => post<any>({ url: URL.executeScript, params: {}, data: data, headers: { 'Content-Type': 'application/json' } });
@@ -57,8 +59,11 @@ const getScriptTaskResultApi = async (taskId?: string, executionId?: string) => 
 // 取消任务独立API
 const cancelTaskApi = async (executionId: number) => post<any>({ url: `${URL.cancelTask}${executionId}/`, params: {}, data: {}, headers: { 'Content-Type': 'application/json' } });
 
+// 获取页面脚本配置
+const getPageConfigsApi = (pageRoute: string) => get<any>({ url: `${URL.pageConfigs}?page_route=${encodeURIComponent(pageRoute)}` });
+
 export { 
-    listApi, createApi, updateApi, deleteApi, detailApi, sendmessageApi,
+    listApi, createApi, updateApi, deleteApi, detailApi, sendmessageApi, rerunScriptApi,
     listScriptsApi, getScriptDetailApi, getPageConfigsApi,
     executeScriptApi, getScriptTaskResultApi, cancelTaskApi
 };

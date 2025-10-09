@@ -7,7 +7,7 @@ from myapp.views import celery_views
 # 创建DRF路由器
 router = DefaultRouter()
 router.register(r'scripts', celery_views.ScriptViewSet, basename='script')
-router.register(r'page-configs', celery_views.PageScriptConfigViewSet, basename='page-config') 
+router.register(r'page-configs', celery_views.PageScriptConfigViewSet, basename='page-config')
 router.register(r'task-executions', celery_views.TaskExecutionViewSet, basename='task-execution')
 router.register(r'script-executions', celery_views.ScriptExecutionViewSet, basename='script-execution')
 
@@ -29,6 +29,7 @@ urlpatterns = [
     path('admin/scanDevUpdate/scanResultdelete', views.admin.scanDevUpdate.delete),
     path('admin/scanDevUpdate/scanResultdetail', views.admin.scanDevUpdate.detail),
     path('admin/scanDevUpdate/scanResultsendmessage', views.admin.scanDevUpdate.sendmessage),
+    path('admin/scanDevUpdate/scanResultrerun', views.admin.scanDevUpdate.rerun_script),
 
     path('admin/thing/list', views.admin.thing.list_api),
     path('admin/thing/detail', views.admin.thing.detail),
@@ -45,6 +46,10 @@ urlpatterns = [
     
     # 动态创建前端页面的API
     path('api/create-frontend-page/', views.page_creator.create_frontend_page),
+    
+    # 真实控制台抓取API
+    # path('api/real-console/fetch/', views.real_console_fetcher.fetch_real_console_messages),
+    # path('api/real-console/monitor/', views.real_console_fetcher.monitor_console_realtime),
 
     path('admin/loginLog/list', views.admin.loginLog.list_api),
     path('admin/loginLog/create', views.admin.loginLog.create),

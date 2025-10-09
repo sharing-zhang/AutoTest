@@ -61,7 +61,6 @@ from celery.utils.log import get_task_logger  # Celery日志记录器
 
 # 项目内部模块
 from ..models import TaskExecution, Script  # 数据模型
-from ..management.commands.script_config_manager import script_config_manager  # 脚本配置管理器
 
 # 初始化Celery任务日志记录器
 logger = get_task_logger(__name__)
@@ -373,6 +372,19 @@ class TaskExecutionManager:
             self.task_execution.save()
             logger.info(f"TaskExecution {self.task_execution_id} updated with task_id: {task_id}")
     
+    def _get_dialog_title(self):
+        """获取脚本的对话框标题"""
+        script_name = self.task_execution.script.name if self.task_execution.script else 'unknown'
+        
+        try:
+            if self.task_execution.script and self.task_execution.script.dialog_title:
+                return self.task_execution.script.dialog_title
+            else:
+                return f'{script_name} 执行结果'
+        except Exception as e:
+            logger.warning(f"获取脚本配置失败: {e}")
+            return f'{script_name} 执行结果'
+
     def _save_to_scan_result(self, result: Any, execution_time: float, memory_usage: float):
         """
         保存执行结果到扫描结果表
@@ -396,16 +408,11 @@ class TaskExecutionManager:
             
             from myapp.models import ScanDevUpdate_scanResult
             from django.utils import timezone
-            from myapp.management.commands.script_config_manager import ScriptConfigManager
             import json
             
             # 生成文件名 - 使用 dialog_title 
             script_name = self.task_execution.script.name if self.task_execution.script else 'unknown'
-            
-            # 获取脚本的 dialog_title
-            config_manager = ScriptConfigManager()
-            display_info = config_manager.get_script_display_info(script_name)
-            dialog_title = display_info.get('dialog_title', script_name)
+            dialog_title = self._get_dialog_title()
             
             # 添加调试日志
             # logger.info(f"脚本名称: {script_name}")
@@ -470,7 +477,8 @@ class TaskExecutionManager:
                 script_output=display_content,  # 只显示message字段
                 error_message=None,
                 execution_status=execution_status,
-                result_summary=result_summary
+                result_summary=result_summary,
+                parameters=self.task_execution.parameters  # 保存执行参数
             )
             scan_result.save()
             
@@ -506,16 +514,11 @@ class TaskExecutionManager:
             
             from myapp.models import ScanDevUpdate_scanResult
             from django.utils import timezone
-            from myapp.management.commands.script_config_manager import ScriptConfigManager
             import json
             
             # 生成文件名 - 使用 dialog_title 
             script_name = self.task_execution.script.name if self.task_execution.script else 'unknown'
-            
-            # 获取脚本的 dialog_title
-            config_manager = ScriptConfigManager()
-            display_info = config_manager.get_script_display_info(script_name)
-            dialog_title = display_info.get('dialog_title', script_name)
+            dialog_title = self._get_dialog_title()
             
             timestamp = timezone.now().strftime('%Y%m%d_%H%M%S')
             filename = f"{dialog_title}"
@@ -575,7 +578,8 @@ class TaskExecutionManager:
                 script_output=display_content,  # 显示错误信息
                 error_message=error_message,
                 execution_status=execution_status,
-                result_summary=result_summary
+                result_summary=result_summary,
+                parameters=self.task_execution.parameters  # 保存执行参数
             )
             scan_result.save()
             

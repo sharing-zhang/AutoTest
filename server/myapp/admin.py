@@ -98,10 +98,17 @@ class TaskExecutionAdmin(admin.ModelAdmin):
 @admin.register(PageScriptConfig)
 class PageScriptConfigAdmin(admin.ModelAdmin):
     """页面脚本配置管理"""
-    list_display = ['id', 'script', 'page_route', 'button_text', 'position', 'is_enabled']
-    list_filter = ['page_route', 'position', 'is_enabled']
-    search_fields = ['script__name', 'page_route', 'button_text']
-    ordering = ['page_route', 'display_order']
+    list_display = ['id', 'page_name', 'page_route', 'scripts', 'is_enabled']
+    list_filter = ['page_route', 'is_enabled']
+    search_fields = ['page_name', 'page_route']
+    ordering = ['page_route']
+    
+    def scripts(self, obj):
+        """显示脚本列表"""
+        if obj.scripts:
+            return ', '.join(obj.scripts)
+        return '-'
+    scripts.short_description = '脚本列表'
 
 @admin.register(ScanDevUpdate_scanResult)
 class ScanDevUpdateScanResultAdmin(admin.ModelAdmin):

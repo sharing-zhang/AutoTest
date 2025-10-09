@@ -13,7 +13,6 @@ AutoTest Celery任务和视图管理系统
 
 2. DRF ViewSets
    - ScriptViewSet: 脚本管理
-   - PageScriptConfigViewSet: 页面脚本配置
    - TaskExecutionViewSet: 任务执行记录
 
 3. REST API接口
@@ -72,7 +71,6 @@ import psutil
 # 项目内部模块 - 自定义业务逻辑
 from ..models import Script, TaskExecution, PageScriptConfig, ScanDevUpdate_scanResult  # 数据模型
 from ..serializers import ScriptSerializer, TaskExecutionSerializer, PageScriptConfigSerializer  # 序列化器
-from ..management.commands.script_config_manager import script_config_manager  # 脚本配置管理器
 from ..auth.authentication import AdminTokenAuthtication  # 管理员认证
 
 # 获取Celery任务日志
@@ -207,8 +205,7 @@ def execute_script_task(self, task_execution_id, script_info, parameters, user_i
 #
 # 本模块包含Django REST Framework的ViewSet类，提供RESTful API接口：
 # 1. ScriptViewSet: 脚本管理API（CRUD操作）
-# 2. PageScriptConfigViewSet: 页面脚本配置API（只读）
-# 3. TaskExecutionViewSet: 任务执行记录API（查询和取消）
+# 2. TaskExecutionViewSet: 任务执行记录API（查询和取消）
 #
 # 设计特点：
 # - 遵循RESTful API设计原则
@@ -218,7 +215,6 @@ def execute_script_task(self, task_execution_id, script_info, parameters, user_i
 #
 # 认证机制：
 # - ScriptViewSet: 管理员认证 (AdminTokenAuthtication)
-# - PageScriptConfigViewSet: 用户认证 (IsAuthenticated)
 # - TaskExecutionViewSet: 用户认证 (IsAuthenticated)
 # ============================================================================
 
@@ -289,6 +285,8 @@ class ScriptViewSet(viewsets.ModelViewSet):
                 'script_type': script.script_type,
                 'script_path': script.script_path,
                 'parameters_schema': script.parameters_schema,
+                'dialog_title': script.dialog_title,
+                'is_active': script.is_active,
                 'created_at': script.created_at.isoformat(),
                 'tasks': []
             }
@@ -322,14 +320,14 @@ class PageScriptConfigViewSet(viewsets.ReadOnlyModelViewSet):
     """
     页面脚本配置ViewSet - 页面脚本配置的只读API
     
-    提供页面脚本配置的查询操作，用于前端获取特定页面的脚本按钮配置信息。
-    支持按页面路由过滤，返回该页面可用的脚本按钮列表。
+    提供页面脚本配置的查询操作，用于前端获取特定页面的脚本配置信息。
+    支持按页面路由过滤，返回该页面可用的脚本配置。
     
     API端点:
     --------
-    - GET /api/page-script-configs/                    - 获取所有页面配置
-    - GET /api/page-script-configs/?page_route=xxx     - 获取特定页面的配置
-    - GET /api/page-script-configs/{id}/               - 获取指定配置的详细信息
+    - GET /api/page-configs/                    - 获取所有页面配置
+    - GET /api/page-configs/?page_route=xxx     - 获取特定页面的配置
+    - GET /api/page-configs/{id}/               - 获取指定配置的详细信息
     
     查询参数:
     --------
@@ -348,25 +346,20 @@ class PageScriptConfigViewSet(viewsets.ReadOnlyModelViewSet):
     --------
     - 基础模型: PageScriptConfig（页面脚本配置表）
     - 过滤条件: is_enabled=True（只显示启用的配置）
-    - 排序规则: display_order（按显示顺序排序）
     - 序列化器: PageScriptConfigSerializer
     
     返回数据格式:
     ------------
     每个配置项包含：
-    - script_id: 关联的脚本ID
-    - button_text: 按钮显示文本
-    - button_style: 按钮样式配置
-    - position: 按钮位置（top-left, top-right等）
-    - display_order: 显示顺序
-    - dialog_title: 参数弹窗标题
+    - page_route: 页面路由
+    - scripts: 脚本名称列表
+    - is_enabled: 是否启用
     
     使用场景:
     --------
-    - 前端页面加载时获取脚本按钮配置
-    - 动态生成页面上的脚本执行按钮
-    - 根据用户权限过滤可用脚本
-    - 支持多页面共享脚本配置
+    - 前端页面加载时获取脚本配置
+    - 动态生成页面上的脚本列表
+    - 根据页面路由过滤可用脚本
     """
     serializer_class = PageScriptConfigSerializer
     permission_classes = []  # 页面配置是公开的，不需要认证
@@ -375,11 +368,11 @@ class PageScriptConfigViewSet(viewsets.ReadOnlyModelViewSet):
         """根据查询参数返回相应的页面脚本配置"""
         page_route = self.request.query_params.get('page_route')
         if page_route:
-            # 返回特定页面的配置，按显示顺序排序
+            # 返回特定页面的配置
             return PageScriptConfig.objects.filter(
                 page_route=page_route, 
                 is_enabled=True
-            ).order_by('display_order')
+            )
         # 返回所有启用的配置
         return PageScriptConfig.objects.filter(is_enabled=True)
 
@@ -940,25 +933,32 @@ def get_script_configs(request):
     try:
         script_name = request.GET.get('script_name')
         
+        # 脚本配置现在直接从数据库模型获取
         if script_name:
             # 获取单个脚本配置
-            config = script_config_manager.get_parameter_schema(script_name)
-            return JsonResponse({
-                'success': True,
-                'script_config': config
-            })
+            script = Script.objects.filter(name=script_name).first()
+            if script:
+                return JsonResponse({
+                    'success': True,
+                    'script_config': script.parameters_schema or {}
+                })
+            else:
+                return JsonResponse({
+                    'success': False,
+                    'error': f'脚本 {script_name} 不存在'
+                })
         else:
             # 获取所有脚本列表
-            all_scripts = script_config_manager.get_all_scripts()
+            scripts = Script.objects.filter(is_active=True)
             scripts_info = []
             
-            for script in all_scripts:
-                config = script_config_manager.get_script_config(script)
+            for script in scripts:
+                config = script.parameters_schema or {}
                 scripts_info.append({
-                    'script_name': script,
-                    'display_name': script.replace('.py', '').replace('_', ' ').title(),
+                    'script_name': script.name,
+                    'display_name': script.name.replace('_', ' ').title(),
                     'parameter_count': len(config),
-                    'has_required_params': any(p.get('required', False) for p in config)
+                    'has_required_params': any(p.get('required', False) for p in config.values())
                 })
             
             return JsonResponse({
@@ -1040,17 +1040,13 @@ def reload_script_configs(request):
     """
 
     try:
-        # 重新加载当前进程的配置
-        script_config_manager.reload_config()
-        
-        # 如果使用Celery，还需要通知所有worker进程
-        from celery import current_app
-        current_app.control.broadcast('reload_script_configs')
+        # 脚本配置现在直接从数据库模型获取，无需重新加载
+        total_scripts = Script.objects.filter(is_active=True).count()
         
         return JsonResponse({
             'success': True,
             'message': '脚本配置已重新加载',
-            'total_scripts': len(script_config_manager.get_all_scripts())
+            'total_scripts': total_scripts
         })
     except Exception as e:
         return JsonResponse({

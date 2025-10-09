@@ -307,51 +307,29 @@ def get_scan_dev_template(route_key, page_title):
       class="el-tabs__content"
       >
         <el-tab-pane label="扫描结果" name="scanResult" >
-          <a-table
-          size="middle"
-          rowKey="scanResult_id"
-          :loading="data.loading"
-          :columns="scanResultcolumns"
-          :data-source="data.scanResult_dataList"
-          :scroll="{{ x: 'max-content' }}"
-          :pagination="{{
-            size: 'small',
-            current: data.page,
-            pageSize: data.pageSize,
-            onChange: (current) => (data.page = current),
-            showSizeChanger: false,
-            showTotal: (total) => `共${{total}}条数据`,
-          }}">
-            <template #bodyCell="{{ text, record, index, column }}">
-              <template v-if="column.key === 'operation'">
-                <span>
-                  <a @click="handleSend(record)">消息同步</a>
-                  <a-divider type="vertical" />
-                  <a @click="handleEdit(record)">编辑</a>
-                  <a-divider type="vertical" />
-                  <a @click="handleClick(record)">查看详情</a>
-                </span>
-              </template>
-            </template>
-          </a-table>
+          <ScanResultTable
+            :loading="data.loading"
+            :data-source="data.scanResult_dataList"
+            :columns="scanResultcolumns"
+            :current="data.page"
+            :page-size="data.pageSize"
+            :show-rerun="true"
+            :show-edit="false"
+            :use-builtin-rerun="true"
+            @send="handleSend"
+            @view-detail="handleClick"
+            @refresh-data="getDataList"
+            @page-change="(current) => data.page = current"
+          />
         </el-tab-pane>
         <el-tab-pane label="数据备份" name="dataBackup" >
-          <a-table
-          size="middle"
-          rowKey="scanResult_id"
-          :loading="data.loading"
-          :columns="dataBackupcolumns"
-          :data-source="data.dataBackup_dataList"
-          :scroll="{{ x: 'max-content' }}"
-          :pagination="{{
-            size: 'small',
-            current: data.page,
-            pageSize: data.pageSize,
-            onChange: (current) => (data.page = current),
-            showSizeChanger: false,
-            showTotal: (total) => `共${{total}}条数据`,
-          }}">
-          </a-table>
+          <DataBackupTable
+            :loading="data.loading"
+            :data-source="data.dataBackup_dataList"
+            :current="data.page"
+            :page-size="data.pageSize"
+            @page-change="(current) => data.page = current"
+          />
         </el-tab-pane>
         <el-tab-pane label="操作" name="configuration" >
           功能操作区域 <!-- 补充功能操作区域 -->
@@ -360,121 +338,19 @@ def get_scan_dev_template(route_key, page_title):
 
       <!--弹窗区域-->
       <div>
-        <a-modal
-          :visible="modal.scanResult_visile"
-          :forceRender="true"
+        <EditRecordModal
+          v-model:visible="modal.scanResult_visile"
           :title="modal.title"
-          ok-text="确认"
-          cancel-text="取消"
+          :form-data="modal.form"
           @ok="handleOk"
           @cancel="handleCancel"
-        >
-          <div>
-            <a-form ref="myform" :label-col="{{ style: {{ width: '120px'}} }}" :model="modal.form" :rules="modal.rules">
-              <a-row :gutter="24">
-                <a-col span="24">
-                  <a-form-item label="文件名" name="scandevresult_filename">
-                    <a-input placeholder="请输入文件名" v-model:value="modal.form.scandevresult_filename" allowClear />
-                  </a-form-item>
-                </a-col>
-                <a-col span="24">
-                  <a-form-item label="时间" name="scandevresult_time">
-                    <a-input placeholder="时间" v-model:value="modal.form.scandevresult_time" allowClear />
-                  </a-form-item>
-                </a-col>
-                <a-col span="24">
-                  <a-form-item label="负责人" name="director">
-                    <a-input placeholder="请输入负责人" v-model:value="modal.form.director" allowClear />
-                  </a-form-item>
-                </a-col>
-                <a-col span="24">
-                  <a-form-item label="备注" name="remark">
-                    <a-input placeholder="请输入备注" v-model:value="modal.form.remark" allowClear />
-                  </a-form-item>
-                </a-col>
-              </a-row>
-            </a-form>
-          </div>
-        </a-modal>
-      <a-modal
-        width="1600px"
-        :destroyOnClose="true"
-        :body-style="bodystyle"
-        :visible="scanResultContentDetail.scanResultContentDetail_visile"
-        :forceRender="true"
-        :title="scanResultContentDetail.title"
+        />
+      <!-- 使用通用扫描结果弹窗组件 -->
+      <ScanResultModal
+        v-model:visible="scanResultContentDetail.scanResultContentDetail_visile"
+        :resultData="scanResultContentDetail.form"
         @cancel="dataBackup_handleCancel"
-        cancelText="取消"
-      >
-        <!-- 根据结果类型显示不同的内容 -->
-        <div v-if="scanResultContentDetail.form.result_type === 'script' || scanResultContentDetail.form.result_type === 'task'">
-          <!-- 脚本执行结果显示 -->
-          <el-descriptions title="脚本执行信息" :column="2" border>
-            <el-descriptions-item label="脚本名称">
-              {{{{ scanResultContentDetail.form.script_name || '未知' }}}}
-            </el-descriptions-item>
-            <el-descriptions-item label="任务ID">
-              {{{{ scanResultContentDetail.form.task_id || '无' }}}}
-            </el-descriptions-item>
-            <el-descriptions-item label="执行时间">
-              {{{{ scanResultContentDetail.form.scandevresult_time }}}}
-            </el-descriptions-item>
-            <el-descriptions-item label="执行耗时">
-              {{{{ scanResultContentDetail.form.execution_time ? scanResultContentDetail.form.execution_time + '秒' : '未知' }}}}
-            </el-descriptions-item>
-            <el-descriptions-item label="执行者">
-              {{{{ scanResultContentDetail.form.director }}}}
-            </el-descriptions-item>
-            <el-descriptions-item label="结果类型">
-              {{{{ scanResultContentDetail.form.result_type === 'script' ? '脚本执行' : '任务执行' }}}}
-            </el-descriptions-item>
-          </el-descriptions>
-          
-          <!-- 脚本输出结果 -->
-          <el-divider content-position="left">脚本输出结果</el-divider>
-          <el-card v-if="scanResultContentDetail.form.script_output" shadow="never" style="margin-bottom: 16px;">
-            <template #header>
-              <span style="color: #67C23A;">
-                <el-icon><SuccessFilled /></el-icon>
-                执行结果
-              </span>
-            </template>
-            <div style="white-space: pre-wrap; font-family: 'Courier New', monospace; background: #f5f5f5; padding: 12px; border-radius: 4px;">
-              {{{{ scanResultContentDetail.form.script_output }}}}
-            </div>
-          </el-card>
-          
-          <!-- 错误信息 -->
-          <el-card v-if="scanResultContentDetail.form.error_message" shadow="never" style="margin-bottom: 16px;">
-            <template #header>
-              <span style="color: #F56C6C;">
-                <el-icon><CircleCloseFilled /></el-icon>
-                错误信息
-              </span>
-            </template>
-            <div style="white-space: pre-wrap; font-family: 'Courier New', monospace; background: #fef0f0; padding: 12px; border-radius: 4px; color: #F56C6C;">
-              {{{{ scanResultContentDetail.form.error_message }}}}
-            </div>
-          </el-card>
-          
-          <!-- 完整JSON结果（折叠显示） -->
-          <el-collapse style="margin-top: 16px;">
-            <el-collapse-item title="查看完整JSON结果" name="json">
-              <div style="white-space: pre-wrap; font-family: 'Courier New', monospace; background: #f8f8f8; padding: 12px; border-radius: 4px; max-height: 400px; overflow-y: auto;">
-                {{{{ formatJsonContent(scanResultContentDetail.form.scandevresult_content) }}}}
-              </div>
-            </el-collapse-item>
-          </el-collapse>
-        </div>
-        
-        <!-- 传统扫描结果显示 -->
-        <div v-else style="white-space: pre-wrap">
-          {{{{ scanResultContentDetail.form.scandevresult_content }}}}
-        </div>
-        <template #footer="footer">
-          <a-button @click="dataBackup_handleCancel">关闭</a-button>
-        </template>
-      </a-modal>
+      />
       </div>
     </ScriptManagerLayout>
   </div>
@@ -484,6 +360,10 @@ def get_scan_dev_template(route_key, page_title):
 import {{ FormInstance, message }} from 'ant-design-vue';
 import {{ createApi, listApi, updateApi, deleteApi }} from '/@/api/scanDevUpdate';
 import ScriptManagerLayout from '/@/components/ScriptManagerLayout.vue';
+import ScanResultModal from '/@/components/ScanResultModal.vue';
+import ScanResultTable from '/@/components/ScanResultTable.vue';
+import EditRecordModal from '/@/components/EditRecordModal.vue';
+import DataBackupTable from '/@/components/DataBackupTable.vue';
 import {{ SuccessFilled, CircleCloseFilled }} from '@element-plus/icons-vue';
 import dayjs from 'dayjs';
 import {{ ref, reactive, onMounted, h}} from 'vue'
@@ -529,6 +409,18 @@ const scanResultcolumns = reactive([
     align: "center",
     key: 'execution_status',
     width: 120,
+    customRender: ({{ record }}) => {{
+      const statusMap = {{
+        'SUCCESS': {{ text: '成功', type: 'success' }},
+        'FAILURE': {{ text: '失败', type: 'error' }},
+        'RUNNING': {{ text: '运行中', type: 'processing' }},
+        'PENDING': {{ text: '等待中', type: 'default' }},
+        'TIMEOUT': {{ text: '超时', type: 'warning' }},
+        'CANCELLED': {{ text: '已取消', type: 'default' }}
+      }};
+      const status = statusMap[record.execution_status] || {{ text: '未知', type: 'default' }};
+      return h('a-tag', {{ color: status.type }}, status.text);
+    }}
   }},
   {{
     title: '结果摘要',
@@ -544,54 +436,6 @@ const scanResultcolumns = reactive([
       }}
       return summary;
     }}
-  }},
-  {{
-    title: '操作',
-    dataIndex: 'action',
-    key: 'operation',
-    align: 'center',
-    fixed: 'right',
-    width: 140,
-  }},
-]);
-
-// 数据备份表格列配置
-const dataBackupcolumns = reactive([
-
-  {{
-    title: '序号',
-    dataIndex: 'index',
-    key: 'index',
-    align: "center",
-    width: 100
-  }},
-  {{
-    title: '数据备份结果文件',
-    dataIndex: 'scanDevResult',
-    align: "center",
-    key: 'scanDevResult',
-    width: 800
-  }},
-  {{
-    title: '时间',
-    dataIndex: 'scanDevTime',
-    align: "center",
-    key: 'scanDevTime',
-    width: 200
-  }},
-  {{
-    title: '负责人',
-    dataIndex: 'director',
-    align: "center",
-    key: 'director',
-    width: 100
-  }},
-  {{
-    title: '备注',
-    dataIndex: 'remark',
-    align: "center",
-    key: 'remark',
-    width: 260
   }},
   {{
     title: '操作',
@@ -644,7 +488,6 @@ const modal = reactive({{
 const scanResultContentDetail = reactive({{
   scanResultContentDetail_visile: false,
   scanResultContentDetail_editFlag: false,
-  title: '{page_title}结果',
   form: {{
     id: undefined,
     scandevresult_content: undefined,
@@ -652,9 +495,6 @@ const scanResultContentDetail = reactive({{
   rules: {{}},
 }});
 
-
-// 表单实例引用
-const myform = ref<FormInstance>();
 
 // 组件引用
 const scriptManager = ref();
@@ -699,7 +539,7 @@ const getDataList = () => {{
 
 // 搜索功能
 const onSearchChange = (e: Event) => {{
-  data.keyword = e?.target?.value;
+  data.keyword = (e.target as HTMLInputElement)?.value;
   console.log(data.keyword);
 }};
 
@@ -729,52 +569,39 @@ const handleEdit = (record: any) => {{
   }}
 }};
 
-const handleOk = () => {{
-  myform.value
-      ?.validate()
-      .then(() => {{
-        const formData = new FormData();
-        formData.append('id', modal.form.id)
-        formData.append('scandevresult_filename', modal.form.scandevresult_filename)
-        formData.append('scandevresult_time', modal.form.scandevresult_time)
-        formData.append('director', modal.form.director)
-        formData.append('remark', modal.form.remark)
-        formData.append('status', modal.form.status)
-        if (modal.scanResult_editFlag) {{
-          submitting.value = true
-          updateApi({{
-            id: modal.form.id
-          }},formData)
-              .then((res) => {{
-                submitting.value = false
-                handleCancel();
-                getDataList();
-                message.success('项目信息更新成功')
-              }})
-              .catch((err) => {{
-                submitting.value = false
-                console.log(err);
-                message.error(err.msg || '项目信息更新失败');
-              }});
-        }} else {{
-          submitting.value = true
-          createApi(formData)
-              .then((res) => {{
-                submitting.value = false
-                handleCancel();
-                getDataList();
-              }})
-              .catch((err) => {{
-                submitting.value = false
-                console.log(err);
-                message.error(err.msg || '操作失败');
-              }});
-        }}
+const handleOk = (formData: any) => {{
+  if (modal.scanResult_editFlag) {{
+    submitting.value = true
+    updateApi({{
+      id: modal.form.id
+    }}, formData)
+      .then((res) => {{
+        submitting.value = false
+        handleCancel();
+        getDataList();
+        message.success('项目信息更新成功')
       }})
       .catch((err) => {{
-        console.log('不能为空');
+        submitting.value = false
+        console.log(err);
+        message.error(err.msg || '项目信息更新失败');
       }});
-}};
+  }} else {{
+    submitting.value = true
+    createApi(formData)
+      .then((res) => {{
+        submitting.value = false
+        handleCancel();
+        getDataList();
+        message.success('操作成功')
+      }})
+      .catch((err) => {{
+        submitting.value = false
+        console.log(err);
+        message.error(err.msg || '操作失败');
+      }});
+  }}
+}}
 
 // 关闭编辑弹窗
 const handleCancel = () => {{
@@ -789,7 +616,6 @@ const dataBackup_handleCancel = () => {{
 
 // 恢复表单初始状态
 const resetModal = () => {{
-  myform.value?.resetFields();
   fileList.value = []
 }};
 
@@ -811,16 +637,6 @@ const handleClick = (record: any) => {{
   console.log(scanResultContentDetail.form.scandevresult_content )
 }}
 
-// 格式化JSON内容
-const formatJsonContent = (jsonStr: string) => {{
-  if (!jsonStr) return '';
-  try {{
-    const parsed = JSON.parse(jsonStr);
-    return JSON.stringify(parsed, null, 2);
-  }} catch (e) {{
-    return jsonStr;
-  }}
-}}
 
 const bodystyle = {{
   height: '680px',

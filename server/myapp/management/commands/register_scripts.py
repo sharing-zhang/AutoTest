@@ -6,6 +6,7 @@ import os
 import json
 import ast
 import inspect
+import re
 from django.core.management.base import BaseCommand
 from django.conf import settings
 from myapp.models import Script, PageScriptConfig
@@ -137,12 +138,17 @@ class Command(BaseCommand):
             # 转换为相对路径 (相对于server目录)
             relative_path = os.path.relpath(filepath, settings.BASE_DIR)
             
+            # 提取对话框标题
+            script_name = filename.replace('.py', '')
+            dialog_title = self.extract_dialog_title(script_name)
+            
             return {
                 'name': filename.replace('.py', ''),
                 'description': module_docstring or f'方案1脚本: {filename}',
                 'script_path': relative_path,
                 'script_type': script_type,
                 'parameters_schema': parameters_schema,
+                'dialog_title': dialog_title,
                 'tasks': analyzer.tasks,
                 'functions': analyzer.functions,
                 'imports': analyzer.imports,
@@ -200,9 +206,34 @@ class Command(BaseCommand):
                 
         return schema
 
+    def load_script_configs_from_json(self):
+        """从 script_configs.json 文件加载脚本配置"""
+        config_file = os.path.join(os.path.dirname(__file__), 'script_configs.json')
+        
+        if not os.path.exists(config_file):
+            print(f"配置文件不存在: {config_file}")
+            return {}
+        
+        try:
+            with open(config_file, 'r', encoding='utf-8') as f:
+                configs = json.load(f)
+            print(f"成功加载脚本配置文件: {len(configs)} 个配置")
+            return configs
+        except Exception as e:
+            print(f"加载脚本配置文件失败: {e}")
+            return {}
+
     def extract_parameters_schema_v1(self, filename, content, tasks):
         """方案1专用：提取参数模式"""
-        # 预定义的脚本参数模式
+        # 首先尝试从 JSON 文件加载配置
+        json_configs = self.load_script_configs_from_json()
+        script_name = filename.replace('.py', '')
+        
+        if script_name in json_configs:
+            print(f"使用 JSON 配置: {script_name}")
+            return json_configs[script_name]
+        
+        # 预定义的脚本参数模式（作为备用）
         predefined_schemas = {
             'print_test_script': {
                 'greeting': {
@@ -299,6 +330,32 @@ class Command(BaseCommand):
         
         return schema
 
+    def extract_dialog_title(self, script_name):
+        """从script_configs.json中提取对话框标题"""
+        try:
+            config_file_path = os.path.join(settings.BASE_DIR, 'myapp', 'management', 'commands', 'script_configs.json')
+            
+            if not os.path.exists(config_file_path):
+                return f'{script_name}参数配置'
+            
+            with open(config_file_path, 'r', encoding='utf-8') as f:
+                configs = json.load(f)
+            
+            # 查找脚本配置
+            if script_name in configs:
+                script_config = configs[script_name]
+                if 'dialog_title' in script_config:
+                    return script_config['dialog_title']
+            
+            # 默认使用脚本名称
+            return f'{script_name}参数配置'
+            
+        except Exception as e:
+            self.stdout.write(
+                self.style.WARNING(f'从script_configs.json提取对话框标题失败: {str(e)}')
+            )
+            return f'{script_name}参数配置'
+
     def register_script(self, script_info, force_update=False):
         """注册脚本到数据库"""
         script_name = script_info['name']
@@ -312,6 +369,7 @@ class Command(BaseCommand):
             existing_script.script_path = script_info['script_path']
             existing_script.script_type = script_info['script_type']
             existing_script.parameters_schema = script_info['parameters_schema']
+            existing_script.dialog_title = script_info.get('dialog_title', '')
             existing_script.save()
             
             self.stdout.write(f'  更新脚本: {script_name}')
@@ -327,6 +385,7 @@ class Command(BaseCommand):
                 script_path=script_info['script_path'],
                 script_type=script_info['script_type'],
                 parameters_schema=script_info['parameters_schema'],
+                dialog_title=script_info.get('dialog_title', ''),
                 is_active=True
             )
             

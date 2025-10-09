@@ -128,6 +128,14 @@ class ScanDevUpdate_scanResult(models.Model):
         null=True, 
         verbose_name="结果摘要"
     )
+    
+    # 执行参数
+    parameters = models.JSONField(
+        default=dict, 
+        blank=True, 
+        null=True, 
+        verbose_name="执行参数"
+    )
 
     class Meta:
         # 关联的数据库
@@ -198,6 +206,7 @@ class Script(models.Model):
     ], verbose_name="脚本类型")
     parameters_schema = models.JSONField(default=dict, verbose_name="参数模式")
     visualization_config = models.JSONField(default=dict, verbose_name="可视化配置")
+    dialog_title = models.CharField(max_length=200, blank=True, verbose_name="脚本中文名称")
     is_active = models.BooleanField(default=True, verbose_name="是否启用")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -281,23 +290,13 @@ class LoginLog(models.Model):
 
 
 class PageScriptConfig(models.Model):
-    """页面脚本配置表"""
+    """页面脚本配置表 - 支持一个页面配置多个脚本"""
     page_name = models.CharField(max_length=200, verbose_name="页面名称")
     page_route = models.CharField(max_length=200, verbose_name="页面路由")
-    script = models.ForeignKey(Script, on_delete=models.CASCADE)
-    button_text = models.CharField(max_length=100, default="运行", verbose_name="按钮文本")
-    button_style = models.JSONField(default=dict, verbose_name="按钮样式")
-    position = models.CharField(max_length=50, choices=[
-        ('top-right', '右上角'),
-        ('top-left', '左上角'),
-        ('bottom-right', '右下角'),
-        ('custom', '自定义位置'),
-    ], default='top-right')
-    custom_position = models.JSONField(default=dict, verbose_name="自定义位置配置")
-    is_enabled = models.BooleanField(default=True)
-    display_order = models.IntegerField(default=0, verbose_name="显示顺序")
+    scripts = models.JSONField(default=list, verbose_name="脚本名称列表")
+    is_enabled = models.BooleanField(default=True, verbose_name="是否启用")
 
     class Meta:
         db_table = 'c_page_script_configs'
-        unique_together = ['page_route', 'script']
+        unique_together = ['page_route']
 
