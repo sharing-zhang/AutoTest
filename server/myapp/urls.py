@@ -48,8 +48,8 @@ urlpatterns = [
     path('api/create-frontend-page/', views.page_creator.create_frontend_page),
     
     # 真实控制台抓取API
-    path('api/real-console/fetch/', views.real_console_fetcher.fetch_real_console_messages),
-    path('api/real-console/monitor/', views.real_console_fetcher.monitor_console_realtime),
+    # path('api/real-console/fetch/', views.real_console_fetcher.fetch_real_console_messages),
+    # path('api/real-console/monitor/', views.real_console_fetcher.monitor_console_realtime),
 
     path('admin/loginLog/list', views.admin.loginLog.list_api),
     path('admin/loginLog/create', views.admin.loginLog.create),
