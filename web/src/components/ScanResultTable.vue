@@ -47,7 +47,7 @@
 <script setup lang="ts">
 import { h, computed } from 'vue';
 import { message } from 'ant-design-vue';
-import { rerunScriptApi } from '/@/api/scanDevUpdate';
+import { rerunScriptApi, getScriptTaskResultApi } from '/@/api/scanDevUpdate';
 
 // 定义组件属性
 interface Props {
@@ -249,8 +249,20 @@ const handleBuiltinRerun = async (record: any) => {
     if (response.code === 0) {
       message.success(response.msg || '重跑任务已启动');
       
-      // 发送刷新事件给父组件
-      emit('refresh-data');
+      // 获取新任务的ID和执行ID
+      const newTaskId = response.data?.task_id;
+      const newExecutionId = response.data?.execution_id;
+      const scriptName = response.data?.script_name || record.scandevresult_filename;
+      
+      if (newTaskId) {
+        // 启动任务状态监控，复用现有的监控逻辑
+        monitorRerunTaskStatus(newTaskId, newExecutionId, scriptName);
+      } else {
+        // 如果没有任务ID，延迟刷新一次
+        setTimeout(() => {
+          emit('refresh-data');
+        }, 2000);
+      }
     } else {
       message.error(response.msg || '重跑失败');
     }
@@ -263,6 +275,85 @@ const handleBuiltinRerun = async (record: any) => {
       loadingMessage();
     }
   }
+};
+
+// 重跑任务状态监控（复用现有的监控逻辑）
+const monitorRerunTaskStatus = async (taskId: string, executionId?: string, scriptName?: string) => {
+  const maxAttempts = 30;
+  let attempts = 0;
+  
+  console.log(`开始监控重跑任务状态: taskId=${taskId}, executionId=${executionId}`);
+  
+  // 递归轮询函数
+  const poll = async () => {
+    try {
+      attempts++;
+      console.log(`重跑任务状态轮询: 第${attempts}次`);
+      
+      // 查询任务状态（兼容 axios 与直出）
+      const result = await getScriptTaskResultApi(taskId, executionId);
+      const taskData = result.data || result;
+      
+      if (taskData && taskData.ready) {
+        // 任务已完成
+        console.log('重跑任务已完成:', taskData);
+        
+        if (taskData.success) {
+          message.success(`${scriptName || '重跑任务'} 执行成功！`);
+          
+          // 延迟刷新数据，确保数据库已写入
+          setTimeout(() => {
+            console.log('重跑任务成功，刷新数据列表...');
+            emit('refresh-data');
+            
+            // 二次刷新确保数据同步
+            setTimeout(() => {
+              console.log('重跑任务二次刷新...');
+              emit('refresh-data');
+            }, 1000);
+          }, 2000);
+        } else {
+          message.error(`${scriptName || '重跑任务'} 执行失败: ${taskData.error || '未知错误'}`);
+          
+          // 即使失败也刷新数据，可能有部分结果
+          setTimeout(() => {
+            console.log('重跑任务失败，刷新数据列表...');
+            emit('refresh-data');
+          }, 1000);
+        }
+      } else if (attempts >= maxAttempts) {
+        // 超过最大轮询次数
+        console.warn('重跑任务状态查询超时');
+        message.warning(`${scriptName || '重跑任务'} 状态查询超时，请手动刷新页面查看结果`);
+        
+        // 超时后也尝试刷新一次
+        setTimeout(() => {
+          emit('refresh-data');
+        }, 1000);
+      } else {
+        // 任务还在执行中，继续轮询
+        console.log('重跑任务执行中，继续轮询...');
+        setTimeout(poll, 2000);
+      }
+    } catch (error) {
+      console.error('重跑任务状态查询失败:', error);
+      
+      if (attempts >= maxAttempts) {
+        message.error(`${scriptName || '重跑任务'} 状态查询失败，请手动刷新页面查看结果`);
+        
+        // 查询失败后也尝试刷新一次
+        setTimeout(() => {
+          emit('refresh-data');
+        }, 1000);
+      } else {
+        // 暂时失败，过会儿再试
+        setTimeout(poll, 2000);
+      }
+    }
+  };
+  
+  // 延迟1秒开始轮询，给任务启动时间
+  setTimeout(poll, 1000);
 };
 
 const handleEdit = (record: any) => {

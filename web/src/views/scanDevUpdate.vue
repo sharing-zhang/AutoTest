@@ -21,21 +21,13 @@
           />
         </el-tab-pane>
         <el-tab-pane label="数据备份" name="dataBackup">
-          <a-table
-            size="middle"
-            rowKey="scanResult_id"
+          <DataBackupTable
             :loading="data.loading"
-            :columns="dataBackupcolumns"
             :data-source="data.dataBackup_dataList"
-            :scroll="{ x: 'max-content' }"
-            :pagination="{
-              size: 'small',
-              current: data.page,
-              pageSize: data.pageSize,
-              onChange: (current) => (data.page = current),
-              showSizeChanger: false,
-              showTotal: (total) => `共${total}条数据`,
-            }"
+            :columns="dataBackupcolumns"
+            :current="data.page"
+            :page-size="data.pageSize"
+            @page-change="(current) => data.page = current"
           />
         </el-tab-pane>
         <el-tab-pane label="操作" name="configuration">
@@ -46,42 +38,13 @@
 
       <!--弹窗区域-->
       <div>
-        <a-modal
-          :visible="modal.scanResult_visile"
-          :forceRender="true"
+        <EditRecordModal
+          v-model:visible="modal.scanResult_visile"
           :title="modal.title"
-          ok-text="确认"
-          cancel-text="取消"
-          @ok="handleOk"
+          :form-data="modal.form"
+          @ok="handleEditOk"
           @cancel="handleCancel"
-        >
-          <div>
-            <a-form ref="myform" :label-col="{ style: { width: '120px' } }" :model="modal.form" :rules="modal.rules">
-              <a-row :gutter="24">
-                <a-col span="24">
-                  <a-form-item label="文件名" name="scandevresult_filename">
-                    <a-input placeholder="请输入文件名" v-model:value="modal.form.scandevresult_filename" allowClear />
-                  </a-form-item>
-                </a-col>
-                <a-col span="24">
-                  <a-form-item label="时间" name="scandevresult_time">
-                    <a-input placeholder="时间" v-model:value="modal.form.scandevresult_time" allowClear />
-                  </a-form-item>
-                </a-col>
-                <a-col span="24">
-                  <a-form-item label="负责人" name="director">
-                    <a-input placeholder="请输入负责人" v-model:value="modal.form.director" allowClear />
-                  </a-form-item>
-                </a-col>
-                <a-col span="24">
-                  <a-form-item label="备注" name="remark">
-                    <a-input placeholder="请输入备注" v-model:value="modal.form.remark" allowClear />
-                  </a-form-item>
-                </a-col>
-              </a-row>
-            </a-form>
-          </div>
-        </a-modal>
+        />
         <!-- 使用通用扫描结果弹窗组件 -->
         <ScanResultModal
           v-model:visible="scanResultContentDetail.scanResultContentDetail_visile"
@@ -95,12 +58,13 @@
 </template>
 
 <script setup lang="ts">
-  import { FormInstance, message } from 'ant-design-vue';
+  import { message } from 'ant-design-vue';
   import { createApi, listApi, updateApi, deleteApi } from '/@/api/scanDevUpdate';
   import ScriptManagerLayout from '/@/components/ScriptManagerLayout.vue';
   import ScanResultModal from '/@/components/ScanResultModal.vue';
   import ScanResultTable from '/@/components/ScanResultTable.vue';
-  import { SuccessFilled, CircleCloseFilled } from '@element-plus/icons-vue';
+  import DataBackupTable from '/@/components/DataBackupTable.vue';
+  import EditRecordModal from '/@/components/EditRecordModal.vue';
   import dayjs from 'dayjs';
   import { ref, reactive, onMounted, h } from 'vue';
 
@@ -258,8 +222,7 @@ const scanResultcolumns = reactive([
     },
   ]);
 
-  // 文件列表和提交状态
-  const fileList = ref<any[]>([]);
+  // 提交状态
   const submitting = ref<boolean>(false);
 
   // 页面数据状态
@@ -287,12 +250,6 @@ const scanResultcolumns = reactive([
       status: undefined,
       scandevresult_content: undefined,
     },
-    rules: {
-      scandevresult_filename: [{ required: true, message: '请输入文件名', trigger: 'change' }],
-      scandevresult_time: [{ required: true, message: '请输入时间', trigger: 'change' }],
-      director: [{ required: true, message: '请输入负责人', trigger: 'change' }],
-      remark: [{ required: false, trigger: 'change' }],
-    },
   });
 
 
@@ -308,9 +265,6 @@ const scanResultcolumns = reactive([
   });
 
 
-
-  // 表单实例引用
-  const myform = ref<FormInstance>();
 
   // 组件引用
   const scriptManager = ref();
@@ -355,7 +309,7 @@ onMounted(() => {
 
   // 搜索功能
   const onSearchChange = (e: Event) => {
-    data.keyword = e?.target?.value;
+    data.keyword = (e?.target as HTMLInputElement)?.value || '';
     console.log(data.keyword);
   };
 
@@ -370,69 +324,72 @@ onMounted(() => {
     }
   };
 
-  const handleEdit = (record: any) => {
-    resetModal();
-    modal.scanResult_visile = true;
-    modal.scanResult_editFlag = true;
-    modal.title = '编辑资源扫描结果文件信息';
-    for (const key in modal.form) {
-      modal.form[key] = undefined;
+  // 重置表单数据
+  const resetFormData = (form: any) => {
+    for (const key in form) {
+      form[key] = undefined;
     }
+  };
+
+  // 填充表单数据
+  const fillFormData = (form: any, record: any) => {
     for (const key in record) {
       if (record[key]) {
-        modal.form[key] = record[key];
+        form[key] = record[key];
       }
     }
   };
 
-  const handleOk = () => {
-    myform.value
-      ?.validate()
-      .then(() => {
-        const formData = new FormData();
-        formData.append('id', modal.form.id);
-        formData.append('scandevresult_filename', modal.form.scandevresult_filename);
-        formData.append('scandevresult_time', modal.form.scandevresult_time);
-        formData.append('director', modal.form.director);
-        formData.append('remark', modal.form.remark);
-        formData.append('status', modal.form.status);
-        if (modal.scanResult_editFlag) {
-          submitting.value = true;
-          updateApi(
-            {
-              id: modal.form.id,
-            },
-            formData,
-          )
-            .then((res) => {
-              submitting.value = false;
-              handleCancel();
-              getDataList();
-              message.success('项目信息更新成功');
-            })
-            .catch((err) => {
-              submitting.value = false;
-              console.log(err);
-              message.error(err.msg || '项目信息更新失败');
-            });
-        } else {
-          submitting.value = true;
-          createApi(formData)
-            .then((res) => {
-              submitting.value = false;
-              handleCancel();
-              getDataList();
-            })
-            .catch((err) => {
-              submitting.value = false;
-              console.log(err);
-              message.error(err.msg || '操作失败');
-            });
-        }
-      })
-      .catch((err) => {
-        console.log('不能为空');
-      });
+  const handleEdit = (record: any) => {
+    modal.scanResult_visile = true;
+    modal.scanResult_editFlag = true;
+    modal.title = '编辑资源扫描结果文件信息';
+    resetFormData(modal.form);
+    fillFormData(modal.form, record);
+  };
+
+  const handleEditOk = (formData: any) => {
+    const submitData = new FormData();
+    submitData.append('id', formData.id);
+    submitData.append('scandevresult_filename', formData.scandevresult_filename);
+    submitData.append('scandevresult_time', formData.scandevresult_time);
+    submitData.append('director', formData.director);
+    submitData.append('remark', formData.remark);
+    submitData.append('status', formData.status);
+    
+    if (modal.scanResult_editFlag) {
+      submitting.value = true;
+      updateApi(
+        {
+          id: formData.id,
+        },
+        submitData,
+      )
+        .then((res) => {
+          submitting.value = false;
+          handleCancel();
+          getDataList();
+          message.success('项目信息更新成功');
+        })
+        .catch((err) => {
+          submitting.value = false;
+          console.log(err);
+          message.error(err.msg || '项目信息更新失败');
+        });
+    } else {
+      submitting.value = true;
+      createApi(submitData)
+        .then((res) => {
+          submitting.value = false;
+          handleCancel();
+          getDataList();
+        })
+        .catch((err) => {
+          submitting.value = false;
+          console.log(err);
+          message.error(err.msg || '操作失败');
+        });
+    }
   };
 
   // 关闭编辑弹窗
@@ -445,26 +402,13 @@ onMounted(() => {
     scanResultContentDetail.scanResultContentDetail_visile = false;
   };
 
-  // 恢复表单初始状态
-  const resetModal = () => {
-    myform.value?.resetFields();
-    fileList.value = [];
-  };
-
   // 查看详情点击响应
   const handleClick = (record: any) => {
-    resetModal();
     scanResultContentDetail.scanResultContentDetail_visile = true;
     scanResultContentDetail.scanResultContentDetail_editFlag = true;
     console.log(record);
-    for (const key in scanResultContentDetail.form) {
-      scanResultContentDetail.form[key] = undefined;
-    }
-    for (const key in record) {
-      if (record[key]) {
-        scanResultContentDetail.form[key] = record[key];
-      }
-    }
+    resetFormData(scanResultContentDetail.form);
+    fillFormData(scanResultContentDetail.form, record);
     console.log(scanResultContentDetail.form['scandevresult_content']);
   };
 
@@ -486,9 +430,6 @@ onMounted(() => {
     width: '1600px',
   };
 
-  // 页面加载时获取脚本列表
-  onMounted(() => {
-  });
 </script>
 
 <style scoped lang="less">
