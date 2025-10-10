@@ -230,7 +230,7 @@ const emit = defineEmits(['script-executed'])
   transition: all 0.3s ease;
   border: 1px solid #e4e7ed;
   border-radius: 8px;
-  height: 150px;
+  height: 100px;
 }
 
 .script-item-card:hover {

@@ -43,7 +43,7 @@
     ]
   },
   "check_ConfigTime": {
-    "dialog_title": "检查配置时间",
+    "dialog_title": "活动时间配置检查",
     "parameters": [
       {
         "name": "directory",
@@ -119,7 +119,7 @@
   },
 
   "checkConfigExist": {
-    "dialog_title": "检查配置路径存在性",
+    "dialog_title": "配置表资源路径存在性检查",
     "parameters": [
       {
         "name": "config_file",
@@ -164,7 +164,7 @@
   },
 
   "checkFileName": {
-    "dialog_title": "检查文件名合法性",
+    "dialog_title": "文件名合法性检查",
     "parameters": [
       {
         "name": "root_path",
@@ -204,7 +204,7 @@
     ]
   },
   "checkconfigempty": {
-    "dialog_title": "检查配置不为空",
+    "dialog_title": "配置字段空值检查",
     "parameters": [
       {
         "name": "file_path",
@@ -225,7 +225,7 @@
     ]
   },
   "checkconfigunique": {
-    "dialog_title": "检查配置唯一性",
+    "dialog_title": "配置字段唯一性检查",
     "parameters": [
       {
         "name": "file_path",
