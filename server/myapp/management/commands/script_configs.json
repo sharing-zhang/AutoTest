@@ -112,8 +112,7 @@
           7,
           14
         ],
-        "placeholder": "输入天数，按回车添加（例如：3, 7, 14）",
-        "description": "输入允许的活动持续天数，支持多个值"
+        "placeholder": "输入天数，按回车添加（例如：3, 7, 14）"
       }
     ]
   },
@@ -134,16 +133,14 @@
         "type": "text",
         "label": "工程文件目录",
         "required": true,
-        "default": "E:\\Dev_2024_3_30\\client\\MainProject\\Assets\\InBundle",
-        "description": "输入工程文件的目录，支持输入精确or大致路径"
+        "default": "E:\\Dev_2024_3_30\\client\\MainProject\\Assets\\InBundle"
       },
       {
         "name": "path_fields_param",
         "type": "text",
         "label": "配置参数名",
         "required": true,
-        "default": "assetName",
-        "description": "输入想要查找的配置参数名"
+        "default": "assetName"
       },
       {
         "name": "custom_extensions_param",
@@ -157,8 +154,7 @@
         ],
         "required": false,
         "multiple": true,
-        "default": [".txt"],
-        "description": "选择要检查的文件后缀类型，可多选。如果不选择任何项，将检查所有文件"
+        "default": [".txt"]
       }
     ]
   },
@@ -179,8 +175,7 @@
         "type": "text",
         "label": "正则表达式",
         "required": true,
-        "default": "^[a-zA-Z0-9_]+\\.[a-z]+$",
-        "description": "用于匹配文件名的正则表达式，例如：^[A-Z][a-zA-Z0-9]*\\.cs$ 表示PascalCase的C#文件"
+        "default": "^[a-zA-Z0-9_]+\\.[a-z]+$"
       },
       {
         "name": "file_extensions",
@@ -198,8 +193,7 @@
         ],
         "required": false,
         "multiple": true,
-        "default": [".txt"],
-        "description": "选择要检查的文件后缀类型，可多选。如果不选择任何项，将检查所有文件"
+        "default": [".txt"]
       }
     ]
   },
@@ -219,8 +213,7 @@
         "type": "text",
         "label": "配置参数名",
         "required": true,
-        "default": "id",
-        "description": "输入想要查找的配置参数名"
+        "default": "id"
       }
     ]
   },
@@ -240,8 +233,7 @@
         "type": "text",
         "label": "配置参数名",
         "required": true,
-        "default": "id",
-        "description": "输入想要查找的配置参数名"
+        "default": "id"
       }
     ]
   },
@@ -328,8 +320,7 @@
         "required": true,
         "multiple": true,
         "default":"F:\\fish_test",
-        "placeholder": "输入要搜索的文件或目录路径，按回车添加",
-        "description": "可以指定具体的文件路径或目录路径，支持多个路径"
+        "placeholder": "输入要搜索的文件或目录路径，按回车添加"
       },
       {
         "name": "file_formats",
@@ -340,8 +331,7 @@
         ],
         "required": false,
         "multiple": true,
-        "default": [".txt", ".json"],
-        "description": "选择要搜索的文件格式，可多选"
+        "default": [".txt", ".json"]
       },
       {
         "name": "match_rules",
@@ -355,8 +345,7 @@
         ],
         "required": false,
         "multiple": true,
-        "default": ["包含匹配"],
-        "description": "选择匹配规则：全匹配、前缀匹配、后缀匹配、包含匹配"
+        "default": ["包含匹配"]
       }
     ]
   }
