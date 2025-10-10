@@ -1,6 +1,6 @@
 {
   "check_Reward": {
-    "dialog_title": "检查奖励配置",
+    "dialog_title": "道具数量检查",
     "parameters": [
       {
         "name": "directory",
@@ -8,7 +8,8 @@
         "label": "目录路径",
         "required": true,
         "default": "C:\\temp",
-        "placeholder": "例如: C:\\temp 或 /home/user/documents"
+        "placeholder": "请输入目录路径",
+        "help": "输入所在项目配置表路径"
       },
       {
         "name": "file_name",
@@ -16,26 +17,28 @@
         "label": "需要检查的文件名",
         "required": true,
         "default": "POINT_PROGRESS_REWARD.data.txt",
-        "placeholder": "仅支持单个文件名"
+        "placeholder": "仅支持单个文件名",
+        "help": "配置表文件名，支持 .txt、.data、.json等格式"
       },
       {
         "name": "block_name",
         "type": "text",
         "label": "配置块名称",
         "required": true,
-        "default": "progressRewards"
+        "default": "progressRewards",
+        "help": "配置道具的字段名称"
       },
       {
         "name": "rules",
         "type": "group-list",
         "label": "配置项组",
         "required": true,
+        "help": "包含：奖励ID、数量ID、最大奖励值",
         "item_fields": [
           { "name": "reward_id", "type": "text", "label": "reward_id", "placeholder": "奖励ID，支持正则或精确值" },
           { "name": "count_id", "type": "text", "label": "count_id", "placeholder": "数量ID" },
           { "name": "max_reward", "type": "number", "label": "max_reward", "min": 0 , "addonAfter": "最大奖励值" }
-        ],
-        "description": "每组包含：奖励ID、数量ID、最大奖励值"
+        ]
       }
     ]
   },
@@ -251,7 +254,8 @@
         "label": "目录路径",
         "required": true,
         "default": "D:\\",
-        "placeholder": "例如: C:\\temp 或 /home/user/docs"
+        "placeholder": "例如: C:\\temp 或 /home/user/docs",
+        "help": "输入所在项目配置表路径"
       },
       {
         "name": "file_name1",

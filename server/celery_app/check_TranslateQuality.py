@@ -1,18 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-翻译质量检查脚本
-
-功能:
-- 接收参数: directory(目录), file_name1(中文语言配置表), file_name2(英文语言配置表), field(配置文本的字段)
-- 读取两个语言配置文件，提取指定字段的中英文文本
-- 调用 DeepSeek Chat Completions API，对中英文翻译进行正确性分析
-- 返回包含每条目的翻译问题与建议
-
-环境变量:
-- DEEPSEEK_API_KEY (必填)
-- DEEPSEEK_API_BASE (可选，默认 https://api.deepseek.com)
-- DEEPSEEK_MODEL    (可选，默认 deepseek-chat)
+翻译质量检查脚本 - 调用AI模型检查中英文翻译的正确性，给出问题列表和建议
 """
 
 import os

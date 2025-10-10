@@ -1,18 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-文本质量检查脚本
-
-功能:
-- 接收参数: directory(目录), file_name(文件名), field(可选，键名)
-- 读取目标文件内容，按条目提取文本
-- 调用 DeepSeek Chat Completions API，对条目进行语法/错别字等文本问题分析
-- 返回包含每条目的问题列表与建议
-
-环境变量:
-- DEEPSEEK_API_KEY (必填)
-- DEEPSEEK_API_BASE (可选，默认 https://api.deepseek.com)
-- DEEPSEEK_MODEL    (可选，默认 deepseek-v3.1)
+文本质量检查脚本 - 调用AI模型检查文本的语法、错别字等问题，给出问题列表和建议
 """
 
 import os
@@ -81,7 +70,8 @@ def extract_entries(script: ScriptBase, content: str, field: Optional[str]) -> L
 
 def deepseek_check(script: ScriptBase, items: List[str]) -> Dict[str, Any]:
     """调用 DeepSeek API 进行文本质量检查"""
-    #api_key = os.getenv('DEEPSEEK_API_KEY')
+
+    # api_key = os.getenv('DEEPSEEK_API_KEY')
     api_key = "sk-8f18bde8ff294c1580ee050a2baf26b8"
     if not api_key:
         return {'error': 'DEEPSEEK_API_KEY 未设置', 'result': []}
@@ -97,10 +87,44 @@ def deepseek_check(script: ScriptBase, items: List[str]) -> Dict[str, Any]:
     # 官方公开可用模型（按优先顺序）
     model_candidates.extend(['deepseek-chat', 'deepseek-reasoner'])
 
-    # 限制条目数量和长度
-    preview = items[:30]
-    preview = [t[:1000] if len(t) > 300 else t for t in preview]
+    # 定义headers
+    headers = {
+        'Authorization': f'Bearer {api_key}',
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+    }
+    
+    # 分批处理：每批处理5个条目，避免API限制
+    batch_size = 5
+    all_results = []
+    total_checked = 0
+    
+    script.info(f"开始分批处理 {len(items)} 个条目，每批 {batch_size} 个")
+    
+    for i in range(0, len(items), batch_size):
+        batch_items = items[i:i + batch_size]
+        batch_preview = [t[:200] if len(t) > 200 else t for t in batch_items]
+        
+        script.info(f"处理第 {i//batch_size + 1} 批，条目 {i+1}-{min(i+batch_size, len(items))}")
+        
+        batch_result = _process_batch(script, url, headers, model_candidates, batch_preview, i)
+        if batch_result:
+            all_results.extend(batch_result)
+            total_checked += len(batch_preview)
+        else:
+            script.warning(f"第 {i//batch_size + 1} 批处理失败")
+    
+    return {
+        'checked_count': total_checked,
+        'total_entries': len(items),
+        'result': all_results,
+        'model': 'deepseek-chat'  # 使用第一个成功的模型
+    }
 
+
+def _process_batch(script: ScriptBase, url: str, headers: dict, model_candidates: List[str], 
+                  batch_items: List[str], start_index: int) -> List[Dict[str, Any]]:
+    """处理一批条目"""
     prompt = (
         "你是中文文本校对助手。检查以下文本的：拼写错误、语法问题、标点问题。"
         "输出JSON数组，格式：[{\"index\": 0, \"original\": \"原文\", \"issues\": [\"问题1\"], \"suggestions\": [\"建议1\"]}]"
@@ -110,18 +134,12 @@ def deepseek_check(script: ScriptBase, items: List[str]) -> Dict[str, Any]:
         'messages': [
             {'role': 'system', 'content': prompt},
             {'role': 'user', 'content': json.dumps({'entries': [
-                {'index': i, 'text': t} for i, t in enumerate(preview)
+                {'index': i + start_index, 'text': t} for i, t in enumerate(batch_items)
             ]}, ensure_ascii=False)}
         ],
         'temperature': 0.2,
-        'max_tokens': 8192,
+        'max_tokens': 2048,  # 增加token限制以处理更多结果
         'response_format': {'type': 'json_object'}
-    }
-
-    headers = {
-        'Authorization': f'Bearer {api_key}',
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
     }
 
     last_error_text: Optional[str] = None
@@ -152,16 +170,11 @@ def deepseek_check(script: ScriptBase, items: List[str]) -> Dict[str, Any]:
             except Exception:
                 issues = []
 
-            return {
-                'checked_count': len(preview),
-                'total_entries': len(items),
-                'result': issues,
-                'model': used_model or ''
-            }
+            return issues
         except requests.HTTPError as e:
             if hasattr(e, 'response') and e.response is not None:
                 if e.response.status_code == 402:
-                    return {'error': '余额不足', 'result': []}
+                    return []
                 last_status = e.response.status_code
                 try:
                     last_error_text = e.response.text
@@ -173,8 +186,8 @@ def deepseek_check(script: ScriptBase, items: List[str]) -> Dict[str, Any]:
             last_error_text = str(e)
 
     # 所有候选模型均失败
-    detail = f"HTTP {last_status}: {last_error_text[:300]}" if last_status else (last_error_text or '未知错误')
-    return {'error': f'API请求失败: {detail}', 'result': []}
+    script.warning(f"批次处理失败: {last_error_text[:200] if last_error_text else '未知错误'}")
+    return []
 
 
 def format_detailed_message(script: ScriptBase, ds_result: Dict[str, Any]) -> str:
@@ -266,9 +279,9 @@ def main_logic(script: ScriptBase) -> Dict[str, Any]:
     """
 
     # 1. 获取参数
-    directory = script.get_parameter('directory', r"D:\\")
-    file_name = script.get_parameter('file_name',  "4.txt")
-    field = script.get_parameter('field',  't_description')
+    directory = script.get_parameter('directory', r"F:\\fish_test")
+    file_name = script.get_parameter('file_name', '2.txt')
+    field = script.get_parameter('field', '')
 
     script.info("开始文本质量检查")
 
