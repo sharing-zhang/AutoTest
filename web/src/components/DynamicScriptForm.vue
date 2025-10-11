@@ -50,10 +50,24 @@
         <!-- 组列表（可动态增删的一组字段集合，最终输出为数组） -->
         <el-form-item 
           v-if="param.type === 'group-list'" 
-          :label="param.label" 
           :prop="param.name"
           :required="param.required"
         >
+          <template #label>
+            <div class="custom-label-wrapper">
+              <span>{{ param.label }}</span>
+              <div v-if="param.help" class="field-help-tooltip-label">
+                <el-tooltip 
+                  :content="param.help" 
+                  placement="top" 
+                  effect="dark"
+                  :show-after="300"
+                >
+                  <el-icon class="help-icon"><InfoFilled /></el-icon>
+                </el-tooltip>
+              </div>
+            </div>
+          </template>
           <div style="width:100%">
             <div v-if="!Array.isArray(formData[param.name])" style="color:#909399;margin-bottom:8px;">无初始数据</div>
             <div v-for="(groupItem, gi) in (formData[param.name] as any[])" :key="gi" style="display:flex; gap:12px; align-items:flex-start; margin-bottom:12px; flex-wrap:wrap;">
@@ -88,87 +102,86 @@
             </div>
             <el-button type="primary" plain @click="addGroupItem(param.name)">添加一组</el-button>
           </div>
+          <!-- 字段描述 -->
+          <div v-if="param.description" class="field-description">
+            {{ param.description }}
+          </div>
         </el-form-item>
 
-        <!-- 文本输入框 -->
+        <!-- 通用字段模板 -->
         <el-form-item
-          v-else-if="param.type === 'text'"
-          :label="param.label"
+          v-else
           :prop="param.name"
           :required="param.required"
         >
+          <template #label>
+            <div class="custom-label-wrapper">
+              <span>{{ param.label }}</span>
+              <div v-if="param.help" class="field-help-tooltip-label">
+                <el-tooltip 
+                  :content="param.help" 
+                  placement="top" 
+                  effect="dark"
+                  :show-after="300"
+                >
+                  <el-icon class="help-icon"><InfoFilled /></el-icon>
+                </el-tooltip>
+              </div>
+            </div>
+          </template>
+          
+          <!-- 文本输入框 -->
           <el-input
+            v-if="param.type === 'text'"
             v-model="formData[param.name]"
             :placeholder="param.placeholder || `请输入${param.label}`"
             clearable
           />
-        </el-form-item>
-        <!-- 数字输入框 -->
-         <!-- <div v-else-if="field.type === 'number'" class="field-wrapper">-->
-<!--            <div class="number-input-container">-->
-<!--              <el-input-number-->
-<!--                v-model="groupItem[field.name]"-->
-<!--                :min="field.min"-->
-<!--                :max="field.max"-->
-<!--                :step="1"-->
-<!--                :placeholder="field.placeholder"-->
-<!--                controls-position="right"-->
-<!--                style="width: 180px;"-->
-<!--              />-->
-<!--              &lt;!&ndash; addonAfter 提示 &ndash;&gt;-->
-<!--              <span v-if="field.addonAfter" class="addon-after">-->
-<!--                {{ field.addonAfter }}-->
-<!--              </span>-->
-<!--            </div>-->
-<!--            &lt;!&ndash; 字段描述 &ndash;&gt;-->
-<!--            <div v-if="field.description" class="field-description">-->
-<!--              {{ field.description }}-->
-<!--            </div>-->
-<!--            &lt;!&ndash; 帮助提示 &ndash;&gt;-->
-<!--            <div v-if="field.help" class="field-help">-->
-<!--              <el-icon><InfoFilled /></el-icon>-->
-<!--              {{ field.help }}-->
-<!--            </div>-->
-<!--          </div>-->
-
-       <!-- &lt;!&ndash; 数字输入框 &ndash;&gt; -->
-        <el-form-item
-          v-else-if="param.type === 'number'"
-          :label="param.label"
-         :prop="param.name"
-          :required="param.required"
-        >
-          <el-input-number
-            v-model="formData[param.name]"
-            :min="param.min"
-            :max="param.max"
-            :step="1"
-            style="width: 100%"
-         />
-        </el-form-item>
-
-        <!-- 开关 -->
-        <el-form-item 
-          v-else-if="param.type === 'switch'" 
-          :label="param.label" 
-          :prop="param.name"
-          :required="param.required"
-        >
+          
+          <!-- 目录路径输入框 -->
+          <div v-else-if="param.type === 'directory'" class="directory-input-container">
+            <el-input
+              v-model="formData[param.name]"
+              :placeholder="param.placeholder || `请输入${param.label}`"
+              clearable
+              @click="openDirectoryDialog(param.name)"
+            >
+              <template #suffix>
+                <el-icon class="directory-icon" @click="openDirectoryDialog(param.name)">
+                  <FolderOpened />
+                </el-icon>
+              </template>
+            </el-input>
+          </div>
+          
+          <!-- 数字输入框 -->
+          <div v-else-if="param.type === 'number'" class="number-input-container">
+            <el-input-number
+              v-model="formData[param.name]"
+              :min="param.min"
+              :max="param.max"
+              :step="1"
+              :placeholder="param.placeholder"
+              controls-position="right"
+              style="width: 100%"
+            />
+            <!-- addonAfter 提示 -->
+            <span v-if="param.addonAfter" class="addon-after">
+              {{ param.addonAfter }}
+            </span>
+          </div>
+          
+          <!-- 开关 -->
           <el-switch
+            v-else-if="param.type === 'switch'"
             v-model="formData[param.name]"
             active-text="是"
             inactive-text="否"
           />
-        </el-form-item>
-
-        <!-- 下拉选择 -->
-        <el-form-item 
-          v-else-if="param.type === 'select'" 
-          :label="param.label" 
-          :prop="param.name"
-          :required="param.required"
-        >
+          
+          <!-- 下拉选择 -->
           <el-select 
+            v-else-if="param.type === 'select'"
             v-model="formData[param.name]" 
             :placeholder="`请选择${param.label}`"
             style="width: 100%"
@@ -180,16 +193,10 @@
               :value="option"
             />
           </el-select>
-        </el-form-item>
-
-        <!-- 多选下拉（带勾选） -->
-        <el-form-item 
-          v-else-if="param.type === 'checkbox'" 
-          :label="param.label" 
-          :prop="param.name"
-          :required="param.required"
-        >
+          
+          <!-- 多选下拉（带勾选） -->
           <el-select
+            v-else-if="param.type === 'checkbox'"
             v-model="formData[param.name]"
             multiple
             :collapse-tags="false"
@@ -210,20 +217,11 @@
               </div>
             </el-option>
           </el-select>
-        </el-form-item>
-
-        <!-- 其他类型的默认处理 -->
-        <el-form-item 
-          v-else 
-          :label="param.label" 
-          :prop="param.name"
-          :required="param.required"
-        >
-          <el-input
-            v-model="formData[param.name]"
-            :placeholder="param.placeholder || `请输入${param.label}`"
-            clearable
-          />
+          
+          <!-- 字段描述 -->
+          <div v-if="param.description" class="field-description">
+            {{ param.description }}
+          </div>
         </el-form-item>
       </div>
 
@@ -295,14 +293,14 @@
 <script setup lang="ts">
 import { ref, reactive, computed, watch, nextTick } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { VideoPlay, Refresh, Setting } from '@element-plus/icons-vue'
+import { VideoPlay, Refresh, Setting, InfoFilled, FolderOpened } from '@element-plus/icons-vue'
 import type { FormInstance, FormRules } from 'element-plus'
 import { BASE_URL } from '/@/store/constants'
 import { executeScriptApi, getScriptTaskResultApi, cancelTaskApi } from '/@/api/scanDevUpdate'
 
 interface ScriptParameter {
   name: string
-  type: string
+  type: 'text' | 'number' | 'switch' | 'select' | 'checkbox' | 'group-list' | 'directory'
   label: string
   required: boolean
   default?: any
@@ -312,6 +310,8 @@ interface ScriptParameter {
   min?: number
   max?: number
   addonAfter?: string
+  description?: string  // 字段描述
+  help?: string        // 帮助提示
   item_fields?: ScriptParameter[]  // 用于 group-list 类型
 }
 
@@ -382,7 +382,7 @@ const validationRules = computed(() => {
       if (param.type === 'number') {
         if (!rules[param.name]) rules[param.name] = []
         if (param.min !== undefined) {
-          rules[param.name].push({
+          (rules[param.name] as any[]).push({
             type: 'number',
             min: param.min,
             message: `值不能小于 ${param.min}`,
@@ -390,7 +390,7 @@ const validationRules = computed(() => {
           })
         }
         if (param.max !== undefined) {
-          rules[param.name].push({
+          (rules[param.name] as any[]).push({
             type: 'number',
             max: param.max,
             message: `值不能大于 ${param.max}`,
@@ -528,6 +528,71 @@ const addGroupItem = (paramName: string) => {
 const removeGroupItem = (paramName: string, index: number) => {
   if (Array.isArray(formData[paramName])) {
     ;(formData[paramName] as any[]).splice(index, 1)
+  }
+}
+
+// 目录选择方法 - 通过选择文件获取目录路径
+const openDirectoryDialog = async (paramName: string) => {
+  try {
+    // 使用 Electron 的 dialog API（如果在 Electron 环境中）
+    if ((window as any).electronAPI && (window as any).electronAPI.showOpenDialog) {
+      const result = await (window as any).electronAPI.showOpenDialog({
+        properties: ['openDirectory'],
+        title: '选择目录'
+      })
+      
+      if (!result.canceled && result.filePaths.length > 0) {
+        formData[paramName] = result.filePaths[0]
+      }
+    } else {
+      // 浏览器环境：通过选择文件获取目录路径
+      const input = document.createElement('input')
+      input.type = 'file'
+      input.style.display = 'none'
+      input.accept = '*/*' // 接受所有文件类型
+      
+      input.onchange = (event: any) => {
+        const file = event.target.files[0]
+        if (file) {
+          // 在浏览器环境中，我们无法获取完整的文件路径
+          // 但可以提示用户手动输入目录路径
+          const fileName = file.name
+          const fileSize = (file.size / 1024).toFixed(2) + ' KB'
+          
+          ElMessageBox.confirm(
+            `您选择了文件: ${fileName} (${fileSize})\n\n由于浏览器安全限制，无法直接获取文件路径。\n请手动输入该文件所在的目录路径。`,
+            '选择文件成功',
+            {
+              confirmButtonText: '手动输入路径',
+              cancelButtonText: '取消',
+              type: 'info'
+            }
+          ).then(() => {
+            // 用户确认后，使用 prompt 让用户输入目录路径
+            const currentPath = formData[paramName] || ''
+            const newPath = prompt('请输入文件所在的目录路径:', currentPath)
+            
+            if (newPath !== null && newPath.trim() !== '') {
+              formData[paramName] = newPath.trim()
+              ElMessage.success(`已设置目录路径: ${formData[paramName]}`)
+            }
+          }).catch(() => {
+            // 用户取消
+          })
+        }
+        document.body.removeChild(input)
+      }
+      
+      input.oncancel = () => {
+        document.body.removeChild(input)
+      }
+      
+      document.body.appendChild(input)
+      input.click()
+    }
+  } catch (error) {
+    console.error('目录选择失败:', error)
+    ElMessage.error('目录选择失败，请手动输入路径')
   }
 }
 
@@ -846,28 +911,68 @@ defineExpose({
     }
   }
 
-  // 字段描述样式
-  .field-description {
-    font-size: 11px;
-    color: #909399;
-    line-height: 1.2;
-    max-width: 220px;
-  }
-
-  // 字段帮助样式
-  .field-help {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    font-size: 11px;
-    color: #409eff;
-
-    .el-icon {
-      font-size: 12px;
+  // 目录输入框样式
+  .directory-input-container {
+    width: 100%;
+    
+    .directory-icon {
+      cursor: pointer;
+      color: #409eff;
+      transition: color 0.3s ease;
+      
+      &:hover {
+        color: #66b1ff;
+      }
+    }
+    
+    .el-input {
+      cursor: pointer;
+      
+      &:hover {
+        border-color: #409eff;
+      }
     }
   }
 
-    .form-actions {
+  // 自定义标签包装器
+  .custom-label-wrapper {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    
+    span {
+      flex: 1;
+    }
+  }
+
+  // 标签中的帮助图标
+  .field-help-tooltip-label {
+    margin-left: 8px;
+    flex-shrink: 0;
+    
+    .help-icon {
+      font-size: 14px;
+      color: #409eff;
+      cursor: pointer;
+      transition: color 0.3s ease;
+      
+      &:hover {
+        color: #66b1ff;
+      }
+    }
+  }
+
+  // 字段描述样式
+  .field-description {
+    font-size: 12px;
+    color: #909399;
+    line-height: 1.4;
+    margin-top: 4px;
+    word-wrap: break-word;
+  }
+
+  .form-actions {
       margin-top: 24px;
       padding-top: 16px;
       border-top: 1px solid #e4e7ed;

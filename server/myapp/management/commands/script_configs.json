@@ -1,6 +1,6 @@
 {
   "check_Reward": {
-    "dialog_title": "检查奖励配置",
+    "dialog_title": "道具数量检查",
     "parameters": [
       {
         "name": "directory",
@@ -8,7 +8,8 @@
         "label": "目录路径",
         "required": true,
         "default": "C:\\temp",
-        "placeholder": "例如: C:\\temp 或 /home/user/documents"
+        "placeholder": "请输入目录路径",
+        "help": "输入所在项目配置表路径"
       },
       {
         "name": "file_name",
@@ -16,31 +17,33 @@
         "label": "需要检查的文件名",
         "required": true,
         "default": "POINT_PROGRESS_REWARD.data.txt",
-        "placeholder": "仅支持单个文件名"
+        "placeholder": "仅支持单个文件名",
+        "help": "配置表文件名，支持 .txt、.data、.json等格式"
       },
       {
         "name": "block_name",
         "type": "text",
         "label": "配置块名称",
         "required": true,
-        "default": "progressRewards"
+        "default": "progressRewards",
+        "help": "配置道具的字段名称"
       },
       {
         "name": "rules",
         "type": "group-list",
         "label": "配置项组",
         "required": true,
+        "help": "包含：奖励ID、数量ID、最大奖励值",
         "item_fields": [
           { "name": "reward_id", "type": "text", "label": "reward_id", "placeholder": "奖励ID，支持正则或精确值" },
           { "name": "count_id", "type": "text", "label": "count_id", "placeholder": "数量ID" },
           { "name": "max_reward", "type": "number", "label": "max_reward", "min": 0 , "addonAfter": "最大奖励值" }
-        ],
-        "description": "每组包含：奖励ID、数量ID、最大奖励值"
+        ]
       }
     ]
   },
   "check_ConfigTime": {
-    "dialog_title": "检查配置时间",
+    "dialog_title": "活动时间配置检查",
     "parameters": [
       {
         "name": "directory",
@@ -109,14 +112,13 @@
           7,
           14
         ],
-        "placeholder": "输入天数，按回车添加（例如：3, 7, 14）",
-        "description": "输入允许的活动持续天数，支持多个值"
+        "placeholder": "输入天数，按回车添加（例如：3, 7, 14）"
       }
     ]
   },
 
   "checkConfigExist": {
-    "dialog_title": "检查配置路径存在性",
+    "dialog_title": "配置表资源路径存在性检查",
     "parameters": [
       {
         "name": "config_file",
@@ -131,16 +133,14 @@
         "type": "text",
         "label": "工程文件目录",
         "required": true,
-        "default": "E:\\Dev_2024_3_30\\client\\MainProject\\Assets\\InBundle",
-        "description": "输入工程文件的目录，支持输入精确or大致路径"
+        "default": "E:\\Dev_2024_3_30\\client\\MainProject\\Assets\\InBundle"
       },
       {
         "name": "path_fields_param",
         "type": "text",
         "label": "配置参数名",
         "required": true,
-        "default": "assetName",
-        "description": "输入想要查找的配置参数名"
+        "default": "assetName"
       },
       {
         "name": "custom_extensions_param",
@@ -154,14 +154,13 @@
         ],
         "required": false,
         "multiple": true,
-        "default": [".txt"],
-        "description": "选择要检查的文件后缀类型，可多选。如果不选择任何项，将检查所有文件"
+        "default": [".txt"]
       }
     ]
   },
 
   "checkFileName": {
-    "dialog_title": "检查文件名合法性",
+    "dialog_title": "文件名合法性检查",
     "parameters": [
       {
         "name": "root_path",
@@ -176,8 +175,7 @@
         "type": "text",
         "label": "正则表达式",
         "required": true,
-        "default": "^[a-zA-Z0-9_]+\\.[a-z]+$",
-        "description": "用于匹配文件名的正则表达式，例如：^[A-Z][a-zA-Z0-9]*\\.cs$ 表示PascalCase的C#文件"
+        "default": "^[a-zA-Z0-9_]+\\.[a-z]+$"
       },
       {
         "name": "file_extensions",
@@ -195,13 +193,12 @@
         ],
         "required": false,
         "multiple": true,
-        "default": [".txt"],
-        "description": "选择要检查的文件后缀类型，可多选。如果不选择任何项，将检查所有文件"
+        "default": [".txt"]
       }
     ]
   },
   "checkconfigempty": {
-    "dialog_title": "检查配置不为空",
+    "dialog_title": "配置字段空值检查",
     "parameters": [
       {
         "name": "file_path",
@@ -216,13 +213,12 @@
         "type": "text",
         "label": "配置参数名",
         "required": true,
-        "default": "id",
-        "description": "输入想要查找的配置参数名"
+        "default": "id"
       }
     ]
   },
   "checkconfigunique": {
-    "dialog_title": "检查配置唯一性",
+    "dialog_title": "配置字段唯一性检查",
     "parameters": [
       {
         "name": "file_path",
@@ -237,8 +233,7 @@
         "type": "text",
         "label": "配置参数名",
         "required": true,
-        "default": "id",
-        "description": "输入想要查找的配置参数名"
+        "default": "id"
       }
     ]
   },
@@ -251,7 +246,8 @@
         "label": "目录路径",
         "required": true,
         "default": "D:\\",
-        "placeholder": "例如: C:\\temp 或 /home/user/docs"
+        "placeholder": "例如: C:\\temp 或 /home/user/docs",
+        "help": "输入所在项目配置表路径"
       },
       {
         "name": "file_name1",
@@ -324,8 +320,7 @@
         "required": true,
         "multiple": true,
         "default":"F:\\fish_test",
-        "placeholder": "输入要搜索的文件或目录路径，按回车添加",
-        "description": "可以指定具体的文件路径或目录路径，支持多个路径"
+        "placeholder": "输入要搜索的文件或目录路径，按回车添加"
       },
       {
         "name": "file_formats",
@@ -336,8 +331,7 @@
         ],
         "required": false,
         "multiple": true,
-        "default": [".txt", ".json"],
-        "description": "选择要搜索的文件格式，可多选"
+        "default": [".txt", ".json"]
       },
       {
         "name": "match_rules",
@@ -351,8 +345,7 @@
         ],
         "required": false,
         "multiple": true,
-        "default": ["包含匹配"],
-        "description": "选择匹配规则：全匹配、前缀匹配、后缀匹配、包含匹配"
+        "default": ["包含匹配"]
       }
     ]
   }
