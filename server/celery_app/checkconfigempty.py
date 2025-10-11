@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-策划表配置空值检查脚本 - 检查配置表中为空的数据，给出空值的配置位置
+配置文件参数检查脚本
+检查配置块中是否缺失指定参数
+支持多个参数独立检查，分别输出报告
 """
 
 import re
@@ -125,16 +127,16 @@ def load_config_file(script, file_path: str) -> tuple:
         raise
 
 
-def check_missing_parameters(script, lines: List[str], parameters: List[str]) -> Dict:
-    """检查配置块中缺失的参数"""
-    script.info(f"开始检查缺失参数: {', '.join(parameters)}")
+def check_single_parameter(script, lines: List[str], parameter: str) -> Dict:
+    """检查单个参数在配置块中的缺失情况"""
+    script.debug(f"检查参数: {parameter}")
 
     missing_blocks = []  # 缺失参数的配置块
+    found_blocks = []  # 包含参数的配置块
     total_blocks = 0
-    found_blocks = 0
 
     current_block = None
-    current_block_params = set()  # 当前块找到的参数
+    parameter_found = False
     brace_count = 0
     in_block = False
 
@@ -157,7 +159,7 @@ def check_missing_parameters(script, lines: List[str], parameters: List[str]) ->
                     'end_line': None,
                     'block_index': total_blocks + 1  # 配置块的序号（从1开始）
                 }
-                current_block_params = set()
+                parameter_found = False
 
                 # 计算初始大括号数量
                 brace_count = line_stripped.count('{') - line_stripped.count('}')
@@ -167,9 +169,8 @@ def check_missing_parameters(script, lines: List[str], parameters: List[str]) ->
                 script.debug(f"发现配置块: {block_type} - {block_id} (第{total_blocks}个，行 {line_num})")
 
                 # 检查当前行是否包含目标参数
-                for param in parameters:
-                    if is_parameter_in_line(param, line_stripped):
-                        current_block_params.add(param)
+                if is_parameter_in_line(parameter, line_stripped):
+                    parameter_found = True
 
                 continue
 
@@ -178,56 +179,60 @@ def check_missing_parameters(script, lines: List[str], parameters: List[str]) ->
             brace_count += line_stripped.count('{') - line_stripped.count('}')
 
             # 检查当前行是否包含目标参数
-            for param in parameters:
-                if is_parameter_in_line(param, line_stripped):
-                    current_block_params.add(param)
+            if not parameter_found and is_parameter_in_line(parameter, line_stripped):
+                parameter_found = True
 
             # 检查块是否结束
             if brace_count <= 0:
                 current_block['end_line'] = line_num
 
-                # 检查是否有缺失的参数
-                missing_params = set(parameters) - current_block_params
-                if missing_params:
+                # 检查参数是否存在
+                if parameter_found:
+                    found_blocks.append({
+                        'block_id': current_block['id'],
+                        'block_index': current_block['block_index'],
+                        'start_line': current_block['start_line'],
+                        'end_line': current_block['end_line']
+                    })
+                    script.debug(f"第{current_block['block_index']}个配置块 {current_block['id']} 包含参数 {parameter}")
+                else:
                     missing_blocks.append({
                         'block_id': current_block['id'],
                         'block_index': current_block['block_index'],
                         'start_line': current_block['start_line'],
-                        'end_line': current_block['end_line'],
-                        'missing_params': list(missing_params),
-                        'found_params': list(current_block_params)
+                        'end_line': current_block['end_line']
                     })
-                    script.debug(
-                        f"第{current_block['block_index']}个配置块 {current_block['id']} 缺失参数: {missing_params}")
-                else:
-                    found_blocks += 1
-                    script.debug(f"第{current_block['block_index']}个配置块 {current_block['id']} 包含所有参数")
+                    script.debug(f"第{current_block['block_index']}个配置块 {current_block['id']} 缺失参数 {parameter}")
 
                 in_block = False
                 current_block = None
-                current_block_params = set()
+                parameter_found = False
                 brace_count = 0
 
     # 处理可能未正确关闭的块
     if in_block and current_block:
         current_block['end_line'] = len(lines)
-        missing_params = set(parameters) - current_block_params
-        if missing_params:
+        if parameter_found:
+            found_blocks.append({
+                'block_id': current_block['id'],
+                'block_index': current_block['block_index'],
+                'start_line': current_block['start_line'],
+                'end_line': current_block['end_line']
+            })
+        else:
             missing_blocks.append({
                 'block_id': current_block['id'],
                 'block_index': current_block['block_index'],
                 'start_line': current_block['start_line'],
-                'end_line': current_block['end_line'],
-                'missing_params': list(missing_params),
-                'found_params': list(current_block_params)
+                'end_line': current_block['end_line']
             })
-        else:
-            found_blocks += 1
 
     return {
+        'parameter': parameter,
         'missing_blocks': missing_blocks,
-        'total_blocks': total_blocks,
         'found_blocks': found_blocks,
+        'total_blocks': total_blocks,
+        'found_count': len(found_blocks),
         'missing_count': len(missing_blocks)
     }
 
@@ -245,82 +250,116 @@ def format_file_size(file_path: str) -> str:
         return "未知大小"
 
 
-def generate_chinese_message(results: Dict, parameters: List[str], file_path: str, used_encoding: str) -> str:
-    """生成中文消息"""
-    missing_blocks = results['missing_blocks']
-    total_blocks = results['total_blocks']
-    found_blocks = results['found_blocks']
-    missing_count = results['missing_count']
+def generate_single_parameter_report(parameter_result: Dict, file_info: Dict) -> str:
+    """生成单个参数的检查报告"""
+    param = parameter_result['parameter']
+    missing_blocks = parameter_result['missing_blocks']
+    found_blocks = parameter_result['found_blocks']
+    total_blocks = parameter_result['total_blocks']
+    found_count = parameter_result['found_count']
+    missing_count = parameter_result['missing_count']
 
-    # 获取文件基本信息
-    file_name = os.path.basename(file_path)
-    file_size = format_file_size(file_path)
-
-    # 构建消息头
-    separator = "=" * 60
-    message_parts = [
-        separator,
-        "配置文件参数检查报告",
-        separator,
-        f"文件信息:",
-        f"  文件名: {file_name}",
-        f"  文件大小: {file_size}",
-        f"  文件编码: {used_encoding}",
-        "",
-        f"检查参数: {', '.join(parameters)}",
-        f"参数数量: {len(parameters)} 个",
-        "",
-        f"检查结果:",
-        f"  配置块总数: {total_blocks} 个",
-        f"  合格配置块: {found_blocks} 个",
-        f"  缺失参数的配置块: {missing_count} 个",
-        ""
+    report_parts = [
+        f"参数 '{param}' 检查报告",
+        f"检查结果: 配置块总数 {total_blocks} 个，包含该参数 {found_count} 个，缺失该参数 {missing_count} 个"
     ]
 
-    # 计算合格率
+    # 计算覆盖率
     if total_blocks > 0:
-        success_rate = (found_blocks / total_blocks) * 100
-        message_parts.append(f"  合格率: {success_rate:.1f}%")
-        message_parts.append("")
+        coverage_rate = (found_count / total_blocks) * 100
+        report_parts.append(f"参数覆盖率: {coverage_rate:.1f}%")
 
-    # 检查结果状态
+    # 状态判断
     if missing_count == 0:
-        message_parts.extend([
-            "检查状态: 通过",
-            "所有配置块都包含所需的参数",
-            separator
+        report_parts.extend([
+            f"状态: ✓ 通过",
+            f"所有配置块都包含参数 '{param}'"
         ])
     else:
-        message_parts.extend([
-            "检查状态: 未通过",
-            f"发现 {missing_count} 个配置块存在参数缺失问题",
-            ""
+        report_parts.extend([
+            f"状态: ✗ 未通过",
+            f"发现 {missing_count} 个配置块缺失参数 '{param}'"
         ])
 
-        # 显示前10个缺失参数的配置块详情
-        display_count = min(missing_count, 10)
-        message_parts.append(f"缺失参数详情 (显示前 {display_count} 个):")
+        # 显示缺失参数的配置块详情（最多显示5个）
+        display_count = min(missing_count, 5)
+        if display_count > 0:
+            report_parts.append(f"缺失详情 (显示前 {display_count} 个):")
 
-        for i, block in enumerate(missing_blocks[:display_count], 1):
-            missing_params_str = ', '.join(sorted(block['missing_params']))
-            found_params_str = ', '.join(sorted(block['found_params'])) if block['found_params'] else "无"
+            for i, block in enumerate(missing_blocks[:display_count], 1):
+                report_parts.append(
+                    f"  [{i}] 第 {block['block_index']} 个配置块 - {block['block_id']} "
+                    f"({block['start_line']}-{block['end_line']} 行)"
+                )
 
-            message_parts.extend([
-                f"  [{i}] 第 {block['block_index']} 个配置块 ({block['start_line']}-{block['end_line']} 行)",
-                f"      配置块ID: {block['block_id']}",
-                f"      缺失参数: {missing_params_str}",
-                f"      已有参数: {found_params_str}",
-                ""
-            ])
+            # 如果有更多缺失的配置块，显示省略信息
+            if missing_count > display_count:
+                report_parts.append(f"  ... 还有 {missing_count - display_count} 个配置块缺失该参数")
 
-        # 如果有更多缺失的配置块，显示省略信息
-        if missing_count > 10:
-            message_parts.append(f"  ... 还有 {missing_count - 10} 个配置块存在参数缺失")
-            message_parts.append("")
+    return "\n".join(report_parts)
 
-        message_parts.append(separator)
 
-    return "\n".join(message_parts)
+def generate_summary_report(all_results: List[Dict], file_info: Dict, parameters: List[str]) -> str:
+    """生成总体汇总报告"""
+    summary_parts = [
+        "配置文件参数检查汇总报告",
+        f"文件信息: {file_info['file_name']} ({file_info['file_size']}, {file_info['file_encoding']}, {file_info['total_lines']} 行)",
+        f"检查概况: 检查参数数量 {len(parameters)} 个，参数列表 [{', '.join(parameters)}]"
+    ]
+
+    if all_results:
+        total_blocks = all_results[0]['total_blocks']  # 所有参数的total_blocks应该相同
+        summary_parts.append(f"配置块总数: {total_blocks} 个")
+
+        # 各参数检查结果概览
+        summary_parts.append("参数检查结果概览:")
+        pass_count = 0
+        fail_count = 0
+
+        for result in all_results:
+            param = result['parameter']
+            missing_count = result['missing_count']
+            found_count = result['found_count']
+            coverage_rate = (found_count / total_blocks) * 100 if total_blocks > 0 else 0
+
+            status = "✓ 通过" if missing_count == 0 else "✗ 未通过"
+            if missing_count == 0:
+                pass_count += 1
+            else:
+                fail_count += 1
+
+            summary_parts.append(
+                f"  {param}: {status} (覆盖率: {coverage_rate:.1f}%, 缺失: {missing_count} 个)"
+            )
+
+        # 整体状态
+        summary_parts.extend([
+            f"整体检查结果: 通过参数 {pass_count} 个，未通过参数 {fail_count} 个",
+            f"总体状态: {'✓ 全部通过' if fail_count == 0 else '✗ 存在问题'}"
+        ])
+
+    return "\n".join(summary_parts)
+
+
+def generate_complete_report(all_results: List[Dict], file_info: Dict, parameters: List[str]) -> str:
+    """生成完整的检查报告"""
+    # 生成汇总报告
+    summary_report = generate_summary_report(all_results, file_info, parameters)
+
+    # 生成各参数的详细报告
+    detail_reports = []
+    for result in all_results:
+        detail_report = generate_single_parameter_report(result, file_info)
+        detail_reports.append(detail_report)
+
+    # 组合完整报告
+    complete_report_parts = [summary_report]
+
+    if detail_reports:
+        complete_report_parts.append("详细检查报告:")
+        complete_report_parts.extend(detail_reports)
+
+    return "\n\n".join(complete_report_parts)
 
 
 # ==================== 主逻辑函数 ====================
@@ -328,36 +367,72 @@ def main_logic(script):
     """配置文件参数检查主逻辑"""
 
     try:
-        # 1. 获取参数 - 使用正确的方法名
+        # 1. 获取参数
         file_path = script.get_parameter('file_path', 'D:\\TimeConfig\\FISH.data.txt')
-        # 同时支持两种参数名
-        parameters_str = script.get_parameter('parameters_str', script.get_parameter('parameters', 'id'))
+
+        # 获取参数 - 支持tags类型的数组和字符串类型
+        parameters_input = script.get_parameter('parameters_str', script.get_parameter('parameters', ['id']))
 
         script.info("Configuration parameter check script started")
         script.debug(f"File path: {file_path}")
-        script.debug(f"Parameters: {parameters_str}")
+        script.debug(f"Parameters input type: {type(parameters_input)}")
+        script.debug(f"Parameters input: {parameters_input}")
 
         # 2. 验证输入
         if not file_path:
             script.error("文件路径不能为空")
             return script.error_result("文件路径不能为空", "ParameterError")
 
-        if not parameters_str:
+        if not parameters_input:
             script.error("参数列表不能为空")
             return script.error_result("参数列表不能为空", "ParameterError")
 
-        # 解析参数列表
+        # 处理不同类型的参数输入
         parameters = []
-        if ',' in parameters_str:
-            parameters = [p.strip() for p in parameters_str.split(',') if p.strip()]
-        else:
-            parameters = [p.strip() for p in parameters_str.split() if p.strip()]
+
+        try:
+            if isinstance(parameters_input, list):
+                # 如果是数组类型（tags组件返回的标准格式）
+                script.debug("处理list类型参数")
+                parameters = [str(p).strip() for p in parameters_input if str(p).strip()]
+            elif isinstance(parameters_input, str):
+                # 如果是字符串类型（兼容旧的输入方式）
+                script.debug("处理string类型参数")
+                if ',' in parameters_input:
+                    parameters = [p.strip() for p in parameters_input.split(',') if p.strip()]
+                else:
+                    parameters = [p.strip() for p in parameters_input.split() if p.strip()]
+            else:
+                # 尝试转换为字符串再处理
+                script.debug(f"尝试转换类型: {type(parameters_input)}")
+                parameters_str = str(parameters_input)
+                if ',' in parameters_str:
+                    parameters = [p.strip() for p in parameters_str.split(',') if p.strip()]
+                else:
+                    parameters = [p.strip() for p in parameters_str.split() if p.strip()]
+        except Exception as e:
+            script.error(f"参数解析失败: {e}")
+            return script.error_result(f"参数解析失败: {e}", "ParameterError")
 
         if not parameters:
-            script.error("解析参数列表失败")
-            return script.error_result("解析参数列表失败", "ParameterError")
+            script.error("解析参数列表后为空")
+            return script.error_result("解析参数列表后为空，请检查输入格式", "ParameterError")
 
-        script.info(f"检查参数: {parameters}")
+        # 验证每个参数不为空
+        valid_parameters = []
+        for param in parameters:
+            param_str = str(param).strip()
+            if param_str:
+                valid_parameters.append(param_str)
+            else:
+                script.warning(f"跳过空参数: {param}")
+
+        if not valid_parameters:
+            script.error("没有有效的参数")
+            return script.error_result("所有参数都为空，请检查输入", "ParameterError")
+
+        parameters = valid_parameters
+        script.info(f"最终检查参数: {parameters}")
 
         # 检查文件是否存在
         if not os.path.exists(file_path):
@@ -368,39 +443,66 @@ def main_logic(script):
         # 加载文件
         lines, used_encoding = load_config_file(script, file_path)
 
-        # 检查缺失参数
-        results = check_missing_parameters(script, lines, parameters)
+        # 准备文件信息
+        file_info = {
+            'file_name': os.path.basename(file_path),
+            'file_path': file_path,
+            'file_size': format_file_size(file_path),
+            'file_encoding': used_encoding,
+            'total_lines': len(lines)
+        }
 
-        # 生成格式化的中文消息
-        message = generate_chinese_message(results, parameters, file_path, used_encoding)
+        # 对每个参数分别进行检查
+        all_results = []
+        for parameter in parameters:
+            script.info(f"开始检查参数: {parameter}")
+            result = check_single_parameter(script, lines, parameter)
+            all_results.append(result)
+            coverage_rate = (result['found_count'] / result['total_blocks'] * 100) if result['total_blocks'] > 0 else 0
+            script.info(f"参数 {parameter} 检查完成 - 覆盖率: {coverage_rate:.1f}%")
 
-        script.info("参数检查完成")
+        # 生成完整报告
+        complete_message = generate_complete_report(all_results, file_info, parameters)
 
-        # 4. 返回结果
-        return script.success_result(
-            message=message,
-            data={
-                'file_info': {
-                    'file_name': os.path.basename(file_path),
-                    'file_path': file_path,
-                    'file_size': format_file_size(file_path),
-                    'file_encoding': used_encoding,
-                    'total_lines': len(lines)
-                },
-                'check_summary': {
-                    'checked_parameters': parameters,
-                    'parameter_count': len(parameters),
-                    'total_blocks': results['total_blocks'],
-                    'found_blocks': results['found_blocks'],
-                    'missing_count': results['missing_count'],
-                    'success_rate': round((results['found_blocks'] / results['total_blocks']) * 100, 1) if results[
-                                                                                                               'total_blocks'] > 0 else 0,
-                    'check_status': 'PASS' if results['missing_count'] == 0 else 'FAIL'
-                },
-                'missing_blocks': results['missing_blocks'][:10] if len(results['missing_blocks']) > 10 else results[
-                    'missing_blocks'],  # 限制返回数量避免数据过大
-                'has_more_missing': len(results['missing_blocks']) > 10
+        script.info("所有参数检查完成")
+
+        # 4. 计算汇总数据
+        total_blocks = all_results[0]['total_blocks'] if all_results else 0
+        pass_count = sum(1 for result in all_results if result['missing_count'] == 0)
+        fail_count = len(all_results) - pass_count
+
+        # 构建返回的数据结构
+        return_data = {
+            'file_info': file_info,
+            'check_summary': {
+                'checked_parameters': parameters,
+                'parameter_count': len(parameters),
+                'total_blocks': total_blocks,
+                'pass_parameters': pass_count,
+                'fail_parameters': fail_count,
+                'overall_status': 'PASS' if fail_count == 0 else 'FAIL'
+            },
+            'parameter_results': []
+        }
+
+        # 添加每个参数的详细结果（限制数量避免数据过大）
+        for result in all_results:
+            param_data = {
+                'parameter': result['parameter'],
+                'total_blocks': result['total_blocks'],
+                'found_count': result['found_count'],
+                'missing_count': result['missing_count'],
+                'coverage_rate': round((result['found_count'] / result['total_blocks']) * 100, 1) if result[
+                                                                                                         'total_blocks'] > 0 else 0,
+                'status': 'PASS' if result['missing_count'] == 0 else 'FAIL',
+                'missing_blocks': result['missing_blocks'][:5],  # 只返回前5个
+                'has_more_missing': len(result['missing_blocks']) > 5
             }
+            return_data['parameter_results'].append(param_data)
+
+        return script.success_result(
+            message=complete_message,
+            data=return_data
         )
 
     except Exception as e:

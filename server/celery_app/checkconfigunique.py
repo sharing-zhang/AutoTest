@@ -1,38 +1,22 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-配置表字段唯一性检查脚本 - 检查配置表中指定字段是否存在重复值
+配置文件参数唯一性检查脚本
+检查配置块中指定参数是否存在重复值
+支持多个参数独立检查，分别输出报告
 """
 
-import sys
-import os
 import re
-import traceback
+import os
 from typing import List, Dict, Optional, Tuple
 from collections import defaultdict
-
-# 添加脚本目录到路径
-script_dir = os.path.dirname(os.path.abspath(__file__))
-if script_dir not in sys.path:
-    sys.path.insert(0, script_dir)
-
-try:
-    from script_base import create_simple_script
-except ImportError as e:
-    print(f"导入script_base失败: {e}")
-    sys.exit(1)
 
 
 # ==================== 辅助函数区域 ====================
 def detect_file_encoding_simple(script, file_path: str) -> Optional[str]:
     """简单的文件编码检测"""
+    script.debug(f"检测文件编码: {file_path}")
     try:
-        script.debug(f"检测文件编码: {file_path}")
-
-        if not os.path.exists(file_path):
-            script.error(f"文件不存在: {file_path}")
-            return None
-
         with open(file_path, 'rb') as f:
             header = f.read(4)
 
@@ -49,71 +33,45 @@ def detect_file_encoding_simple(script, file_path: str) -> Optional[str]:
 
         return None
     except Exception as e:
-        script.error(f"编码检测异常: {e}")
+        script.debug(f"编码检测异常: {e}")
         return None
 
 
-def safe_read_file(script, file_path: str, encoding: str) -> Tuple[bool, List[str], str]:
-    """安全地读取文件"""
-    try:
-        script.debug(f"尝试使用编码 {encoding} 读取文件")
-
-        with open(file_path, 'r', encoding=encoding, errors='strict') as f:
-            lines = f.readlines()
-
-        script.debug(f"成功使用编码 {encoding} 读取 {len(lines)} 行")
-        return True, lines, encoding
-
-    except UnicodeDecodeError as e:
-        script.debug(f"编码 {encoding} 解码失败: {e}")
-        return False, [], ""
-    except Exception as e:
-        script.error(f"读取文件时发生未知错误 (编码: {encoding}): {e}")
-        return False, [], ""
-
-
-def try_read_with_encodings(script, file_path: str, encodings: List[str]) -> Tuple[bool, List[str], str]:
+def try_read_with_encodings(script, file_path: str, encodings: List[str]) -> tuple:
     """尝试用多种编码读取文件"""
-    script.debug(f"尝试读取文件: {file_path}")
-
     for encoding in encodings:
-        success, lines, used_encoding = safe_read_file(script, file_path, encoding)
-        if success:
+        try:
+            with open(file_path, 'r', encoding=encoding, errors='strict') as f:
+                lines = f.readlines()
             script.info(f"成功使用编码 {encoding} 读取文件")
-            return True, lines, used_encoding
+            return True, lines, encoding
+        except (UnicodeDecodeError, Exception) as e:
+            script.debug(f"编码 {encoding} 失败: {e}")
+            continue
+    return False, [], None
 
-    return False, [], ""
 
-
-def detect_block_start(line: str, line_num: int) -> Tuple[Optional[str], Optional[str]]:
+def detect_block_start(line: str, line_num: int) -> tuple:
     """检测配置块开始"""
-    try:
-        line_stripped = line.strip()
+    line_stripped = line.strip()
 
-        if not line_stripped:
-            return None, None
+    # 格式1: blocktype{ 或 blocktype {
+    block_match = re.match(r'^(\w+)\s*\{', line_stripped)
+    if block_match:
+        block_type = block_match.group(1)
+        return block_type, f"{block_type}_Line{line_num}"
 
-        # 格式1: blocktype{ 或 blocktype {
-        block_match = re.match(r'^(\w+)\s*\{', line_stripped)
-        if block_match:
-            block_type = block_match.group(1)
-            return block_type, f"{block_type}_Line{line_num}"
+    # 格式2: 单独的 {
+    if line_stripped.endswith('{'):
+        prefix = line_stripped[:-1].strip()
+        if prefix:
+            type_match = re.search(r'(\w+)$', prefix)
+            if type_match:
+                block_type = type_match.group(1)
+                return block_type, f"{block_type}_Line{line_num}"
+        return "unknown", f"Block_Line{line_num}"
 
-        # 格式2: 单独的 {
-        if line_stripped.endswith('{'):
-            prefix = line_stripped[:-1].strip()
-            if prefix:
-                type_match = re.search(r'(\w+)$', prefix)
-                if type_match:
-                    block_type = type_match.group(1)
-                    return block_type, f"{block_type}_Line{line_num}"
-            return "unknown", f"Block_Line{line_num}"
-
-        return None, None
-
-    except Exception as e:
-        # 返回None而不是抛出异常
-        return None, None
+    return None, None
 
 
 def extract_parameter_value(param_name: str, line: str) -> Optional[str]:
@@ -149,6 +107,148 @@ def extract_parameter_value(param_name: str, line: str) -> Optional[str]:
         return None
 
 
+def load_config_file(script, file_path: str) -> tuple:
+    """加载配置文件"""
+    script.info(f"加载配置文件: {file_path}")
+
+    common_encodings = [
+        'utf-8-sig', 'utf-8', 'utf-16', 'utf-16le', 'utf-16be',
+        'gbk', 'gb2312', 'gb18030', 'cp1252', 'cp936', 'latin1', 'ascii'
+    ]
+
+    try:
+        detected_encoding = detect_file_encoding_simple(script, file_path)
+        encodings_to_try = []
+
+        if detected_encoding:
+            encodings_to_try.append(detected_encoding)
+
+        for enc in common_encodings:
+            if enc not in encodings_to_try:
+                encodings_to_try.append(enc)
+
+        success, lines, used_encoding = try_read_with_encodings(script, file_path, encodings_to_try)
+
+        if success:
+            script.info(f"成功加载文件，使用编码: {used_encoding}，共 {len(lines)} 行")
+            return lines, used_encoding
+        else:
+            # 最后尝试：忽略错误读取
+            try:
+                with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                    lines = f.readlines()
+                script.warning("使用UTF-8忽略错误模式读取文件")
+                return lines, 'utf-8-ignore'
+            except Exception:
+                raise Exception("无法读取文件")
+
+    except Exception as e:
+        script.error(f"读取文件失败: {e}")
+        raise
+
+
+def check_single_parameter_uniqueness(script, lines: List[str], parameter: str) -> Dict:
+    """检查单个参数的唯一性"""
+    script.debug(f"检查参数唯一性: {parameter}")
+
+    param_values = defaultdict(list)
+    total_param_instances = 0
+    total_blocks = 0
+
+    current_block = None
+    brace_count = 0
+    in_block = False
+
+    for line_num, line in enumerate(lines, 1):
+        line_stripped = line.strip()
+
+        # 跳过空行和注释行
+        if not line_stripped or line_stripped.startswith('#') or line_stripped.startswith('//'):
+            continue
+
+        # 检测配置块开始
+        if not in_block and '{' in line_stripped:
+            block_type, block_id = detect_block_start(line_stripped, line_num)
+
+            if block_type:  # 成功检测到块
+                current_block = {
+                    'id': block_id,
+                    'type': block_type,
+                    'start_line': line_num,
+                    'end_line': None,
+                    'block_index': total_blocks + 1  # 配置块的序号（从1开始）
+                }
+
+                # 计算初始大括号数量
+                brace_count = line_stripped.count('{') - line_stripped.count('}')
+                in_block = True
+                total_blocks += 1
+
+                script.debug(f"发现配置块: {block_type} - {block_id} (第{total_blocks}个，行 {line_num})")
+
+                # 检查当前行是否包含目标参数
+                value = extract_parameter_value(parameter, line_stripped)
+                if value is not None:
+                    total_param_instances += 1
+                    param_values[value].append({
+                        'block_id': current_block['id'],
+                        'block_type': current_block['type'],
+                        'block_index': current_block['block_index'],
+                        'start_line': current_block['start_line'],
+                        'param_line': line_num,
+                        'value': value
+                    })
+
+                continue
+
+        if in_block and current_block:
+            # 更新大括号计数
+            brace_count += line_stripped.count('{') - line_stripped.count('}')
+
+            # 检查当前行是否包含目标参数
+            value = extract_parameter_value(parameter, line_stripped)
+            if value is not None:
+                total_param_instances += 1
+                param_values[value].append({
+                    'block_id': current_block['id'],
+                    'block_type': current_block['type'],
+                    'block_index': current_block['block_index'],
+                    'start_line': current_block['start_line'],
+                    'param_line': line_num,
+                    'value': value
+                })
+
+            # 检查块是否结束
+            if brace_count <= 0:
+                current_block['end_line'] = line_num
+                in_block = False
+                current_block = None
+                brace_count = 0
+
+    # 处理可能未正确关闭的块
+    if in_block and current_block:
+        current_block['end_line'] = len(lines)
+
+    # 找出重复的参数值
+    duplicates = {}
+    unique_values = 0
+    for value, block_list in param_values.items():
+        if len(block_list) > 1:
+            duplicates[value] = block_list
+        else:
+            unique_values += 1
+
+    return {
+        'parameter': parameter,
+        'duplicates': duplicates,
+        'total_blocks': total_blocks,
+        'total_param_instances': total_param_instances,
+        'unique_values': unique_values,
+        'duplicate_values_count': len(duplicates),
+        'duplicate_instances_count': sum(len(block_list) for block_list in duplicates.values())
+    }
+
+
 def format_file_size(file_path: str) -> str:
     """格式化文件大小"""
     try:
@@ -162,339 +262,136 @@ def format_file_size(file_path: str) -> str:
         return "未知大小"
 
 
-def load_config_file(script, file_path: str) -> Tuple[List[str], str]:
-    """加载配置文件"""
-    script.info(f"开始加载配置文件: {file_path}")
+def generate_single_parameter_uniqueness_report(parameter_result: Dict, file_info: Dict) -> str:
+    """生成单个参数的唯一性检查报告"""
+    param = parameter_result['parameter']
+    duplicates = parameter_result['duplicates']
+    total_blocks = parameter_result['total_blocks']
+    total_param_instances = parameter_result['total_param_instances']
+    unique_values = parameter_result['unique_values']
+    duplicate_values_count = parameter_result['duplicate_values_count']
+    duplicate_instances_count = parameter_result['duplicate_instances_count']
 
-    # 检查文件是否存在
-    if not os.path.exists(file_path):
-        raise FileNotFoundError(f"文件不存在: {file_path}")
-
-    # 检查文件大小
-    try:
-        file_size = os.path.getsize(file_path)
-        script.debug(f"文件大小: {file_size} 字节")
-
-        if file_size == 0:
-            script.warning("文件为空")
-            return [], 'utf-8'
-
-        if file_size > 100 * 1024 * 1024:  # 100MB
-            script.warning(f"文件较大 ({file_size / (1024 * 1024):.1f}MB)，处理可能较慢")
-
-    except Exception as e:
-        script.error(f"获取文件大小失败: {e}")
-
-    # 编码检测和读取
-    common_encodings = [
-        'utf-8-sig', 'utf-8', 'utf-16', 'utf-16le', 'utf-16be',
-        'gbk', 'gb2312', 'gb18030', 'cp1252', 'cp936', 'latin1'
+    report_parts = [
+        f"参数 '{param}' 唯一性检查报告",
+        f"检查结果: 配置块总数 {total_blocks} 个，参数实例总数 {total_param_instances} 个"
     ]
 
-    try:
-        # 检测编码
-        detected_encoding = detect_file_encoding_simple(script, file_path)
-        encodings_to_try = []
+    # 计算重复率
+    if total_param_instances > 0:
+        duplicate_rate = (duplicate_instances_count / total_param_instances) * 100
+        report_parts.append(f"重复率: {duplicate_rate:.1f}%")
 
-        if detected_encoding and detected_encoding not in encodings_to_try:
-            encodings_to_try.append(detected_encoding)
-
-        for enc in common_encodings:
-            if enc not in encodings_to_try:
-                encodings_to_try.append(enc)
-
-        # 尝试读取
-        success, lines, used_encoding = try_read_with_encodings(script, file_path, encodings_to_try)
-
-        if success:
-            script.info(f"成功加载文件，使用编码: {used_encoding}，共 {len(lines)} 行")
-            return lines, used_encoding
-        else:
-            # 最后尝试：忽略错误读取
-            script.warning("尝试使用UTF-8忽略错误模式读取文件")
-            try:
-                with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
-                    lines = f.readlines()
-                script.info(f"使用UTF-8忽略错误模式成功读取 {len(lines)} 行")
-                return lines, 'utf-8-ignore'
-            except Exception as e:
-                raise Exception(f"所有编码尝试失败，最终错误: {e}")
-
-    except Exception as e:
-        script.error(f"读取文件失败: {e}")
-        raise
-
-
-def check_parameter_uniqueness(script, lines: List[str], parameters: List[str]) -> Dict:
-    """检查配置块中指定参数的唯一性"""
-    script.info(f"开始检查参数唯一性: {', '.join(parameters)}")
-
-    if not lines:
-        script.warning("文件内容为空")
-        return {
-            'duplicates': {param: {} for param in parameters},
-            'total_blocks': 0,
-            'param_values': {param: defaultdict(list) for param in parameters},
-            'total_param_instances': {param: 0 for param in parameters},
-            'unique_values': {param: 0 for param in parameters}
-        }
-
-    # 存储每个参数的值和位置信息
-    param_values = {}
-    total_param_instances = {}
-    for param in parameters:
-        param_values[param] = defaultdict(list)
-        total_param_instances[param] = 0
-
-    total_blocks = 0
-    current_block = None
-    current_block_index = 0
-    brace_count = 0
-    in_block = False
-
-    try:
-        for line_num, line in enumerate(lines, 1):
-            try:
-                line_stripped = line.strip()
-
-                # 跳过空行和注释行
-                if not line_stripped or line_stripped.startswith('#') or line_stripped.startswith('//'):
-                    continue
-
-                # 检测配置块开始
-                if not in_block and '{' in line_stripped:
-                    block_type, block_id = detect_block_start(line_stripped, line_num)
-
-                    if block_type:
-                        current_block_index += 1
-                        current_block = {
-                            'id': block_id,
-                            'type': block_type,
-                            'start_line': line_num,
-                            'end_line': None,
-                            'block_index': current_block_index
-                        }
-
-                        brace_count = line_stripped.count('{') - line_stripped.count('}')
-                        in_block = True
-                        total_blocks += 1
-
-                        script.debug(f"发现第{current_block_index}个配置块: {block_type} - {block_id} (行 {line_num})")
-
-                        # 检查当前行的参数
-                        for param in parameters:
-                            try:
-                                value = extract_parameter_value(param, line_stripped)
-                                if value is not None:
-                                    total_param_instances[param] += 1
-                                    param_values[param][value].append({
-                                        'block_id': current_block['id'],
-                                        'block_type': current_block['type'],
-                                        'block_index': current_block_index,
-                                        'start_line': current_block['start_line'],
-                                        'param_line': line_num,
-                                        'value': value
-                                    })
-                                    script.debug(
-                                        f"在第{current_block_index}个配置块第{line_num}行找到参数 {param}={value}")
-                            except Exception as e:
-                                script.debug(f"提取参数 {param} 时出错 (行 {line_num}): {e}")
-
-                        continue
-
-                if in_block and current_block:
-                    # 更新大括号计数
-                    brace_count += line_stripped.count('{') - line_stripped.count('}')
-
-                    # 检查当前行的参数
-                    for param in parameters:
-                        try:
-                            value = extract_parameter_value(param, line_stripped)
-                            if value is not None:
-                                total_param_instances[param] += 1
-                                param_values[param][value].append({
-                                    'block_id': current_block['id'],
-                                    'block_type': current_block['type'],
-                                    'block_index': current_block['block_index'],
-                                    'start_line': current_block['start_line'],
-                                    'param_line': line_num,
-                                    'value': value
-                                })
-                                script.debug(
-                                    f"在第{current_block['block_index']}个配置块第{line_num}行找到参数 {param}={value}")
-                        except Exception as e:
-                            script.debug(f"提取参数 {param} 时出错 (行 {line_num}): {e}")
-
-                    # 检查块是否结束
-                    if brace_count <= 0:
-                        current_block['end_line'] = line_num
-                        in_block = False
-                        current_block = None
-                        brace_count = 0
-
-            except Exception as e:
-                script.debug(f"处理行 {line_num} 时出错: {e}")
-                continue
-
-    except Exception as e:
-        script.error(f"解析文件时发生错误: {e}")
-        raise
-
-    # 处理可能未正确关闭的块
-    if in_block and current_block:
-        current_block['end_line'] = len(lines)
-
-    # 找出重复的参数值
-    duplicates = {}
-    unique_values = {}
-    for param in parameters:
-        duplicates[param] = {}
-        unique_values[param] = 0
-        for value, block_list in param_values[param].items():
-            if len(block_list) > 1:
-                duplicates[param][value] = block_list
-            else:
-                unique_values[param] += 1
-
-    script.info(f"解析完成: 共发现 {total_blocks} 个配置块")
-
-    return {
-        'duplicates': duplicates,
-        'total_blocks': total_blocks,
-        'param_values': param_values,
-        'total_param_instances': total_param_instances,
-        'unique_values': unique_values
-    }
-
-
-def generate_chinese_uniqueness_message(results: Dict, parameters: List[str], file_path: str,
-                                        used_encoding: str) -> str:
-    """生成中文的唯一性检查消息"""
-    try:
-        duplicates = results['duplicates']
-        total_blocks = results['total_blocks']
-        total_param_instances = results['total_param_instances']
-        unique_values = results['unique_values']
-
-        # 获取文件基本信息
-        file_name = os.path.basename(file_path)
-        file_size = format_file_size(file_path)
-
-        # 构建消息头
-        separator = "=" * 60
-        message_parts = [
-            separator,
-            "配置文件参数唯一性检查报告",
-            separator,
-            f"文件信息:",
-            f"  文件名: {file_name}",
-            f"  文件大小: {file_size}",
-            f"  文件编码: {used_encoding}",
-            "",
-            f"检查参数: {', '.join(parameters)}",
-            f"参数数量: {len(parameters)} 个",
-            "",
-            f"统计信息:",
-            f"  配置块总数: {total_blocks} 个",
-            ""
-        ]
-
-        # 统计各参数的情况
-        total_duplicates = 0
-        total_duplicate_instances = 0
-        total_unique_instances = 0
-
-        for param in parameters:
-            param_total = total_param_instances.get(param, 0)
-            param_unique = unique_values.get(param, 0)
-            param_duplicates = len(duplicates.get(param, {}))
-            param_duplicate_instances = sum(len(block_list) for block_list in duplicates.get(param, {}).values())
-
-            total_duplicates += param_duplicates
-            total_duplicate_instances += param_duplicate_instances
-            total_unique_instances += param_unique
-
-            message_parts.extend([
-                f"  参数 '{param}':",
-                f"    参数实例总数: {param_total} 个",
-                f"    唯一值数量: {param_unique} 个",
-                f"    重复值数量: {param_duplicates} 个",
-                f"    重复实例数量: {param_duplicate_instances} 个",
-                ""
-            ])
-
-        # 总体统计
-        message_parts.extend([
-            f"总体统计:",
-            f"  参数实例总数: {sum(total_param_instances.values())} 个",
-            f"  唯一值总数: {total_unique_instances} 个",
-            f"  重复值总数: {total_duplicates} 个",
-            f"  重复实例总数: {total_duplicate_instances} 个",
-            ""
+    # 状态判断
+    if duplicate_values_count == 0:
+        report_parts.extend([
+            f"状态: ✓ 通过",
+            f"参数 '{param}' 的所有值都是唯一的，共 {unique_values} 个唯一值"
+        ])
+    else:
+        report_parts.extend([
+            f"状态: ✗ 未通过",
+            f"发现 {duplicate_values_count} 个重复值，涉及 {duplicate_instances_count} 个参数实例",
+            f"唯一值数量: {unique_values} 个"
         ])
 
-        # 检查结果状态
-        if total_duplicates == 0:
-            message_parts.extend([
-                "检查状态: 通过",
-                "所有参数值都是唯一的，未发现重复",
-                separator
-            ])
-        else:
-            # 计算重复率
-            total_instances = sum(total_param_instances.values())
-            duplicate_rate = (total_duplicate_instances / total_instances * 100) if total_instances > 0 else 0
+        # 显示重复详情（最多显示5个）
+        display_count = min(duplicate_values_count, 5)
+        if display_count > 0:
+            report_parts.append(f"重复详情 (显示前 {display_count} 个):")
 
-            message_parts.extend([
-                "检查状态: 未通过",
-                f"发现 {total_duplicates} 个重复值，涉及 {total_duplicate_instances} 个参数实例",
-                f"重复率: {duplicate_rate:.1f}%",
-                ""
-            ])
+            for i, (value, block_list) in enumerate(list(duplicates.items())[:display_count], 1):
+                report_parts.append(
+                    f"  [{i}] 值 '{value}' 重复 {len(block_list)} 次:"
+                )
 
-            # 显示重复详情
-            display_count = 0
-            max_display = 10
+                # 显示前3个重复位置
+                for j, block_info in enumerate(block_list[:3], 1):
+                    report_parts.append(
+                        f"      位置{j}: 第{block_info['param_line']}行 "
+                        f"(第{block_info['block_index']}个配置块 {block_info['block_id']})"
+                    )
 
-            message_parts.append("重复参数详情:")
+                if len(block_list) > 3:
+                    report_parts.append(f"      ... 还有 {len(block_list) - 3} 个重复位置")
 
-            for param in parameters:
-                if duplicates.get(param):
-                    for value, block_list in list(duplicates[param].items()):
-                        if display_count >= max_display:
-                            break
+            # 如果有更多重复值，显示省略信息
+            if duplicate_values_count > display_count:
+                report_parts.append(f"  ... 还有 {duplicate_values_count - display_count} 个重复值未显示")
 
-                        display_count += 1
-                        message_parts.extend([
-                            f"  [{display_count}] 参数 '{param}' 值 '{value}' (重复 {len(block_list)} 次):",
-                        ])
+    return "\n".join(report_parts)
 
-                        for i, block_info in enumerate(block_list[:5], 1):  # 最多显示5个位置
-                            message_parts.append(
-                                f"      位置{i}: 第{block_info['param_line']}行 "
-                                f"(第{block_info['block_index']}个配置块 {block_info['block_id']})"
-                            )
 
-                        if len(block_list) > 5:
-                            message_parts.append(f"      ... 还有 {len(block_list) - 5} 个重复位置")
+def generate_uniqueness_summary_report(all_results: List[Dict], file_info: Dict, parameters: List[str]) -> str:
+    """生成唯一性检查汇总报告"""
+    summary_parts = [
+        "配置文件参数唯一性检查汇总报告",
+        f"文件信息: {file_info['file_name']} ({file_info['file_size']}, {file_info['file_encoding']}, {file_info['total_lines']} 行)",
+        f"检查概况: 检查参数数量 {len(parameters)} 个，参数列表 [{', '.join(parameters)}]"
+    ]
 
-                        message_parts.append("")
+    if all_results:
+        total_blocks = all_results[0]['total_blocks']  # 所有参数的total_blocks应该相同
+        summary_parts.append(f"配置块总数: {total_blocks} 个")
 
-                    if display_count >= max_display:
-                        break
+        # 各参数检查结果概览
+        summary_parts.append("参数唯一性检查结果概览:")
+        pass_count = 0
+        fail_count = 0
+        total_duplicate_values = 0
+        total_duplicate_instances = 0
 
-            # 如果有更多重复，显示省略信息
-            remaining_duplicates = total_duplicates - display_count
-            if remaining_duplicates > 0:
-                message_parts.append(f"  ... 还有 {remaining_duplicates} 个重复值未显示")
-                message_parts.append("")
+        for result in all_results:
+            param = result['parameter']
+            duplicate_values_count = result['duplicate_values_count']
+            duplicate_instances_count = result['duplicate_instances_count']
+            total_param_instances = result['total_param_instances']
 
-            message_parts.append(separator)
+            duplicate_rate = (
+                        duplicate_instances_count / total_param_instances * 100) if total_param_instances > 0 else 0
 
-        return "\n".join(message_parts)
+            status = "✓ 通过" if duplicate_values_count == 0 else "✗ 未通过"
+            if duplicate_values_count == 0:
+                pass_count += 1
+            else:
+                fail_count += 1
 
-    except Exception as e:
-        return f"生成报告时出错: {e}"
+            total_duplicate_values += duplicate_values_count
+            total_duplicate_instances += duplicate_instances_count
+
+            summary_parts.append(
+                f"  {param}: {status} (重复率: {duplicate_rate:.1f}%, 重复值: {duplicate_values_count} 个)"
+            )
+
+        # 整体状态
+        summary_parts.extend([
+            f"整体检查结果: 通过参数 {pass_count} 个，未通过参数 {fail_count} 个",
+            f"总重复统计: 重复值 {total_duplicate_values} 个，重复实例 {total_duplicate_instances} 个",
+            f"总体状态: {'✓ 全部通过' if fail_count == 0 else '✗ 存在重复'}"
+        ])
+
+    return "\n".join(summary_parts)
+
+
+def generate_complete_uniqueness_report(all_results: List[Dict], file_info: Dict, parameters: List[str]) -> str:
+    """生成完整的唯一性检查报告"""
+    # 生成汇总报告
+    summary_report = generate_uniqueness_summary_report(all_results, file_info, parameters)
+
+    # 生成各参数的详细报告
+    detail_reports = []
+    for result in all_results:
+        detail_report = generate_single_parameter_uniqueness_report(result, file_info)
+        detail_reports.append(detail_report)
+
+    # 组合完整报告
+    complete_report_parts = [summary_report]
+
+    if detail_reports:
+        complete_report_parts.append("详细检查报告:")
+        complete_report_parts.extend(detail_reports)
+
+    return "\n\n".join(complete_report_parts)
 
 
 # ==================== 主逻辑函数 ====================
@@ -502,134 +399,161 @@ def main_logic(script):
     """配置文件参数唯一性检查主逻辑"""
 
     try:
-        script.info("配置文件参数唯一性检查脚本开始运行")
-
         # 1. 获取参数
         file_path = script.get_parameter('file_path', 'D:\\TimeConfig\\FISH.data.txt')
-        parameters_str = script.get_parameter('parameters_str', 'id')  # 修正参数名
 
-        script.debug(f"文件路径: {file_path}")
-        script.debug(f"检查参数: {parameters_str}")
+        # 获取参数 - 支持tags类型的数组和字符串类型
+        parameters_input = script.get_parameter('parameters_str', script.get_parameter('parameters', ['id']))
+
+        script.info("Configuration parameter uniqueness check script started")
+        script.debug(f"File path: {file_path}")
+        script.debug(f"Parameters input type: {type(parameters_input)}")
+        script.debug(f"Parameters input: {parameters_input}")
 
         # 2. 验证输入
         if not file_path:
+            script.error("文件路径不能为空")
             return script.error_result("文件路径不能为空", "ParameterError")
 
-        if not parameters_str:
+        if not parameters_input:
+            script.error("参数列表不能为空")
             return script.error_result("参数列表不能为空", "ParameterError")
 
-        # 解析参数列表
+        # 处理不同类型的参数输入
         parameters = []
+
         try:
-            if ',' in parameters_str:
-                parameters = [p.strip() for p in parameters_str.split(',') if p.strip()]
+            if isinstance(parameters_input, list):
+                # 如果是数组类型（tags组件返回的标准格式）
+                script.debug("处理list类型参数")
+                parameters = [str(p).strip() for p in parameters_input if str(p).strip()]
+            elif isinstance(parameters_input, str):
+                # 如果是字符串类型（兼容旧的输入方式）
+                script.debug("处理string类型参数")
+                if ',' in parameters_input:
+                    parameters = [p.strip() for p in parameters_input.split(',') if p.strip()]
+                else:
+                    parameters = [p.strip() for p in parameters_input.split() if p.strip()]
             else:
-                parameters = [p.strip() for p in parameters_str.split() if p.strip()]
-
-            if not parameters:
-                return script.error_result("解析参数列表失败", "ParameterError")
-
+                # 尝试转换为字符串再处理
+                script.debug(f"尝试转换类型: {type(parameters_input)}")
+                parameters_str = str(parameters_input)
+                if ',' in parameters_str:
+                    parameters = [p.strip() for p in parameters_str.split(',') if p.strip()]
+                else:
+                    parameters = [p.strip() for p in parameters_str.split() if p.strip()]
         except Exception as e:
-            return script.error_result(f"解析参数列表时出错: {e}", "ParameterError")
+            script.error(f"参数解析失败: {e}")
+            return script.error_result(f"参数解析失败: {e}", "ParameterError")
 
-        script.info(f"检查参数唯一性: {', '.join(parameters)}")
+        if not parameters:
+            script.error("解析参数列表后为空")
+            return script.error_result("解析参数列表后为空，请检查输入格式", "ParameterError")
+
+        # 验证每个参数不为空
+        valid_parameters = []
+        for param in parameters:
+            param_str = str(param).strip()
+            if param_str:
+                valid_parameters.append(param_str)
+            else:
+                script.warning(f"跳过空参数: {param}")
+
+        if not valid_parameters:
+            script.error("没有有效的参数")
+            return script.error_result("所有参数都为空，请检查输入", "ParameterError")
+
+        parameters = valid_parameters
+        script.info(f"最终检查参数: {parameters}")
 
         # 检查文件是否存在
         if not os.path.exists(file_path):
+            script.error(f"文件不存在: {file_path}")
             return script.error_result(f"文件不存在: {file_path}", "FileNotFoundError")
 
         # 3. 执行检查逻辑
-        try:
-            # 加载文件
-            script.info("开始加载配置文件...")
-            lines, used_encoding = load_config_file(script, file_path)
-            script.info(f"文件加载完成，编码: {used_encoding}")
+        # 加载文件
+        lines, used_encoding = load_config_file(script, file_path)
 
-            # 检查参数唯一性
-            script.info("开始检查参数唯一性...")
-            results = check_parameter_uniqueness(script, lines, parameters)
-            script.info("参数唯一性检查完成")
+        # 准备文件信息
+        file_info = {
+            'file_name': os.path.basename(file_path),
+            'file_path': file_path,
+            'file_size': format_file_size(file_path),
+            'file_encoding': used_encoding,
+            'total_lines': len(lines)
+        }
 
-            # 生成格式化的中文消息
-            message = generate_chinese_uniqueness_message(results, parameters, file_path, used_encoding)
+        # 对每个参数分别进行唯一性检查
+        all_results = []
+        for parameter in parameters:
+            script.info(f"开始检查参数唯一性: {parameter}")
+            result = check_single_parameter_uniqueness(script, lines, parameter)
+            all_results.append(result)
 
-            # 统计重复数量
-            duplicate_count = 0
-            duplicate_instances = 0
-            for param in parameters:
-                param_duplicates = results['duplicates'].get(param, {})
-                duplicate_count += len(param_duplicates)
-                duplicate_instances += sum(len(block_list) for block_list in param_duplicates.values())
+            if result['duplicate_values_count'] == 0:
+                script.info(f"参数 {parameter} 唯一性检查通过")
+            else:
+                script.info(f"参数 {parameter} 发现 {result['duplicate_values_count']} 个重复值")
 
-            script.info("唯一性检查任务完成")
+        # 生成完整报告
+        complete_message = generate_complete_uniqueness_report(all_results, file_info, parameters)
 
-            # 4. 返回结果
-            return script.success_result(
-                message=message,
-                data={
-                    'file_info': {
-                        'file_name': os.path.basename(file_path),
-                        'file_path': file_path,
-                        'file_size': format_file_size(file_path),
-                        'file_encoding': used_encoding,
-                        'total_lines': len(lines)
-                    },
-                    'check_summary': {
-                        'checked_parameters': parameters,
-                        'parameter_count': len(parameters),
-                        'total_blocks': results['total_blocks'],
-                        'total_param_instances': sum(results['total_param_instances'].values()),
-                        'unique_values_count': sum(results['unique_values'].values()),
-                        'duplicate_values_count': duplicate_count,
-                        'duplicate_instances_count': duplicate_instances,
-                        'duplicate_rate': round(
-                            (duplicate_instances / sum(results['total_param_instances'].values()) * 100), 1) if sum(
-                            results['total_param_instances'].values()) > 0 else 0,
-                        'check_status': 'PASS' if duplicate_count == 0 else 'FAIL'
-                    },
-                    'parameter_statistics': {
-                        param: {
-                            'total_instances': results['total_param_instances'].get(param, 0),
-                            'unique_values': results['unique_values'].get(param, 0),
-                            'duplicate_values': len(results['duplicates'].get(param, {})),
-                            'duplicate_instances': sum(
-                                len(block_list) for block_list in results['duplicates'].get(param, {}).values())
-                        }
-                        for param in parameters
-                    },
-                    'duplicates': {param: dict(list(duplicates.items())[:5]) for param, duplicates in
-                                   results['duplicates'].items()},  # 限制返回数量
-                    'has_more_duplicates': duplicate_count > 50
-                }
-            )
+        script.info("所有参数唯一性检查完成")
 
-        except FileNotFoundError as e:
-            return script.error_result(f"文件未找到: {e}", "FileNotFoundError")
-        except PermissionError as e:
-            return script.error_result(f"文件访问权限不足: {e}", "PermissionError")
-        except Exception as e:
-            script.error(f"唯一性检查过程中发生错误: {str(e)}")
-            script.error(f"错误详情: {traceback.format_exc()}")
-            return script.error_result(f"执行过程中发生错误: {str(e)}", "ExecutionError")
+        # 4. 计算汇总数据
+        total_blocks = all_results[0]['total_blocks'] if all_results else 0
+        pass_count = sum(1 for result in all_results if result['duplicate_values_count'] == 0)
+        fail_count = len(all_results) - pass_count
+        total_duplicate_values = sum(result['duplicate_values_count'] for result in all_results)
+        total_duplicate_instances = sum(result['duplicate_instances_count'] for result in all_results)
+
+        # 构建返回的数据结构
+        return_data = {
+            'file_info': file_info,
+            'check_summary': {
+                'checked_parameters': parameters,
+                'parameter_count': len(parameters),
+                'total_blocks': total_blocks,
+                'pass_parameters': pass_count,
+                'fail_parameters': fail_count,
+                'total_duplicate_values': total_duplicate_values,
+                'total_duplicate_instances': total_duplicate_instances,
+                'overall_status': 'PASS' if fail_count == 0 else 'FAIL'
+            },
+            'parameter_results': []
+        }
+
+        # 添加每个参数的详细结果（限制数量避免数据过大）
+        for result in all_results:
+            param_data = {
+                'parameter': result['parameter'],
+                'total_blocks': result['total_blocks'],
+                'total_param_instances': result['total_param_instances'],
+                'unique_values': result['unique_values'],
+                'duplicate_values_count': result['duplicate_values_count'],
+                'duplicate_instances_count': result['duplicate_instances_count'],
+                'duplicate_rate': round((result['duplicate_instances_count'] / result['total_param_instances']) * 100,
+                                        1) if result['total_param_instances'] > 0 else 0,
+                'status': 'PASS' if result['duplicate_values_count'] == 0 else 'FAIL',
+                'duplicates': {k: v[:3] for k, v in list(result['duplicates'].items())[:5]},  # 只返回前5个重复值，每个值最多3个位置
+                'has_more_duplicates': len(result['duplicates']) > 5
+            }
+            return_data['parameter_results'].append(param_data)
+
+        return script.success_result(
+            message=complete_message,
+            data=return_data
+        )
 
     except Exception as e:
-        # 最外层异常处理
-        error_msg = f"脚本执行失败: {str(e)}"
-        try:
-            script.error(error_msg)
-            script.error(f"完整错误信息: {traceback.format_exc()}")
-            return script.error_result(error_msg, "ScriptError")
-        except:
-            # 如果连错误日志都无法记录，直接退出
-            print(f"严重错误: {error_msg}")
-            print(f"堆栈跟踪: {traceback.format_exc()}")
-            sys.exit(1)
+        script.error(f"检查过程中发生错误: {e}")
+        import traceback
+        script.error(f"详细错误: {traceback.format_exc()}")
+        return script.error_result(str(e), "ExecutionError")
 
 
 if __name__ == '__main__':
-    try:
-        create_simple_script('config_parameter_uniqueness_checker', main_logic)
-    except Exception as e:
-        print(f"脚本启动失败: {e}")
-        print(f"错误详情: {traceback.format_exc()}")
-        sys.exit(1)
+    from script_base import create_simple_script
+
+    create_simple_script('config_parameter_uniqueness_checker', main_logic)

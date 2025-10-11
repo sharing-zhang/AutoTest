@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-配置表资源字段存在性检查脚本 - 根据用户指定的配置表和字段名，检查对应的路径是否在工程目录中存在
+配置文件指定路径字段验证脚本
+根据用户指定的配置文件和字段名，检查对应的路径是否在工程目录中存在
+展示所有缺失的配置和部分找到的文件路径
 """
 
 from script_base import create_simple_script
@@ -177,18 +179,18 @@ def scan_all_field_occurrences(script, content: str, target_fields: List[str]) -
         return []
 
 
-def safe_find_matching_items(script, root_path: Path, item_name: str, is_file: bool = False, max_depth: int = 6) -> \
-        List[Path]:
-    """安全地在指定根目录下递归查找匹配的文件或文件夹"""
+def find_directories_by_name(script, root_path: Path, dir_name: str, max_depth: int = 6) -> List[Path]:
+    """在指定根目录下递归查找所有匹配名称的目录"""
     try:
-        if not root_path or not item_name:
+        if not root_path or not dir_name:
             return []
 
         if not root_path.exists() or not root_path.is_dir():
             return []
 
-        matching_paths = []
+        matching_dirs = []
         processed_dirs = set()  # 防止循环引用
+        dir_name_lower = dir_name.lower()
 
         def search_recursive(current_path: Path, current_depth: int):
             if current_depth > max_depth:
@@ -212,23 +214,22 @@ def safe_find_matching_items(script, root_path: Path, item_name: str, is_file: b
 
                 for item_path in items:
                     try:
-                        if len(matching_paths) >= 100:  # 限制结果数量
+                        if len(matching_dirs) >= 100:  # 限制结果数量
                             return
 
-                        item_name_lower = item_name.lower()
-                        item_path_name_lower = item_path.name.lower()
+                        if safe_path_operation(item_path.is_dir):
+                            item_name_lower = item_path.name.lower()
 
-                        if is_file and safe_path_operation(
-                                item_path.is_file) and item_path_name_lower == item_name_lower:
-                            matching_paths.append(item_path)
-                        elif not is_file and safe_path_operation(
-                                item_path.is_dir) and item_path_name_lower == item_name_lower:
-                            matching_paths.append(item_path)
-                        elif safe_path_operation(item_path.is_dir):
-                            # 跳过常见的无关目录
+                            # 如果找到匹配的目录名
+                            if item_name_lower == dir_name_lower:
+                                matching_dirs.append(item_path)
+                                script.debug(f"找到匹配目录: {item_path}")
+
+                            # 跳过常见无关目录
                             if item_path.name not in {'.git', '.svn', '.vs', 'node_modules', 'Temp', 'Library', 'Logs',
                                                       '__pycache__', 'bin', 'obj', 'Debug', 'Release'}:
                                 search_recursive(item_path, current_depth + 1)
+
                     except (PermissionError, OSError, ValueError) as e:
                         script.debug(f"访问路径出错 {item_path}: {e}")
                         continue
@@ -248,59 +249,113 @@ def safe_find_matching_items(script, root_path: Path, item_name: str, is_file: b
         except Exception as e:
             script.debug(f"搜索异常: {e}")
 
-        return matching_paths
+        return matching_dirs
 
     except Exception as e:
-        script.debug(f"查找匹配项时出错: {e}")
+        script.debug(f"查找目录时出错: {e}")
         return []
 
 
-def find_all_matching_items_with_extensions(script, root_path: Path, item_name: str, extensions: List[str]) -> List[
-    Path]:
-    """在指定根目录下递归查找所有匹配的文件（包含指定扩展名）"""
+def find_files_in_directory(script, directory: Path, filename: str, extensions: List[str]) -> List[Path]:
+    """在指定目录中查找匹配的文件（包括扩展名变体）"""
     try:
-        if not item_name:
+        if not directory.exists() or not directory.is_dir():
             return []
 
-        matching_paths = []
-        item_path = Path(item_name)
-        has_extension = len(item_path.suffix) > 0
+        matching_files = []
+        filename_lower = filename.lower()
 
-        if has_extension:
-            exact_matches = safe_find_matching_items(script, root_path, item_name, is_file=True)
-            matching_paths.extend(exact_matches)
-        else:
-            exact_matches = safe_find_matching_items(script, root_path, item_name, is_file=True)
-            matching_paths.extend(exact_matches)
+        # 检查文件是否有扩展名
+        file_path = Path(filename)
+        has_extension = len(file_path.suffix) > 0
 
-            for ext in extensions[:5]:  # 限制扩展名数量
-                if not ext:
-                    continue
-                filename_with_ext = f"{item_name}{ext}"
-                ext_matches = safe_find_matching_items(script, root_path, filename_with_ext, is_file=True)
-                matching_paths.extend(ext_matches)
+        try:
+            for item in directory.iterdir():
+                if safe_path_operation(item.is_file):
+                    item_name_lower = item.name.lower()
 
-        # 去重
-        unique_paths = []
-        seen_paths = set()
-        for path in matching_paths:
-            try:
-                resolved_path = path.resolve()
-                if resolved_path not in seen_paths:
-                    unique_paths.append(path)
-                    seen_paths.add(resolved_path)
-            except (OSError, ValueError):
-                continue
+                    # 精确匹配
+                    if item_name_lower == filename_lower:
+                        matching_files.append(item)
+                        script.debug(f"找到精确匹配文件: {item}")
 
-        return unique_paths
+                    # 如果原文件名没有扩展名，尝试添加扩展名匹配
+                    elif not has_extension:
+                        for ext in extensions:
+                            expected_name = (filename + ext).lower()
+                            if item_name_lower == expected_name:
+                                matching_files.append(item)
+                                script.debug(f"找到扩展名匹配文件: {item}")
+                                break
+
+        except (PermissionError, OSError) as e:
+            script.debug(f"读取目录内容出错 {directory}: {e}")
+
+        return matching_files
 
     except Exception as e:
-        script.debug(f"查找扩展名匹配项时出错: {e}")
+        script.debug(f"在目录中查找文件时出错: {e}")
+        return []
+
+
+def find_path_hierarchically(script, root_path: Path, path_components: List[str], extensions: List[str]) -> List[Path]:
+    """按层级结构查找路径"""
+    try:
+        if not path_components:
+            return []
+
+        script.debug(f"开始层级查找: {' -> '.join(path_components)}")
+
+        # 如果只有一个组件（文件名），直接在根目录搜索
+        if len(path_components) == 1:
+            filename = path_components[0]
+            return find_files_in_directory(script, root_path, filename, extensions)
+
+        # 多个组件的情况，逐层查找
+        current_candidates = [root_path]
+
+        # 处理除最后一个组件外的所有目录组件
+        for i, component in enumerate(path_components[:-1]):
+            next_candidates = []
+            script.debug(f"查找第 {i + 1} 层目录: {component}")
+
+            for candidate_dir in current_candidates:
+                # 在当前候选目录中查找匹配的子目录
+                matching_dirs = find_directories_by_name(script, candidate_dir, component, max_depth=3)
+                next_candidates.extend(matching_dirs)
+
+                # 限制候选目录数量，防止搜索空间过大
+                if len(next_candidates) > 50:
+                    script.debug(f"候选目录数量过多，限制为前50个")
+                    next_candidates = next_candidates[:50]
+                    break
+
+            if not next_candidates:
+                script.debug(f"在第 {i + 1} 层未找到匹配的目录: {component}")
+                return []
+
+            current_candidates = next_candidates
+            script.debug(f"第 {i + 1} 层找到 {len(current_candidates)} 个候选目录")
+
+        # 在所有候选目录中查找最后一个组件（文件名）
+        final_filename = path_components[-1]
+        script.debug(f"在 {len(current_candidates)} 个目录中查找文件: {final_filename}")
+
+        all_matching_files = []
+        for candidate_dir in current_candidates:
+            matching_files = find_files_in_directory(script, candidate_dir, final_filename, extensions)
+            all_matching_files.extend(matching_files)
+
+        script.debug(f"层级查找完成，找到 {len(all_matching_files)} 个匹配文件")
+        return all_matching_files
+
+    except Exception as e:
+        script.debug(f"层级查找时出错: {e}")
         return []
 
 
 def validate_path_exists_with_details(script, path_value: str, project_root: Path, custom_extensions: List[str]) -> \
-Tuple[bool, Optional[str]]:
+        Tuple[bool, Optional[str]]:
     """验证路径是否存在，并返回找到的实际路径"""
     try:
         if not isinstance(path_value, str) or not path_value:
@@ -326,58 +381,62 @@ Tuple[bool, Optional[str]]:
         if not path_obj:
             return False, None
 
-        has_extension = len(path_obj.suffix) > 0
-
-        # 直接路径检查
-        possible_paths = []
+        # 直接路径检查（绝对路径或相对路径）
+        possible_direct_paths = []
         try:
-            possible_paths = [
+            possible_direct_paths = [
                 project_root / expanded_path,
                 project_root / expanded_path.lstrip('./\\'),
             ]
         except (ValueError, OSError):
             pass
 
+        # 检查是否有扩展名
+        has_extension = len(path_obj.suffix) > 0
+
+        # 如果没有扩展名，添加扩展名变体
         if not has_extension and custom_extensions:
             for ext in custom_extensions[:3]:  # 限制扩展名数量
                 try:
-                    possible_paths.extend([
+                    possible_direct_paths.extend([
                         project_root / (expanded_path + ext),
                     ])
                 except (ValueError, OSError):
                     continue
 
         # 检查直接路径
-        for path in possible_paths:
+        for path in possible_direct_paths:
             try:
                 if safe_path_operation(path.exists):
+                    script.debug(f"找到直接路径: {path}")
                     return True, str(path)
             except Exception:
                 continue
 
-        # 简化的递归搜索
+        # 层级搜索
         try:
-            path_components = [comp for comp in expanded_path.replace('\\', '/').split('/') if comp and comp != '.']
+            # 解析路径组件
+            path_components = []
+            normalized_path = expanded_path.replace('\\', '/')
+            components = [comp for comp in normalized_path.split('/') if comp and comp != '.']
 
-            if not path_components or len(path_components) > 10:  # 限制路径深度
+            if not components or len(components) > 10:  # 限制路径深度
                 return False, None
 
-            # 只搜索最后一个组件
-            last_component = path_components[-1]
+            path_components = components
+            script.debug(f"开始层级搜索路径组件: {path_components}")
 
-            # 搜索文件
-            file_matches = find_all_matching_items_with_extensions(script, project_root, last_component,
-                                                                   custom_extensions)
-            if file_matches:
-                return True, str(file_matches[0])
+            # 使用层级搜索
+            matching_files = find_path_hierarchically(script, project_root, path_components, custom_extensions)
 
-            # 搜索目录
-            dir_matches = safe_find_matching_items(script, project_root, last_component, is_file=False)
-            if dir_matches:
-                return True, str(dir_matches[0])
+            if matching_files:
+                # 返回第一个匹配的文件
+                best_match = matching_files[0]
+                script.debug(f"层级搜索找到匹配: {best_match}")
+                return True, str(best_match)
 
         except Exception as e:
-            script.debug(f"递归搜索出错: {e}")
+            script.debug(f"层级搜索出错: {e}")
 
         return False, None
 
