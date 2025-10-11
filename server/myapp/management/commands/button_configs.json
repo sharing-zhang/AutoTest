@@ -9,7 +9,7 @@
     },
     {
         "page_route": "/CheckText",
-        "scripts": ["check_TextQuality"]
+        "scripts": ["check_TextQuality", "check_TranslateQuality"]
     },
     {
         "page_route": "/scanDevUpdate",

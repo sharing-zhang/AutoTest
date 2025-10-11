@@ -52,55 +52,135 @@ def extract_field_entries(script: ScriptBase, content: str, field: str) -> Dict[
     entries: Dict[int, str] = {}
     lines = content.splitlines()
 
+    def smart_extract_quoted_text(text_content: str, context: str = "") -> Optional[str]:
+        """智能提取双引号内的文本"""
+        script.debug(f"尝试从以下内容提取文本: {text_content[:100]}...")
+
+        # 方法1: 寻找 = 号后的双引号内容
+        eq_pos = text_content.find('=')
+        if eq_pos != -1:
+            after_eq = text_content[eq_pos + 1:].strip()
+            if after_eq.startswith('"'):
+                # 找到起始双引号，现在寻找结束双引号
+                content_start = 1
+                i = content_start
+                escaped = False
+
+                while i < len(after_eq):
+                    char = after_eq[i]
+
+                    if escaped:
+                        escaped = False
+                    elif char == '\\':
+                        escaped = True
+                    elif char == '"':
+                        # 检查这是否真的是结束引号
+                        # 简单启发式：如果后面紧跟着结束字符，认为是结束
+                        remaining = after_eq[i + 1:].strip()
+                        if not remaining or remaining[0] in ',;})\n\r':
+                            # 找到结束引号
+                            extracted = after_eq[content_start:i]
+                            # 处理转义字符
+                            result = extracted.replace('\\"', '"').replace('\\\\', '\\')
+                            script.debug(f"方法1成功提取: {len(result)}字符, {len(result.split())}单词")
+                            return result.strip()
+
+                    i += 1
+
+                # 如果没找到明确的结束引号，取到字符串末尾
+                extracted = after_eq[content_start:].rstrip('"')
+                result = extracted.replace('\\"', '"').replace('\\\\', '\\')
+                script.debug(f"方法1备用提取: {len(result)}字符")
+                return result.strip()
+
+        # 方法2: 多种正则模式尝试
+        patterns = [
+            (r'text\s*=\s*"([^"]*(?:"[^"]*"[^"]*)*)"', "包含双引号模式"),
+            (r'text\s*=\s*"(.*?)"(?=\s*[,;})]|$)', "到结束符模式"),
+            (r'=\s*"([^"]*(?:"[^"]*"[^"]*)*)"', "通用等号模式"),
+            (r'"([^"]+(?:"[^"]*"[^"]*)*)"', "直接双引号模式"),
+        ]
+
+        for pattern, desc in patterns:
+            try:
+                match = re.search(pattern, text_content, re.DOTALL)
+                if match:
+                    result = match.group(1).replace('\\"', '"').replace('\\\\', '\\').strip()
+                    script.debug(f"{desc}成功: {len(result)}字符, {len(result.split())}单词")
+                    return result
+            except Exception as e:
+                script.debug(f"{desc}失败: {e}")
+                continue
+
+        script.debug("所有提取方法都失败")
+        return None
+
     # 方法1: 直接匹配字段的键值对，记录行号
     for line_num, line in enumerate(lines, 1):
+        script.debug(f"处理第{line_num}行: {line[:50]}...")
+
         # 匹配 key = field { ... } 格式
         pattern = rf'\w+\s*=\s*{re.escape(field)}\s*\{{\s*([^}}]+)\s*\}}'
         match = re.search(pattern, line)
         if match:
             block_content = match.group(1)
-            # 从块内容中提取文本值
-            text_pattern = r'text\s*=\s*"([^"]+)"'
-            text_match = re.search(text_pattern, block_content)
-            if text_match:
-                entries[line_num] = text_match.group(1).strip()
+            extracted_text = smart_extract_quoted_text(block_content, f"第{line_num}行方法1")
+            if extracted_text:
+                entries[line_num] = extracted_text
+                script.info(f"第{line_num}行方法1成功提取: {len(extracted_text.split())}单词")
 
         # 方法2: 匹配 field = { key = "value" } 格式
-        if not entries:
+        if line_num not in entries:
             block_pattern = rf'{re.escape(field)}\s*=\s*\{{\s*([^}}]+)\s*\}}'
             block_match = re.search(block_pattern, line)
             if block_match:
                 block = block_match.group(1)
-                pairs = re.findall(r'\w+\s*=\s*"([^"]+)"', block)
-                for text in pairs:
-                    if text.strip():
-                        entries[line_num] = text.strip()
-                        break
+                extracted_text = smart_extract_quoted_text(block, f"第{line_num}行方法2")
+                if extracted_text:
+                    entries[line_num] = extracted_text
+                    script.info(f"第{line_num}行方法2成功提取: {len(extracted_text.split())}单词")
 
         # 方法3: 简单的键值对匹配
         if line_num not in entries:
-            simple_pattern = rf'{re.escape(field)}\s*=\s*"([^"]+)"'
-            simple_match = re.search(simple_pattern, line)
-            if simple_match:
-                entries[line_num] = simple_match.group(1).strip()
+            if field in line and '=' in line:
+                extracted_text = smart_extract_quoted_text(line, f"第{line_num}行方法3")
+                if extracted_text:
+                    entries[line_num] = extracted_text
+                    script.info(f"第{line_num}行方法3成功提取: {len(extracted_text.split())}单词")
 
     # 如果上述方法都没有结果，尝试多行匹配
     if not entries:
+        script.info("尝试多行匹配...")
         full_content = '\n'.join(lines)
-        pattern = rf'(\w+)\s*=\s*{re.escape(field)}\s*\{{\s*([^}}]+)\s*\}}'
-        matches = re.findall(pattern, full_content, re.DOTALL)
 
-        for key, block_content in matches:
-            # 找到这个匹配在哪一行
-            for line_num, line in enumerate(lines, 1):
-                if key in line and field in line:
-                    text_pattern = r'text\s*=\s*"([^"]+)"'
-                    text_match = re.search(text_pattern, block_content)
-                    if text_match:
-                        entries[line_num] = text_match.group(1).strip()
-                    break
+        # 查找包含字段的所有位置
+        field_positions = []
+        for match in re.finditer(re.escape(field), full_content):
+            start_pos = match.start()
+            line_num = full_content[:start_pos].count('\n') + 1
+            field_positions.append((line_num, start_pos))
+
+        for line_num, pos in field_positions:
+            # 从字段位置开始，寻找后续的双引号内容
+            context = full_content[pos:pos + 2000]  # 取后续2000字符作为上下文
+            extracted_text = smart_extract_quoted_text(context, f"第{line_num}行多行匹配")
+            if extracted_text:
+                entries[line_num] = extracted_text
+                script.info(f"第{line_num}行多行匹配成功: {len(extracted_text.split())}单词")
 
     script.info(f"从 {field} 字段提取到 {len(entries)} 个文本条目")
+
+    # 详细的调试输出
+    for line_num, text in entries.items():
+        word_count = len(text.split())
+        char_count = len(text)
+        script.info(f"第{line_num}行最终结果: {word_count}个单词, {char_count}个字符")
+        script.info(f"内容预览: {text[:100]}{'...' if len(text) > 100 else ''}")
+
+        # 检查是否可能被截断
+        if '"' in text and not text.endswith('"'):
+            script.warning(f"第{line_num}行可能包含未正确处理的双引号")
+
     return entries
 
 
