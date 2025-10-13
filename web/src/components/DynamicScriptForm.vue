@@ -46,7 +46,7 @@
       :rules="validationRules"
       class="dynamic-form"
     >
-      <div v-for="param in formConfig.parameters" :key="param.name" class="form-item-wrapper">
+      <div v-for="param in formConfig.parameters" :key="param.name" class="form-item-wrapper" v-show="shouldShowParam(param)">
         <!-- 组列表（可动态增删的一组字段集合，最终输出为数组） -->
         <el-form-item 
           v-if="param.type === 'group-list'" 
@@ -194,6 +194,22 @@
             />
           </el-select>
           
+          <!-- 单选按钮组 -->
+          <el-radio-group 
+            v-else-if="param.type === 'radio'"
+            v-model="formData[param.name]"
+            style="width: 100%"
+          >
+            <el-radio
+              v-for="option in param.options"
+              :key="typeof option === 'string' ? option : option.value"
+              :label="typeof option === 'string' ? option : option.value"
+              style="display: block; margin-bottom: 8px;"
+            >
+              {{ typeof option === 'string' ? option : option.label }}
+            </el-radio>
+          </el-radio-group>
+          
           <!-- 多选下拉（带勾选） -->
           <el-select
             v-else-if="param.type === 'checkbox'"
@@ -300,15 +316,16 @@ import { executeScriptApi, getScriptTaskResultApi, cancelTaskApi } from '/@/api/
 
 interface ScriptParameter {
   name: string
-  type: 'text' | 'number' | 'switch' | 'select' | 'checkbox' | 'group-list' | 'directory'
+  type: 'text' | 'number' | 'switch' | 'select' | 'checkbox' | 'group-list' | 'directory' | 'radio'
   label: string
   required: boolean
   default?: any
   placeholder?: string
-  options?: string[]
+  options?: string[] | Array<{value: string, label: string}>
   multiple?: boolean
   min?: number
   max?: number
+  show_when?: string
   addonAfter?: string
   description?: string  // 字段描述
   help?: string        // 帮助提示
@@ -502,6 +519,11 @@ const initializeFormData = () => {
           break
         case 'checkbox':
           formData[param.name] = param.multiple ? [] : ''
+          break
+        case 'radio':
+          // 对于 radio 类型，使用第一个选项作为默认值
+          const firstOption = param.options?.[0]
+          formData[param.name] = typeof firstOption === 'string' ? firstOption : firstOption?.value || ''
           break
         default:
           formData[param.name] = ''
@@ -774,6 +796,33 @@ const handleReset = () => {
 
 const toggleAdvanced = () => {
   showAdvancedOptions.value = !showAdvancedOptions.value
+}
+
+// 判断参数是否应该显示
+const shouldShowParam = (param: any) => {
+  if (!param.show_when) {
+    return true
+  }
+  
+  // 简单的条件解析，支持 input_mode === 'dual_file' 这种格式
+  const condition = param.show_when.trim()
+  
+  // 解析 input_mode === 'dual_file' 格式
+  const match = condition.match(/^(\w+)\s*===\s*['"]([^'"]+)['"]$/)
+  if (match) {
+    const [, fieldName, expectedValue] = match
+    return formData[fieldName] === expectedValue
+  }
+  
+  // 解析 input_mode === 'single_file' 格式
+  const match2 = condition.match(/^(\w+)\s*===\s*['"]([^'"]+)['"]$/)
+  if (match2) {
+    const [, fieldName, expectedValue] = match2
+    return formData[fieldName] === expectedValue
+  }
+  
+  // 默认显示
+  return true
 }
 
 // 生命周期

@@ -241,36 +241,116 @@
     "dialog_title": "文本翻译质量检查",
     "parameters": [
       {
-        "name": "directory",
+        "name": "input_mode",
+        "type": "radio",
+        "label": "输入模式",
+        "required": true,
+        "default": "dual_file",
+        "options": [
+          {"value": "dual_file", "label": "双文件模式"},
+          {"value": "single_file", "label": "单文件双字段模式"}
+        ],
+        "help": "选择输入方式：双文件模式适合中文和外文配置分别在不同文件的情况；单文件模式适合中外文配置在同一文件不同字段的情况"
+      },
+      {
+        "name": "directory1",
         "type": "text",
-        "label": "目录路径",
+        "label": "中文配置表所在路径",
         "required": true,
         "default": "D:\\",
         "placeholder": "例如: C:\\temp 或 /home/user/docs",
-        "help": "输入所在项目配置表路径"
+        "help": "中文配置表所在路径",
+        "show_when": "input_mode === 'dual_file'"
       },
       {
         "name": "file_name1",
         "type": "text",
-        "label": "文件名",
+        "label": "中文配置表文件名",
         "required": true,
         "default": "CH.txt",
-        "placeholder": "需要检查的中文策划表"
+        "placeholder": "需要检查的中文配置表文件名",
+        "show_when": "input_mode === 'dual_file'"
       },
-       {
+      {
+        "name": "directory2",
+        "type": "text",
+        "label": "外文配置表所在路径",
+        "required": true,
+        "default": "D:\\",
+        "placeholder": "例如: C:\\temp 或 /home/user/docs",
+        "help": "外文配置表所在路径",
+        "show_when": "input_mode === 'dual_file'"
+      },
+      {
         "name": "file_name2",
         "type": "text",
-        "label": "文件名",
+        "label": "外文配置表文件名",
         "required": true,
         "default": "Eng.txt",
-        "placeholder": "需要检查的英文策划表"
+        "placeholder": "需要检查的外文配置表文件名",
+        "show_when": "input_mode === 'dual_file'"
       },
       {
         "name": "field",
         "type": "text",
-        "label": "字段名(可选)",
-        "required": false,
-        "placeholder": "如从 key=\"value\"; 中抽取某字段值，例如 desc"
+        "label": "字段名",
+        "required": true,
+        "default": "t_mailcontent",
+        "placeholder": "如从 key=\"value\"; 中抽取某字段值，例如 desc",
+        "help": "指定要检查翻译质量的字段名（双文件模式：两个文件使用相同字段名）",
+        "show_when": "input_mode === 'dual_file'"
+      },
+      {
+        "name": "single_directory",
+        "type": "text",
+        "label": "配置表路径",
+        "required": true,
+        "default": "D:\\",
+        "placeholder": "例如: C:\\temp 或 /home/user/docs",
+        "help": "包含中英文字段的文件的目录路径",
+        "show_when": "input_mode === 'single_file'"
+      },
+      {
+        "name": "single_file_name",
+        "type": "text",
+        "label": "配置表名",
+        "required": true,
+        "default": "config.txt",
+        "placeholder": "多语言文本配置表",
+        "show_when": "input_mode === 'single_file'"
+      },
+      {
+        "name": "chinese_field",
+        "type": "text",
+        "label": "中文字段名",
+        "required": true,
+        "default": "chinese_text",
+        "placeholder": "如从 key=\"value\"; 中抽取中文字段值，例如 desc_cn",
+        "help": "指定包含中文文本的字段名",
+        "show_when": "input_mode === 'single_file'"
+      },
+      {
+        "name": "foreign_field",
+        "type": "text",
+        "label": "外文字段名",
+        "required": true,
+        "default": "english_text",
+        "placeholder": "如从 key=\"value\"; 中抽取外文字段值，例如 desc_en",
+        "help": "指定包含外文文本的字段名",
+        "show_when": "input_mode === 'single_file'"
+      },
+      {
+        "name": "language_check",
+        "type": "select",
+        "label": "翻译语言类型",
+        "required": true,
+        "default": "中英翻译检查",
+        "options": [
+          "中英翻译检查",
+          "中日翻译检查",
+          "中韩翻译检查"
+        ],
+        "help": "选择要进行的翻译质量检查类型"
       }
     ]
   },
