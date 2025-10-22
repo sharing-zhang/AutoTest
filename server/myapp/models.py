@@ -300,3 +300,30 @@ class PageScriptConfig(models.Model):
         db_table = 'c_page_script_configs'
         unique_together = ['page_route']
 
+class FileRecord(models.Model):
+    """文件记录表 - 存储备份文件信息"""
+    backup_time = models.DateTimeField(auto_now_add=True, verbose_name="备份时间")
+    backup_file_name = models.CharField(
+        max_length=255,
+        verbose_name="备份文件名称",
+        default='unknown_backup'  # 添加默认值
+    )
+    backup_path = models.CharField(
+        max_length=500,
+        verbose_name="备份路径",
+        default='/tmp'  # 添加默认值
+    )
+
+    class Meta:
+        db_table = 'c_file_records'
+        unique_together = ['backup_path', 'backup_file_name']
+        verbose_name = "文件记录"
+        verbose_name_plural = "文件记录"
+
+    def __str__(self):
+        return f"{self.backup_path}/{self.backup_file_name}"
+
+    @property
+    def full_backup_path(self):
+        """获取完整备份文件路径"""
+        return f"{self.backup_path.rstrip('/')}/{self.backup_file_name}"
