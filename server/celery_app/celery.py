@@ -3,8 +3,8 @@ AutoTest Celery配置文件
 用于配置Django项目的异步任务处理系统
 
 支持功能：
-- 统一任务执行器 (execute_python_script)
-- 动态脚本执行器 (execute_dynamic_script_task)
+- 统一任务执行器 (execute_script_task) - 直接导入执行
+- SVN差异检测任务 (svn_diff_checker_celery_task)
 - 脚本模板系统集成
 - 完整的任务监控和错误处理
 """
@@ -90,7 +90,7 @@ app.conf.update(
 
 # 包含的任务模块
 app.autodiscover_tasks([
-    'myapp.views.celery_views',      # 方案1统一任务执行器
+    'myapp.views.celery_views',      # 统一任务执行器（execute_script_task）
 ])
 
 # 注意：不在这里明确导入任务，避免循环导入问题

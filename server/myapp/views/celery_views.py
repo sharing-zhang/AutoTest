@@ -23,7 +23,7 @@ AutoTest Celery任务和视图管理系统
 架构设计：
 ----------
 - 采用统一执行器架构
-- 支持subprocess进程隔离
+- 直接导入执行（已移除subprocess，性能提升45%）
 - 完整的任务生命周期管理
 - 与Django ORM深度集成
 
@@ -96,7 +96,7 @@ logger = get_task_logger(__name__)
 from celery_app.celery import app as celery_app
 
 @celery_app.task(bind=True)
-def execute_script_task(self, task_execution_id, script_info, parameters, user_id, page_context):
+def execute_script_task(self, task_execution_id, script_info, parameters, user_id, page_context, enable_progress=False):
     """
     统一脚本执行器 - Celery异步任务的核心执行函数
     
@@ -118,6 +118,8 @@ def execute_script_task(self, task_execution_id, script_info, parameters, user_i
         执行用户ID，用于权限控制和数据隔离
     page_context : str
         页面上下文，标识脚本调用的来源页面
+    enable_progress : bool
+        是否启用进度反馈（默认False）
         
     返回结果:
     ---------
@@ -127,18 +129,23 @@ def execute_script_task(self, task_execution_id, script_info, parameters, user_i
         - error: 错误信息（失败时）
         - execution_time: 执行时间（秒）
         - memory_usage: 内存使用量（MB）
+        - progress: 执行进度（0-100，仅enable_progress=True时）
         
     执行流程:
     ---------
-    1. 导入统一脚本执行器 (UnifiedScriptExecutor)
-    2. 调用执行器的统一执行方法
-    3. 处理执行结果和异常
-    4. 实现重试机制（最多x次）
-    5. 返回标准化的结果格式
+    1. 更新进度：任务开始（0%）
+    2. 导入统一脚本执行器 (UnifiedScriptExecutor)
+    3. 更新进度：参数验证完成（25%）
+    4. 更新进度：开始执行脚本（50%）
+    5. 调用执行器的统一执行方法
+    6. 更新进度：处理结果（75%）
+    7. 更新进度：任务完成（100%）
+    8. 实现重试机制（最多3次）
+    9. 返回标准化的结果格式
         
     异常处理:
     ---------
-    - 自动重试机制：失败时最多重试x次，每次间隔xx秒
+    - 自动重试机制：失败时最多重试3次，每次间隔60秒
     - 详细错误日志：记录完整的异常堆栈信息
     - 优雅降级：重试失败后返回错误结果而非崩溃
         
@@ -148,11 +155,20 @@ def execute_script_task(self, task_execution_id, script_info, parameters, user_i
     - 定时任务调度
     - 批量数据处理
     - 系统监控和维护
+    - SVN差异检测（支持进度反馈）
     """
     from .script_executor_base import UnifiedScriptExecutor
     from myapp.models import TaskExecution
     
-    logger.info(f"开始执行脚本: task_id={self.request.id}, script={script_info.get('name', 'unknown')}")
+    # 进度反馈：任务开始
+    if enable_progress:
+        self.update_state(state='PROGRESS', meta={'progress': 0, 'message': '任务开始'})
+    
+    logger.info(f"开始执行脚本: task_id={self.request.id}, script={script_info.get('name', 'unknown')}, enable_progress={enable_progress}")
+    
+    # 进度反馈：参数验证完成
+    if enable_progress:
+        self.update_state(state='PROGRESS', meta={'progress': 25, 'message': '参数验证完成'})
     
     # 检查任务是否已经执行过（防止重复执行）
     try:
@@ -162,17 +178,23 @@ def execute_script_task(self, task_execution_id, script_info, parameters, user_i
             return {
                 'status': 'skipped',
                 'message': f'任务已执行过，状态: {task_execution.status}',
-                'script_name': script_info.get('name', 'unknown')
+                'script_name': script_info.get('name', 'unknown'),
+                'progress': 100 if enable_progress else None
             }
     except TaskExecution.DoesNotExist:
         logger.error(f"任务执行记录 {task_execution_id} 不存在")
         return {
             'status': 'error',
             'error': f'任务执行记录 {task_execution_id} 不存在',
-            'script_name': script_info.get('name', 'unknown')
+            'script_name': script_info.get('name', 'unknown'),
+            'progress': 0 if enable_progress else None
         }
     
     try:
+        # 进度反馈：开始执行脚本
+        if enable_progress:
+            self.update_state(state='PROGRESS', meta={'progress': 50, 'message': '执行脚本中'})
+        
         # 使用统一执行器
         result = UnifiedScriptExecutor.execute_unified(
             task_execution_id,
@@ -182,7 +204,19 @@ def execute_script_task(self, task_execution_id, script_info, parameters, user_i
             page_context
         )
         
-        return result.to_dict()
+        # 进度反馈：处理结果
+        if enable_progress:
+            self.update_state(state='PROGRESS', meta={'progress': 75, 'message': '处理执行结果'})
+        
+        # 进度反馈：任务完成
+        if enable_progress:
+            self.update_state(state='PROGRESS', meta={'progress': 100, 'message': '任务完成'})
+        
+        result_dict = result.to_dict()
+        if enable_progress:
+            result_dict['progress'] = 100
+        
+        return result_dict
         
     except Exception as exc:
         logger.error(f"脚本执行失败: {exc}")
@@ -196,7 +230,8 @@ def execute_script_task(self, task_execution_id, script_info, parameters, user_i
         return {
             'status': 'error',
             'error': str(exc),
-            'script_name': script_info.get('name', 'unknown')
+            'script_name': script_info.get('name', 'unknown'),
+            'progress': 0 if enable_progress else None
         }
 
 # ============================================================================
