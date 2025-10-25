@@ -185,12 +185,38 @@
             v-model="formData[param.name]" 
             :placeholder="`请选择${param.label}`"
             style="width: 100%"
+            :loading="param.options_source && !dynamicOptions[param.name]"
+            @focus="() => console.log(`下拉框聚焦: ${param.name}, 选项源: ${param.options_source}, 动态选项:`, dynamicOptions[param.name])"
           >
+            <!-- 静态选项 -->
             <el-option
+              v-if="param.options && !param.options_source"
               v-for="option in param.options"
-              :key="option"
-              :label="option"
-              :value="option"
+              :key="typeof option === 'string' ? option : option.value"
+              :label="typeof option === 'string' ? option : option.label"
+              :value="typeof option === 'string' ? option : option.value"
+            />
+            <!-- 动态选项 -->
+            <el-option
+              v-else-if="param.options_source && dynamicOptions[param.name]"
+              v-for="option in dynamicOptions[param.name]"
+              :key="option.value"
+              :label="option.label"
+              :value="option.value"
+            />
+            <!-- 加载中提示 -->
+            <el-option
+              v-else-if="param.options_source && !dynamicOptions[param.name]"
+              disabled
+              label="加载中..."
+              value=""
+            />
+            <!-- 无数据提示 -->
+            <el-option
+              v-else
+              disabled
+              label="暂无数据"
+              value=""
             />
           </el-select>
           
@@ -312,7 +338,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { VideoPlay, Refresh, Setting, InfoFilled, FolderOpened } from '@element-plus/icons-vue'
 import type { FormInstance, FormRules } from 'element-plus'
 import { BASE_URL } from '/@/store/constants'
-import { executeScriptApi, getScriptTaskResultApi, cancelTaskApi } from '/@/api/scanDevUpdate'
+import { executeScriptApi, getScriptTaskResultApi, cancelTaskApi, backupPathOptionsApi, backupFileNameOptionsApi } from '/@/api/scanDevUpdate'
 
 interface ScriptParameter {
   name: string
@@ -322,6 +348,7 @@ interface ScriptParameter {
   default?: any
   placeholder?: string
   options?: string[] | Array<{value: string, label: string}>
+  options_source?: string  // 动态选项数据源API
   multiple?: boolean
   min?: number
   max?: number
@@ -378,6 +405,9 @@ const executionResult = ref<any>(null)
 const executionId = ref<number | null>(null)
 const taskId = ref<string | null>(null)
 const showAdvancedOptions = ref(false)
+
+// 动态选项数据存储
+const dynamicOptions = reactive<Record<string, Array<{value: string, label: string}>>>({})
 
 // 计算属性
 const validationRules = computed(() => {
@@ -468,6 +498,7 @@ const loadScriptConfig = async (scriptName: string) => {
     console.log('使用传入的脚本配置:', props.scriptInfo.parameters_schema)
     formConfig.value = props.scriptInfo.parameters_schema
     initializeFormData()
+    loadDynamicOptions()
     return
   }
   
@@ -478,6 +509,7 @@ const loadScriptConfig = async (scriptName: string) => {
     if (data.success && data.script_config) {
       formConfig.value = data.script_config
       initializeFormData()
+      loadDynamicOptions()
     } else {
       ElMessage.error('加载脚本配置失败')
     }
@@ -485,6 +517,54 @@ const loadScriptConfig = async (scriptName: string) => {
     console.error('加载脚本配置失败:', error)
     ElMessage.error('加载脚本配置失败')
   }
+}
+
+// 加载动态选项数据
+const loadDynamicOptions = async () => {
+  if (!formConfig.value?.parameters) {
+    console.log('没有参数配置，跳过动态选项加载')
+    return
+  }
+  
+  console.log('开始加载动态选项，参数列表:', formConfig.value.parameters.map(p => ({ name: p.name, type: p.type, options_source: p.options_source })))
+  
+  for (const param of formConfig.value.parameters) {
+    if (param.type === 'select' && param.options_source) {
+      try {
+        console.log(`加载动态选项: ${param.name} -> ${param.options_source}`)
+        let response
+        
+        // 根据不同的API源调用不同的函数
+        if (param.options_source.includes('backupPathOptions')) {
+          console.log('调用 backupPathOptionsApi')
+          response = await backupPathOptionsApi()
+        } else if (param.options_source.includes('backupFileNameOptions')) {
+          console.log('调用 backupFileNameOptionsApi')
+          response = await backupFileNameOptionsApi()
+        } else {
+          // 通用API调用
+          console.log('调用通用API:', `${BASE_URL}${param.options_source}`)
+          response = await fetch(`${BASE_URL}${param.options_source}`)
+          response = await response.json()
+        }
+        
+        console.log(`API响应: ${param.name}`, response)
+        
+        if (response && response.data) {
+          dynamicOptions[param.name] = response.data
+          console.log(`动态选项加载成功: ${param.name}`, response.data)
+        } else {
+          console.warn(`动态选项加载失败: ${param.name}`, response)
+          ElMessage.warning(`加载${param.label}选项失败: 无数据`)
+        }
+      } catch (error) {
+        console.error(`加载动态选项失败: ${param.name}`, error)
+        ElMessage.error(`加载${param.label}选项失败: ${error.message}`)
+      }
+    }
+  }
+  
+  console.log('动态选项加载完成:', dynamicOptions)
 }
 
 const initializeFormData = () => {

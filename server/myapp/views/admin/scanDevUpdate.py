@@ -233,3 +233,115 @@ def rerun_script(request):
     except Exception as e:
         print(f"重跑脚本失败: {e}")
         return APIResponse(code=1, msg=f'重跑失败: {str(e)}')
+
+
+@api_view(['GET'])
+def backup_list_api(request):
+    """
+    获取备份数据列表API
+    返回c_file_records表中的所有备份记录，供前端选择
+    """
+    if request.method == 'GET':
+        try:
+            # 获取所有备份记录，按备份时间倒序排列
+            backup_records = FileRecord.objects.all().order_by('-backup_time')
+            
+            # 转换为前端需要的格式
+            backup_data = []
+            for index, record in enumerate(backup_records, 1):
+                backup_data.append({
+                    'id': record.id,
+                    'index': index,
+                    'backup_time': record.backup_time.strftime('%Y-%m-%d %H:%M:%S'),
+                    'backup_file_name': record.backup_file_name,
+                    'backup_path': record.backup_path,
+                })
+            
+            return APIResponse(code=0, msg='查询成功', data=backup_data)
+            
+        except Exception as e:
+            print(f"获取备份数据失败: {e}")
+            return APIResponse(code=1, msg=f'查询失败: {str(e)}')
+
+
+@api_view(['GET'])
+def backup_path_options_api(request):
+    """
+    获取备份路径选项API
+    返回c_file_records表中所有唯一的backup_path值，供下拉框选择
+    """
+    if request.method == 'GET':
+        try:
+            # 获取所有唯一的backup_path值
+            backup_paths = FileRecord.objects.values_list('backup_path', flat=True).distinct().order_by('backup_path')
+            
+            # 转换为前端需要的格式
+            path_options = []
+            for path in backup_paths:
+                path_options.append({
+                    'value': path,
+                    'label': path
+                })
+            
+            return APIResponse(code=0, msg='查询成功', data=path_options)
+            
+        except Exception as e:
+            print(f"获取备份路径选项失败: {e}")
+            return APIResponse(code=1, msg=f'查询失败: {str(e)}')
+
+
+@api_view(['GET'])
+def backup_file_name_options_api(request):
+    """
+    获取备份文件名选项API
+    返回c_file_records表中所有唯一的backup_file_name值，供下拉框选择
+    """
+    if request.method == 'GET':
+        try:
+            # 获取所有唯一的backup_file_name值
+            backup_file_names = FileRecord.objects.values_list('backup_file_name', flat=True).distinct().order_by('backup_file_name')
+            
+            # 转换为前端需要的格式
+            file_name_options = []
+            for file_name in backup_file_names:
+                file_name_options.append({
+                    'value': file_name,
+                    'label': file_name
+                })
+            
+            return APIResponse(code=0, msg='查询成功', data=file_name_options)
+            
+        except Exception as e:
+            print(f"获取备份文件名选项失败: {e}")
+            return APIResponse(code=1, msg=f'查询失败: {str(e)}')
+
+
+@api_view(['GET'])
+def check_asset_scan_result_list_api(request):
+    """
+    获取CheckAssetUpdata页面扫描结果列表API
+    专门为CheckAssetUpdata页面设计，只返回compareAssetsUpdate脚本的结果
+    不返回backupAssetsMD5脚本的结果
+    """
+    if request.method == 'GET':
+        try:
+            # keyword是当有搜索栏对应搜索内容时使用，没有搜索内容则为空
+            keyword = request.GET.get("keyword", None)
+            
+            # 只返回compareAssetsUpdate脚本的结果，不返回backupAssetsMD5脚本的结果
+            # backupAssetsMD5脚本的结果应该显示在数据备份标签页中
+            base_query = ScanDevUpdate_scanResult.objects.exclude(script_name='backupAssetsMD5')
+            
+            if keyword:
+                scanupdates_scanresult = base_query.filter(scandevresult_filename__contains=keyword).order_by('-scandevresult_time')
+            else:
+                scanupdates_scanresult = base_query.order_by('-scandevresult_time')
+                
+            # serializer: 将服务端的数据结构（如模型类对象）转换为客户端可接受的格式（如字典、JSON），
+            # 同时也能将客户端的数据（如JSON）转换为服务端的数据结构。这种转换过程包括序列化（将数据转换为可传输的格式）和反序列化（将传输格式的数据还原为Python数据类型）
+            serializer = ScanDevUpdate_scanResult_Serializer(scanupdates_scanresult, many=True)
+            return APIResponse(code=0, msg='查询成功', data=serializer.data)
+            
+        except Exception as e:
+            print(f"获取CheckAssetUpdata扫描结果失败: {e}")
+            return APIResponse(code=1, msg=f'查询失败: {str(e)}')

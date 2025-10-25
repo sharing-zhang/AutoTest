@@ -18,5 +18,9 @@
     {
         "page_route": "/checkConfigExist",
         "scripts": ["checkConfigExist", "checkconfigempty", "checkconfigunique"]
+    },
+    {
+        "page_route": "/CheckAssetUpdata",
+        "scripts": ["backupAssetsMD5", "compareAssetsUpdate"]
     }
 ]

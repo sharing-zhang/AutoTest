@@ -4,6 +4,18 @@
 文件更新对比脚本
 对比当前目录文件与历史备份文件，检测文件的更新、删除、新增情况
 按照advanced_script_template.py模板重构
+
+新增功能：
+- 支持通过backup_file_name参数指定具体的备份文件进行对比
+- 如果不指定backup_file_name，则使用最近一次备份文件
+- 支持玩家选择任意历史备份文件进行对比
+
+参数说明：
+- root_path: 要扫描的目录路径
+- backup_dir: 备份文件存储目录
+- output_dir: 输出结果目录
+- chunk_size: 文件读取块大小
+- backup_file_name: 指定的备份文件名（可选，不指定则使用最近备份）
 """
 
 import os
@@ -38,38 +50,59 @@ def get_django_models():
             sys.path.insert(0, project_root)
             print(f"已添加项目根目录到Python路径: {project_root}")
 
+        # 临时移除celery_app目录，避免celery.py文件冲突
+        celery_app_dir = os.path.join(project_root, 'celery_app')
+        if celery_app_dir in sys.path:
+            sys.path.remove(celery_app_dir)
+            print("已临时移除celery_app目录，避免celery.py冲突")
+
         # 设置Django环境
         os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'server.settings')
 
-        import django
-        from django.conf import settings
-
-        # 检查Django是否已经初始化
+        # 更安全的Django初始化
         try:
-            if not django.apps.apps.ready:
+            import django
+            from django.conf import settings
+            from django.db import connection
+
+            # 检查Django是否已经初始化
+            if not hasattr(django.apps, 'apps') or not django.apps.apps.ready:
                 print("正在初始化Django环境...")
                 django.setup()
                 print("Django环境初始化完成")
-        except AttributeError:
-            print("正在初始化Django环境（兼容模式）...")
-            django.setup()
-            print("Django环境初始化完成")
+            else:
+                print("Django环境已经初始化")
+
         except Exception as setup_error:
             print(f"Django初始化失败: {setup_error}")
-            return None
-
-        # 导入模型
-        print("正在导入FileRecord模型...")
-        from myapp.models import FileRecord
-        print("FileRecord模型导入成功")
+            # 尝试使用更简单的方式
+            try:
+                import django
+                django.setup()
+                print("Django环境初始化完成（简化模式）")
+            except Exception as e2:
+                print(f"简化模式也失败: {e2}")
+                return None
 
         # 测试数据库连接
-        print("测试数据库连接...")
-        from django.db import connection
-        connection.ensure_connection()
-        print("数据库连接正常")
+        try:
+            print("测试数据库连接...")
+            from django.db import connection
+            connection.ensure_connection()
+            print("数据库连接正常")
+        except Exception as db_error:
+            print(f"数据库连接失败: {db_error}")
+            return None
 
-        return FileRecord
+        # 直接导入模型，避免通过celery_app路径
+        try:
+            print("正在导入FileRecord模型...")
+            from myapp.models import FileRecord
+            print("FileRecord模型导入成功")
+            return FileRecord
+        except ImportError as model_error:
+            print(f"模型导入失败: {model_error}")
+            return None
 
     except ImportError as e:
         print(f"导入模块失败: {e}")
@@ -100,6 +133,7 @@ class CompareAssetsUpdateScript:
         backup_dir = self.script.get_parameter('backup_dir', '../upload/databackup')
         output_dir = self.script.get_parameter('output_dir', './result/domesticLogs/checkAssetsUpdateLogs')
         chunk_size = self.script.get_parameter('chunk_size', 8192)
+        backup_file_name = self.script.get_parameter('backup_file_name', 'Assets_20251022_151141.txt')  # 新增参数
 
         # 验证关键路径
         if not root_path or not isinstance(root_path, str):
@@ -114,11 +148,20 @@ class CompareAssetsUpdateScript:
             self.script.error(f"扫描路径不是目录: {root_path}")
             return False
 
+        # 验证备份文件名参数（可选）
+        if backup_file_name is not None and not isinstance(backup_file_name, str):
+            self.script.error("backup_file_name 参数必须是字符串类型")
+            return False
+
         self.script.info(f"参数验证通过")
         self.script.info(f"扫描目录: {root_path}")
         self.script.info(f"备份目录: {backup_dir}")
         self.script.info(f"输出目录: {output_dir}")
         self.script.info(f"块大小: {chunk_size}")
+        if backup_file_name:
+            self.script.info(f"指定备份文件: {backup_file_name}")
+        else:
+            self.script.info("将使用最近一次备份文件")
 
         return True
 
@@ -129,9 +172,10 @@ class CompareAssetsUpdateScript:
         # 获取参数
         data = {
             'root_path': self.script.get_parameter('root_path', 'D:\\fishdev\\client\\MainProject\\Assets\\InBundle'),
-            'backup_dir': self.script.get_parameter('backup_dir', '../upload/databackup'),
+            'backup_dir': self.script.get_parameter('backup_dir', 'server/upload/databackup'),
             'output_dir': self.script.get_parameter('output_dir', './result/domesticLogs/checkAssetsUpdateLogs'),
             'chunk_size': self.script.get_parameter('chunk_size', 8192),
+            'backup_file_name': self.script.get_parameter('backup_file_name', ''),  # 新增参数
             'timestamp': time.time()
         }
 
@@ -143,8 +187,8 @@ class CompareAssetsUpdateScript:
         self.script.info("开始处理数据")
 
         try:
-            # 1. 从数据库获取最近备份文件
-            backup_file = self.get_latest_backup_file(data['backup_dir'])
+            # 1. 从数据库获取备份文件
+            backup_file = self.get_backup_file(data['backup_dir'], data['backup_file_name'])
             data['backup_file'] = backup_file
 
             # 2. 加载历史备份数据
@@ -217,30 +261,37 @@ class CompareAssetsUpdateScript:
         if comparison_result['updated_files']:
             summary_lines.append("=== 更新文件列表 ===")
             for i, file_info in enumerate(comparison_result['updated_files'], 1):
-                summary_lines.append(f"{i}. {file_info['file_path']}")
-                summary_lines.append(f"   旧MD5: {file_info['old_md5']}")
-                summary_lines.append(f"   新MD5: {file_info['new_md5']}")
-                summary_lines.append(f"   更新时间: {file_info['new_update_time']}")
+                file_name = os.path.basename(file_info['file_path'])
+                summary_lines.append(f"{i:3d}. {file_name}")
+                summary_lines.append(f"     路径: {file_info['file_path']}")
+                summary_lines.append(f"     旧MD5: {file_info['old_md5']}")
+                summary_lines.append(f"     新MD5: {file_info['new_md5']}")
+                summary_lines.append(f"     更新时间: {file_info['new_update_time']}")
                 summary_lines.append("")
 
         # 新增文件详情
         if comparison_result['added_files']:
             summary_lines.append("=== 新增文件列表 ===")
             for i, file_info in enumerate(comparison_result['added_files'], 1):
-                summary_lines.append(f"{i}. {file_info['file_path']}")
-                summary_lines.append(f"   MD5: {file_info['md5_value']}")
-                summary_lines.append(f"   创建时间: {file_info['update_time']}")
+                file_name = os.path.basename(file_info['file_path'])
+                summary_lines.append(f"{i:3d}. {file_name}")
+                summary_lines.append(f"     路径: {file_info['file_path']}")
+                summary_lines.append(f"     MD5: {file_info['md5_value']}")
+                summary_lines.append(f"     创建时间: {file_info['update_time']}")
                 summary_lines.append("")
 
         # 删除文件详情
         if comparison_result['deleted_files']:
             summary_lines.append("=== 删除文件列表 ===")
             for i, file_info in enumerate(comparison_result['deleted_files'], 1):
-                summary_lines.append(f"{i}. {file_info['file_path']}")
-                summary_lines.append(f"   最后更新: {file_info['last_update_time']}")
-                summary_lines.append(f"   最后MD5: {file_info['last_md5']}")
+                file_name = os.path.basename(file_info['file_path'])
+                summary_lines.append(f"{i:3d}. {file_name}")
+                summary_lines.append(f"     路径: {file_info['file_path']}")
+                summary_lines.append(f"     最后更新: {file_info['last_update_time']}")
+                summary_lines.append(f"     最后MD5: {file_info['last_md5']}")
                 summary_lines.append("")
 
+        summary_lines.append("=" * 60)
         return '\n'.join(summary_lines)
 
     def generate_report(self, data: Dict[str, Any]) -> Dict[str, Any]:
@@ -255,21 +306,77 @@ class CompareAssetsUpdateScript:
         total_changes = total_updated + total_deleted + total_added
 
         # 生成消息
-        if total_changes == 0:
-            message = f"文件更新对比完成 - 没有发现任何变化\n"
-            message += f"扫描目录: {data['root_path']}\n"
-            message += f"备份文件: {os.path.basename(data['backup_file'])}\n"
-            message += f"未变化文件: {total_unchanged} 个\n"
-            message += f"所有文件与备份文件完全一致"
+        backup_file_info = os.path.basename(data['backup_file'])
+        if data.get('backup_file_name'):
+            backup_file_info += f" (指定文件: {data['backup_file_name']})"
         else:
-            message = f"文件更新对比完成 - 发现 {total_changes} 个变化\n"
-            message += f"扫描目录: {data['root_path']}\n"
-            message += f"备份文件: {os.path.basename(data['backup_file'])}\n"
-            message += f"更新文件: {total_updated} 个\n"
-            message += f"删除文件: {total_deleted} 个\n"
-            message += f"新增文件: {total_added} 个\n"
-            message += f"未变化文件: {total_unchanged} 个\n"
-            message += f"总变化数: {total_changes} 个"
+            backup_file_info += " (最近备份)"
+
+        # 构建简洁的消息摘要
+        if total_changes == 0:
+            message = f"文件更新对比完成 - 没有发现任何变化\n扫描目录: {data['root_path']}\n备份文件: {backup_file_info}\n未变化文件: {total_unchanged} 个\n所有文件与备份文件完全一致"
+        else:
+            message = f"文件更新对比完成 - 发现 {total_changes} 个变化\n扫描目录: {data['root_path']}\n备份文件: {backup_file_info}\n更新文件: {total_updated} 个\n删除文件: {total_deleted} 个\n新增文件: {total_added} 个\n未变化文件: {total_unchanged} 个\n总变化数: {total_changes} 个"
+
+        # 构建详细的对比结果报告（用于data字段）
+        detailed_report_lines = []
+        detailed_report_lines.append("=" * 60)
+        detailed_report_lines.append("文件更新对比详细结果")
+        detailed_report_lines.append("=" * 60)
+        detailed_report_lines.append(f"检测时间: {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())}")
+        detailed_report_lines.append("")
+
+        # 基本信息
+        detailed_report_lines.append("=== 基本信息 ===")
+        detailed_report_lines.append(f"扫描目录: {data['root_path']}")
+        detailed_report_lines.append(f"备份文件: {backup_file_info}")
+        detailed_report_lines.append(f"总文件数: {len(data['current_files'])} 个")
+        detailed_report_lines.append("")
+
+        # 变化统计
+        detailed_report_lines.append("=== 变化统计 ===")
+        detailed_report_lines.append(f"更新文件: {total_updated} 个")
+        detailed_report_lines.append(f"删除文件: {total_deleted} 个")
+        detailed_report_lines.append(f"新增文件: {total_added} 个")
+        detailed_report_lines.append(f"未变化文件: {total_unchanged} 个")
+        detailed_report_lines.append(f"总变化数: {total_changes} 个")
+        detailed_report_lines.append("")
+
+        if total_changes > 0:
+            # 详细变化列表
+            if comparison_result['updated_files']:
+                detailed_report_lines.append("=== 更新文件列表 ===")
+                for i, file_info in enumerate(comparison_result['updated_files'], 1):
+                    file_name = os.path.basename(file_info['file_path'])
+                    detailed_report_lines.append(f"{i:3d}. {file_name}")
+                    detailed_report_lines.append(f"     路径: {file_info['file_path']}")
+                    detailed_report_lines.append(f"     旧MD5: {file_info['old_md5']}")
+                    detailed_report_lines.append(f"     新MD5: {file_info['new_md5']}")
+                    detailed_report_lines.append(f"     更新时间: {file_info['new_update_time']}")
+                    detailed_report_lines.append("")
+
+            if comparison_result['added_files']:
+                detailed_report_lines.append("=== 新增文件列表 ===")
+                for i, file_info in enumerate(comparison_result['added_files'], 1):
+                    file_name = os.path.basename(file_info['file_path'])
+                    detailed_report_lines.append(f"{i:3d}. {file_name}")
+                    detailed_report_lines.append(f"     路径: {file_info['file_path']}")
+                    detailed_report_lines.append(f"     MD5: {file_info['md5_value']}")
+                    detailed_report_lines.append(f"     创建时间: {file_info['update_time']}")
+                    detailed_report_lines.append("")
+
+            if comparison_result['deleted_files']:
+                detailed_report_lines.append("=== 删除文件列表 ===")
+                for i, file_info in enumerate(comparison_result['deleted_files'], 1):
+                    file_name = os.path.basename(file_info['file_path'])
+                    detailed_report_lines.append(f"{i:3d}. {file_name}")
+                    detailed_report_lines.append(f"     路径: {file_info['file_path']}")
+                    detailed_report_lines.append(f"     最后更新: {file_info['last_update_time']}")
+                    detailed_report_lines.append(f"     最后MD5: {file_info['last_md5']}")
+                    detailed_report_lines.append("")
+
+        detailed_report_lines.append("=" * 60)
+        detailed_report = "\n".join(detailed_report_lines)
 
         # 生成报告数据
         report = {
@@ -286,6 +393,7 @@ class CompareAssetsUpdateScript:
             },
             'details': comparison_result,
             'comparison_summary': data.get('comparison_summary', ''),
+            'detailed_report': detailed_report,  # 添加详细报告
             'metadata': {
                 'script_name': self.script.script_name,
                 'execution_time': time.time(),
@@ -348,28 +456,51 @@ class CompareAssetsUpdateScript:
             return self.script.error_result(f"对比失败: {e}", "ScriptError")
 
     # 以下是原有的辅助方法，现在作为类方法
-    def get_latest_backup_file(self, backup_dir: str) -> str:
-        """从数据库获取最近一次备份的文件名，并在指定目录中查找该文件"""
+    def get_backup_file(self, backup_dir: str, backup_file_name: str = None) -> str:
+        """从数据库获取备份文件，支持指定文件名或获取最近一次备份"""
         try:
-            self.script.info("开始从数据库获取最近备份文件...")
-
             # 导入Django模型
             FileRecord = get_django_models()
             if FileRecord is None:
                 raise Exception("无法导入Django模型")
 
-            # 查询最近一次备份记录
-            latest_record = FileRecord.objects.order_by('-backup_time').first()
+            if backup_file_name:
+                # 如果指定了备份文件名，则查找该文件
+                self.script.info(f"开始查找指定备份文件: {backup_file_name}")
 
-            if not latest_record:
-                raise Exception("数据库中没有找到任何备份记录")
+                # 查询指定文件名的备份记录
+                backup_record = FileRecord.objects.filter(backup_file_name=backup_file_name).first()
 
-            self.script.info(f"找到最近备份记录: {latest_record.backup_file_name}")
-            self.script.info(f"备份时间: {latest_record.backup_time}")
-            self.script.info(f"备份路径: {latest_record.backup_path}")
+                if not backup_record:
+                    raise Exception(f"数据库中没有找到名为 '{backup_file_name}' 的备份记录")
 
-            # 构建备份文件完整路径
-            backup_file_path = os.path.join(backup_dir, latest_record.backup_file_name)
+                self.script.info(f"找到指定备份记录: {backup_record.backup_file_name}")
+                self.script.info(f"备份时间: {backup_record.backup_time}")
+                self.script.info(f"备份路径: {backup_record.backup_path}")
+
+            else:
+                # 如果没有指定文件名，则获取最近一次备份
+                self.script.info("开始从数据库获取最近备份文件...")
+
+                # 查询最近一次备份记录
+                backup_record = FileRecord.objects.order_by('-backup_time').first()
+
+                if not backup_record:
+                    raise Exception("数据库中没有找到任何备份记录")
+
+                self.script.info(f"找到最近备份记录: {backup_record.backup_file_name}")
+                self.script.info(f"备份时间: {backup_record.backup_time}")
+                self.script.info(f"备份路径: {backup_record.backup_path}")
+
+            # 构建备份文件完整路径 - 优先使用数据库中的backup_path
+            backup_file_path = os.path.join(backup_record.backup_path, backup_record.backup_file_name)
+
+            # 如果数据库路径不存在，尝试使用backup_dir参数作为备用路径
+            if not os.path.exists(backup_file_path):
+                self.script.warning(f"数据库路径不存在: {backup_file_path}")
+                backup_dir = self.script.get_parameter('backup_dir', '../upload/databackup')
+                backup_file_path = os.path.join(backup_dir, backup_record.backup_file_name)
+                self.script.info(f"尝试备用路径: {backup_file_path}")
 
             if not os.path.exists(backup_file_path):
                 raise FileNotFoundError(f"备份文件不存在: {backup_file_path}")
@@ -378,7 +509,7 @@ class CompareAssetsUpdateScript:
             return backup_file_path
 
         except Exception as e:
-            self.script.error(f"获取最近备份文件失败: {e}")
+            self.script.error(f"获取备份文件失败: {e}")
             raise
 
     def load_backup_data(self, backup_file_path: str) -> list:
@@ -596,28 +727,34 @@ class CompareAssetsUpdateScript:
             if comparison_result['updated_files']:
                 report_lines.append("=== 更新文件列表 ===")
                 for i, file_info in enumerate(comparison_result['updated_files'], 1):
-                    report_lines.append(f"{i}. {file_info['file_path']}")
-                    report_lines.append(f"   旧MD5: {file_info['old_md5']}")
-                    report_lines.append(f"   新MD5: {file_info['new_md5']}")
-                    report_lines.append(f"   更新时间: {file_info['new_update_time']}")
+                    file_name = os.path.basename(file_info['file_path'])
+                    report_lines.append(f"{i:3d}. {file_name}")
+                    report_lines.append(f"     路径: {file_info['file_path']}")
+                    report_lines.append(f"     旧MD5: {file_info['old_md5']}")
+                    report_lines.append(f"     新MD5: {file_info['new_md5']}")
+                    report_lines.append(f"     更新时间: {file_info['new_update_time']}")
                     report_lines.append("")
 
             # 新增文件详情
             if comparison_result['added_files']:
                 report_lines.append("=== 新增文件列表 ===")
                 for i, file_info in enumerate(comparison_result['added_files'], 1):
-                    report_lines.append(f"{i}. {file_info['file_path']}")
-                    report_lines.append(f"   MD5: {file_info['md5_value']}")
-                    report_lines.append(f"   创建时间: {file_info['update_time']}")
+                    file_name = os.path.basename(file_info['file_path'])
+                    report_lines.append(f"{i:3d}. {file_name}")
+                    report_lines.append(f"     路径: {file_info['file_path']}")
+                    report_lines.append(f"     MD5: {file_info['md5_value']}")
+                    report_lines.append(f"     创建时间: {file_info['update_time']}")
                     report_lines.append("")
 
             # 删除文件详情
             if comparison_result['deleted_files']:
                 report_lines.append("=== 删除文件列表 ===")
                 for i, file_info in enumerate(comparison_result['deleted_files'], 1):
-                    report_lines.append(f"{i}. {file_info['file_path']}")
-                    report_lines.append(f"   最后更新: {file_info['last_update_time']}")
-                    report_lines.append(f"   最后MD5: {file_info['last_md5']}")
+                    file_name = os.path.basename(file_info['file_path'])
+                    report_lines.append(f"{i:3d}. {file_name}")
+                    report_lines.append(f"     路径: {file_info['file_path']}")
+                    report_lines.append(f"     最后更新: {file_info['last_update_time']}")
+                    report_lines.append(f"     最后MD5: {file_info['last_md5']}")
                     report_lines.append("")
 
             # 保存报告
@@ -642,4 +779,15 @@ def main_logic(script: ScriptBase) -> Dict[str, Any]:
 
 
 if __name__ == '__main__':
-    create_simple_script('compareAssetsUpdate', main_logic)
+    try:
+        print("启动文件更新对比脚本...")
+
+        # 创建脚本实例
+        create_simple_script('compareAssetsUpdate', main_logic)
+
+        print("脚本执行完成")
+
+    except Exception as e:
+        print(f"脚本启动失败: {e}")
+        print(f"错误详情: {traceback.format_exc()}")
+        sys.exit(1)

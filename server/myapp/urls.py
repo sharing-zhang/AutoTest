@@ -30,6 +30,11 @@ urlpatterns = [
     path('admin/scanDevUpdate/scanResultdetail', views.admin.scanDevUpdate.detail),
     path('admin/scanDevUpdate/scanResultsendmessage', views.admin.scanDevUpdate.sendmessage),
     path('admin/scanDevUpdate/scanResultrerun', views.admin.scanDevUpdate.rerun_script),
+    path('admin/scanDevUpdate/backupList', views.admin.scanDevUpdate.backup_list_api),
+    path('admin/scanDevUpdate/backupPathOptions', views.admin.scanDevUpdate.backup_path_options_api),
+    path('admin/scanDevUpdate/backupFileNameOptions', views.admin.scanDevUpdate.backup_file_name_options_api),
+    # CheckAssetUpdata页面专用的扫描结果API
+    path('admin/scanDevUpdate/checkAssetScanResultList', views.admin.scanDevUpdate.check_asset_scan_result_list_api),
 
     path('admin/thing/list', views.admin.thing.list_api),
     path('admin/thing/detail', views.admin.thing.detail),
@@ -48,8 +53,8 @@ urlpatterns = [
     path('api/create-frontend-page/', views.page_creator.create_frontend_page),
     
     # 真实控制台抓取API
-    path('api/real-console/fetch/', views.fetch_real_console_messages),
-    path('api/real-console/monitor/', views.monitor_console_realtime),
+    # path('api/real-console/fetch/', views.fetch_real_console_messages),
+    # path('api/real-console/monitor/', views.monitor_console_realtime),
 
     path('admin/loginLog/list', views.admin.loginLog.list_api),
     path('admin/loginLog/create', views.admin.loginLog.create),

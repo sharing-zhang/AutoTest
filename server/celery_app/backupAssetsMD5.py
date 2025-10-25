@@ -131,15 +131,39 @@ class BackupAssetsMD5Script:
             self.script.info("开始初始化数据")
 
             # 获取参数
+            root_path = self.script.get_parameter('root_path', 'D:\\fishdev\\client\\MainProject\\Assets\\InBundle')
+            backup_dir = self.script.get_parameter('backup_dir', 'server/upload/databackup')
+
+            # 确保备份目录是绝对路径
+            if not os.path.isabs(backup_dir):
+                # 获取项目根目录，然后构建绝对路径
+                script_dir = os.path.dirname(os.path.abspath(__file__))
+                project_root = os.path.dirname(os.path.dirname(script_dir))  # 项目根目录
+                backup_dir = os.path.join(project_root, backup_dir)
+                backup_dir = os.path.abspath(backup_dir)
+
+            self.script.info(f"备份目录路径: {backup_dir}")
+
+            # 验证并创建备份目录
+            if not os.path.exists(backup_dir):
+                self.script.info(f"备份目录不存在，正在创建: {backup_dir}")
+                os.makedirs(backup_dir, exist_ok=True)
+                self.script.info("备份目录创建成功")
+            else:
+                self.script.info("备份目录已存在")
+
+            # 验证目录是否可写
+            if not os.access(backup_dir, os.W_OK):
+                raise PermissionError(f"备份目录无写入权限: {backup_dir}")
+
             data = {
-                'root_path': self.script.get_parameter('root_path',
-                                                       'D:\\fishdev\\client\\MainProject\\Assets\\InBundle'),
-                'backup_dir': self.script.get_parameter('backup_dir', '../upload/databackup'),
+                'root_path': root_path,
+                'backup_dir': backup_dir,
                 'chunk_size': self.script.get_parameter('chunk_size', 8192),
                 'timestamp': time.time()
             }
 
-            self.script.debug(f"初始化数据完成")
+            self.script.debug(f"初始化数据完成: {data}")
             return data
         except Exception as e:
             self.script.error(f"初始化数据时出错: {e}")
@@ -163,7 +187,7 @@ class BackupAssetsMD5Script:
                     file_count += 1
 
                     # 每1000个文件报告一次进度，避免内存过度使用
-                    if file_count % 1000 == 0:
+                    if file_count % 1000 == 0: 
                         self.script.info(f"已扫描 {file_count} 个文件...")
                         # 强制垃圾回收
                         gc.collect()
@@ -255,30 +279,60 @@ class BackupAssetsMD5Script:
         保存备份数据到文件
         """
         try:
+            self.script.info(f"开始保存备份数据到目录: {backup_dir}")
+
             # 确保备份目录存在
             backup_path = Path(backup_dir)
-            backup_path.mkdir(parents=True, exist_ok=True)
+            if not backup_path.exists():
+                self.script.info(f"备份目录不存在，正在创建: {backup_path}")
+                backup_path.mkdir(parents=True, exist_ok=True)
+                self.script.info("备份目录创建成功")
+
+            # 验证目录是否可写
+            if not os.access(str(backup_path), os.W_OK):
+                raise PermissionError(f"备份目录无写入权限: {backup_path}")
 
             # 生成备份文件名
             timestamp = time.strftime("%Y%m%d_%H%M%S", time.localtime())
             backup_filename = f"Assets_{timestamp}.txt"
             backup_file_path = backup_path / backup_filename
 
+            self.script.info(f"备份文件路径: {backup_file_path}")
+
             # 保存数据 - 使用更安全的方式
             self.script.info(f"开始保存 {len(backup_data)} 条记录到文件...")
 
-            with open(backup_file_path, 'w', encoding='utf-8') as f:
-                # 分批写入，避免内存问题
-                for i, data_item in enumerate(backup_data):
-                    f.write(str(data_item) + '\n')
-                    if i % 1000 == 0:
-                        f.flush()  # 定期刷新缓冲区
+            try:
+                with open(backup_file_path, 'w', encoding='utf-8') as f:
+                    # 分批写入，避免内存问题
+                    for i, data_item in enumerate(backup_data):
+                        f.write(str(data_item) + '\n')
+                        if i % 1000 == 0:
+                            f.flush()  # 定期刷新缓冲区
 
-            self.script.info(f"备份数据已保存到: {backup_file_path}")
-            return str(backup_file_path)
+                # 验证文件是否成功创建
+                if not backup_file_path.exists():
+                    raise FileNotFoundError(f"备份文件创建失败: {backup_file_path}")
+
+                # 检查文件大小
+                file_size = backup_file_path.stat().st_size
+                if file_size == 0:
+                    raise ValueError("备份文件为空")
+
+                self.script.info(f"✓ 备份数据已成功保存到: {backup_file_path}")
+                self.script.info(f"✓ 文件大小: {file_size} 字节")
+                return str(backup_file_path)
+
+            except IOError as io_error:
+                self.script.error(f"文件写入失败: {io_error}")
+                raise
+            except Exception as write_error:
+                self.script.error(f"写入数据时出错: {write_error}")
+                raise
 
         except Exception as e:
             self.script.error(f"保存备份数据时出错: {e}")
+            self.script.error(f"错误详情: {traceback.format_exc()}")
             raise
 
     def save_backup_record_to_db(self, backup_file_path: str, root_path: str) -> bool:
@@ -545,4 +599,3 @@ if __name__ == '__main__':
     except Exception as e:
         print(f"脚本启动失败: {e}")
         print(f"错误详情: {traceback.format_exc()}")
-        sys.exit(1)

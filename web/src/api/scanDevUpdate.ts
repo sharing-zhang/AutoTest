@@ -13,6 +13,14 @@ enum URL {
     sendmessage = '/myapp/admin/scanDevUpdate/scanResultsendmessage',
     // 重跑脚本接口
     rerunScript = '/myapp/admin/scanDevUpdate/scanResultrerun',
+    // 备份数据列表接口
+    backupList = '/myapp/admin/scanDevUpdate/backupList',
+    // 备份路径选项接口
+    backupPathOptions = '/myapp/admin/scanDevUpdate/backupPathOptions',
+    // 备份文件名选项接口
+    backupFileNameOptions = '/myapp/admin/scanDevUpdate/backupFileNameOptions',
+    // CheckAssetUpdata页面专用的扫描结果接口
+    checkAssetScanResultList = '/myapp/admin/scanDevUpdate/checkAssetScanResultList',
     // ViewSet API 路由
     listScripts = '/myapp/api/scripts/',
     scriptDetail = '/myapp/api/scripts/',
@@ -41,6 +49,18 @@ const sendmessageApi = async (params:any, data: any) =>
 const rerunScriptApi = async (params: any) =>
     post<any>({ url: URL.rerunScript, params: params, data: {}, headers: { 'Content-Type': 'application/json' } });
 
+//备份数据列表接口
+const backupListApi = async (params: any = {}) => get<any>({ url: URL.backupList, params: params, headers: {} });
+
+//备份路径选项接口
+const backupPathOptionsApi = async (params: any = {}) => get<any>({ url: URL.backupPathOptions, params: params, headers: {} });
+
+//备份文件名选项接口
+const backupFileNameOptionsApi = async (params: any = {}) => get<any>({ url: URL.backupFileNameOptions, params: params, headers: {} });
+
+//CheckAssetUpdata页面专用的扫描结果接口
+const checkAssetScanResultListApi = async (params: any = {}) => get<any>({ url: URL.checkAssetScanResultList, params: params, headers: {} });
+
 // ViewSet API 函数
 const listScriptsApi = async (params: any = {}) => get<any>({ url: URL.listScripts, params: params, headers: {} });
 const getScriptDetailApi = async (scriptId: number) => get<any>({ url: `${URL.scriptDetail}/${scriptId}`, params: {}, headers: {} });
@@ -63,7 +83,7 @@ const cancelTaskApi = async (executionId: number) => post<any>({ url: `${URL.can
 const getPageConfigsApi = (pageRoute: string) => get<any>({ url: `${URL.pageConfigs}?page_route=${encodeURIComponent(pageRoute)}` });
 
 export { 
-    listApi, createApi, updateApi, deleteApi, detailApi, sendmessageApi, rerunScriptApi,
+    listApi, createApi, updateApi, deleteApi, detailApi, sendmessageApi, rerunScriptApi, backupListApi, backupPathOptionsApi, backupFileNameOptionsApi, checkAssetScanResultListApi,
     listScriptsApi, getScriptDetailApi, getPageConfigsApi,
     executeScriptApi, getScriptTaskResultApi, cancelTaskApi
 };
