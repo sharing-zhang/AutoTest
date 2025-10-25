@@ -4,15 +4,7 @@
 文本质量检查脚本
 
 功能:
-- 接收参数: directory(目录), file_name(文件名), field(可选，键名)
-- 读取目标文件内容，按条目提取文本
-- 调用 DeepSeek Chat Completions API，对条目进行语法/错别字等文本问题分析
-- 返回包含每条目的问题列表与建议
-
-环境变量:
-- DEEPSEEK_API_KEY (必填)
-- DEEPSEEK_API_BASE (可选，默认 https://api.deepseek.com)
-- DEEPSEEK_MODEL    (可选，默认 deepseek-v3.1)
+中文文本质量检查脚本-调用AI模型检查中文配置文本中的错别字、语病等，给出问题和建议
 """
 
 import os

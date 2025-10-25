@@ -36,6 +36,31 @@ def read_file_text(script: ScriptBase, path: str) -> Optional[str]:
         return None
 
 
+def clean_text_entry(text: str) -> str:
+    """清理文本条目，移除不需要的标识"""
+    if not text:
+        return text
+    
+    # 只移除明确不需要的前缀，保留正常的文本内容
+    # 只有当文本确实以这些前缀开头时才移除
+    original_text = text
+    
+    # 移除可能的前缀标识，但要确保不会误删正常内容
+    if text.startswith('English=') and len(text) > 8:
+        text = text[8:].strip()
+    elif text.startswith('Chinese=') and len(text) > 8:
+        text = text[8:].strip()
+    elif text.startswith('Japanese=') and len(text) > 9:
+        text = text[9:].strip()
+    elif text.startswith('Korean=') and len(text) > 7:
+        text = text[7:].strip()
+    
+    # 如果清理后的文本为空，返回原始文本
+    if not text.strip():
+        return original_text
+    
+    return text
+
 def extract_entries(script: ScriptBase, content: str, field: Optional[str]) -> List[str]:
     """从文件内容中提取待检查的文本条目"""
     entries: List[str] = []
@@ -46,7 +71,7 @@ def extract_entries(script: ScriptBase, content: str, field: Optional[str]) -> L
         pattern = rf'\b{re.escape(field)}\s*=\s*"([^"]+)"'
         matches = re.findall(pattern, content)
         if matches:
-            entries.extend([m.strip() for m in matches if m.strip()])
+            entries.extend([clean_text_entry(m.strip()) for m in matches if m.strip()])
 
         # 作为配置块名称匹配
         if not entries:
@@ -56,13 +81,13 @@ def extract_entries(script: ScriptBase, content: str, field: Optional[str]) -> L
                 pairs = re.findall(r'(\w+)\s*=\s*"([^"]+)"', block)
                 for k, v in pairs:
                     if (k in candidate_keys or not entries) and v.strip():
-                        entries.append(v.strip())
+                        entries.append(clean_text_entry(v.strip()))
     else:
         # 按行提取
         for line in content.splitlines():
             line = line.strip()
             if line:
-                entries.append(line)
+                entries.append(clean_text_entry(line))
 
     script.info(f"提取到 {len(entries)} 个文本条目")
     return entries
@@ -129,44 +154,50 @@ def _process_batch(script: ScriptBase, url: str, headers: dict, model_candidates
     # 根据语言检查类型生成不同的提示词
     if language_check == "中英翻译检查":
         prompt = (
-            "你是专业的中英文翻译质量检查助手。请检查以下文本对的翻译质量，重点关注："
-            "1. 翻译准确性：中文原文和英文译文的意思是否一致"
-            "2. 语言流畅性：英文译文是否符合英语的表达习惯"
-            "3. 术语一致性：专业术语翻译是否统一"
-            "4. 文化适应性：英文译文是否适合英语文化背景"
-            "5. 语法正确性：英文译文语法是否正确"
-            "输出JSON数组，格式：[{\"index\": 0, \"original\": \"原文\", \"issues\": [\"问题1\"], \"suggestions\": [\"建议1\"]}]"
+            "你是专业的中英文翻译质量检查助手。每个输入的text格式为'中文: 原文字 | 英文: 译文字'。\n"
+            "请解析出中文原文和英文译文，然后按照以下三个层面检查翻译质量：\n"
+            "1. 明显翻译错误（最严重）：检查中文原文和英文译文的意思是否严重不符，是否存在根本性理解错误\n"
+            "2. 语法错误（次严重）：检查英文译文的语法是否正确，时态、语态、主谓一致等是否符合英语语法规范\n"
+            "3. 优化建议（轻微）：提供更自然、更地道的英文表达建议，提升译文质量\n"
+            "如果没有发现任何明显翻译错误，则在issues数组中填写['无明显错误即可']。\n"
+            "输出JSON数组，格式：[{\"index\": 0, \"original\": \"原文\", \"translation\": \"译文\", \"issues\": [\"问题1\"], \"suggestions\": [\"建议1\"]}]"
         )
     elif language_check == "中日翻译检查":
         prompt = (
-            "你是专业的中日文翻译质量检查助手。请检查以下文本对的翻译质量，重点关注："
-            "1. 翻译准确性：中文原文和日文译文的意思是否一致"
-            "2. 语言流畅性：日文译文是否符合日语的表达习惯"
-            "3. 术语一致性：专业术语翻译是否统一"
-            "4. 文化适应性：日文译文是否适合日本文化背景"
-            "5. 语法正确性：日文译文语法是否正确"
-            "6. 敬语使用：日文敬语使用是否恰当"
-            "输出JSON数组，格式：[{\"index\": 0, \"original\": \"原文\", \"issues\": [\"问题1\"], \"suggestions\": [\"建议1\"]}]"
+            "你是专业的中日文翻译质量检查助手。每个输入的text格式为'中文: 原文字 | 日文: 译文字'。\n"
+            "请解析出中文原文和日文译文，然后按照以下三个层面检查翻译质量：\n"
+            "1. 明显翻译错误（最严重）：检查中文原文和日文译文的意思是否严重不符，是否存在根本性理解错误\n"
+            "2. 语法错误（次严重）：检查日文译文的语法是否正确，助词使用、敬语表达、语序等是否符合日语语法规范\n"
+            "3. 优化建议（轻微）：提供更自然、更地道的日文表达建议，提升译文质量\n"
+            "如果没有发现任何明显翻译错误，则在issues数组中填写['无明显错误即可']。\n"
+            "输出JSON数组，格式：[{\"index\": 0, \"original\": \"原文\", \"translation\": \"译文\", \"issues\": [\"问题1\"], \"suggestions\": [\"建议1\"]}]"
         )
     elif language_check == "中韩翻译检查":
         prompt = (
-            "你是专业的中韩文翻译质量检查助手。请检查以下文本对的翻译质量，重点关注："
-            "1. 翻译准确性：中文原文和韩文译文的意思是否一致"
-            "2. 语言流畅性：韩文译文是否符合韩语的表达习惯"
-            "3. 术语一致性：专业术语翻译是否统一"
-            "4. 文化适应性：韩文译文是否适合韩国文化背景"
-            "5. 语法正确性：韩文译文语法是否正确"
-            "6. 敬语使用：韩文敬语使用是否恰当"
-            "输出JSON数组，格式：[{\"index\": 0, \"original\": \"原文\", \"issues\": [\"问题1\"], \"suggestions\": [\"建议1\"]}]"
+            "你是专业的中韩文翻译质量检查助手。每个输入的text格式为'中文: 原文字 | 韩文: 译文字'。\n"
+            "请解析出中文原文和韩文译文，然后按照以下三个层面检查翻译质量：\n"
+            "1. 明显翻译错误（最严重）：检查中文原文和韩文译文的意思是否严重不符，是否存在根本性理解错误\n"
+            "2. 语法错误（次严重）：检查韩文译文的语法是否正确，语序、敬语等是否符合韩语规范\n"
+            "3. 优化建议（轻微）：提供更自然、更地道的韩文表达建议，提升译文质量\n"
+            "如果没有发现任何明显翻译错误，则在issues数组中填写['无明显错误即可']。\n"
+            "输出JSON数组，格式：[{\"index\": 0, \"original\": \"原文\", \"translation\": \"译文\", \"issues\": [\"问题1\"], \"suggestions\": [\"建议1\"]}]"
+        )
+    elif language_check == "英中翻译检查":
+        prompt = (
+            "你是专业的英中翻译质量检查助手。每个输入的text格式为'英文: 原文字 | 中文: 译文字'。\n"
+            "请解析出英文原文和中文译文，然后按照以下三个层面检查翻译质量：\n"
+            "1. 明显翻译错误（最严重）：检查英文原文和中文译文的意思是否严重不符，是否存在根本性理解错误\n"
+            "2. 语法错误（次严重）：检查中文译文的语法是否正确，语序、表达等是否符合中文规范\n"
+            "3. 优化建议（轻微）：提供更自然、更地道的中文表达建议，提升译文质量\n"
+            "如果没有发现任何明显翻译错误，则在issues数组中填写['无明显错误即可']。\n"
+            "输出JSON数组，格式：[{\"index\": 0, \"original\": \"原文\", \"translation\": \"译文\", \"issues\": [\"问题1\"], \"suggestions\": [\"建议1\"]}]"
         )
     else:
         prompt = (
-            "你是专业的翻译质量检查助手。请检查以下文本对的翻译质量，重点关注："
-            "1. 翻译准确性：原文和译文的意思是否一致"
-            "2. 语言流畅性：译文是否符合目标语言的表达习惯"
-            "3. 术语一致性：专业术语翻译是否统一"
-            "4. 文化适应性：译文是否适合目标语言的文化背景"
-            "5. 语法正确性：译文语法是否正确"
+            "你是专业的翻译质量检查助手。请按照以下三个层面检查文本对的翻译质量：\n"
+            "1. 明显翻译错误（最严重）：检查原文和译文的意思是否严重不符，是否存在根本性理解错误\n"
+            "2. 语法错误（次严重）：检查译文的语法是否正确，是否符合目标语言的语法规范\n"
+            "3. 优化建议（轻微）：提供更自然、更地道的表达建议，提升译文质量\n"
             "输出JSON数组，格式：[{\"index\": 0, \"original\": \"原文\", \"issues\": [\"问题1\"], \"suggestions\": [\"建议1\"]}]"
         )
 
@@ -251,6 +282,8 @@ def format_detailed_message(script: ScriptBase, ds_result: Dict[str, Any]) -> st
             continue
 
         original = item.get('original', '')
+        translation = item.get('translation', '')
+
         issues = item.get('issues', [])
         suggestions = item.get('suggestions', [])
 
@@ -261,7 +294,9 @@ def format_detailed_message(script: ScriptBase, ds_result: Dict[str, Any]) -> st
         if not valid_issues and not valid_suggestions:
             continue
 
-        lines.append(f"【第{idx}条】 {original}")
+        lines.append(f"【第{idx}条】")
+        lines.append(f"原文: {original}")
+        lines.append(f"译文: {translation}")
 
         if valid_issues:
             problem_count += len(valid_issues)
@@ -400,10 +435,26 @@ def process_dual_file_mode(script: ScriptBase, language_check: str) -> Dict[str,
         combined_entries = []
         max_len = max(len(entries1), len(entries2))
         
+        # 根据翻译类型确定原文和译文的标识
+        if "中英" in language_check:
+            original_label = "中文"
+            target_label = "英文"
+        elif "中日" in language_check:
+            original_label = "中文"
+            target_label = "日文"
+        elif "中韩" in language_check:
+            original_label = "中文"
+            target_label = "韩文"
+        else:
+            original_label = "原文"
+            target_label = "译文"
+        
         for i in range(max_len):
             entry1 = entries1[i] if i < len(entries1) else ""
             entry2 = entries2[i] if i < len(entries2) else ""
-            combined_entries.append(f"文件1: {entry1} | 文件2: {entry2}")
+            # 添加调试信息
+            script.info(f"合并条目 {i+1}: {original_label}='{entry1}', {target_label}='{entry2}'")
+            combined_entries.append(f"{original_label}: {entry1} | {target_label}: {entry2}")
 
         script.info(f"合并后共 {len(combined_entries)} 个条目进行{language_check}")
 
@@ -486,10 +537,26 @@ def process_single_file_mode(script: ScriptBase, language_check: str) -> Dict[st
         combined_entries = []
         max_len = max(len(chinese_entries), len(foreign_entries))
         
+        # 根据翻译类型确定原文和译文的标识
+        if "中英" in language_check:
+            original_label = "中文"
+            target_label = "英文"
+        elif "中日" in language_check:
+            original_label = "中文"
+            target_label = "日文"
+        elif "中韩" in language_check:
+            original_label = "中文"
+            target_label = "韩文"
+        else:
+            original_label = "中文"
+            target_label = "外文"
+        
         for i in range(max_len):
             chinese_text = chinese_entries[i] if i < len(chinese_entries) else ""
             foreign_text = foreign_entries[i] if i < len(foreign_entries) else ""
-            combined_entries.append(f"中文: {chinese_text} | 外文: {foreign_text}")
+            # 添加调试信息
+            script.info(f"合并条目 {i+1}: {original_label}='{chinese_text}', {target_label}='{foreign_text}'")
+            combined_entries.append(f"{original_label}: {chinese_text} | {target_label}: {foreign_text}")
 
         script.info(f"合并后共 {len(combined_entries)} 个条目进行{language_check}")
 
